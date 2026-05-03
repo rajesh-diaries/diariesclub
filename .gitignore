@@ -1,0 +1,28 @@
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+.fvm/
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Environment / secrets — NEVER commit
+env/*.json
+!env/.gitkeep
+.env
+.env.local
+*.keystore
+*.jks
+ios/Runner/GoogleService-Info.plist
+android/app/google-services.json
+
+# OS
+Thumbs.db
