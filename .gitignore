@@ -1,4 +1,6 @@
-# Flutter
+# ===========================================================================
+# Flutter / Dart
+# ===========================================================================
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
@@ -7,22 +9,64 @@
 .pub/
 build/
 .fvm/
-.DS_Store
 
+# ===========================================================================
+# iOS
+# ===========================================================================
+ios/Flutter/.last_build_id
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Pods/
+ios/.symlinks/
+ios/Runner.xcworkspace/xcuserdata/
+ios/Runner.xcodeproj/xcuserdata/
+ios/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+**/DerivedData/
+
+# ===========================================================================
+# Android
+# ===========================================================================
+android/.gradle/
+android/captures/
+android/local.properties
+android/key.properties
+android/app/debug
+android/app/profile
+android/app/release
+android/app/google-services.json
+*.keystore
+*.jks
+
+# ===========================================================================
 # IDE
+# ===========================================================================
 .idea/
 .vscode/
 *.iml
 
+# ===========================================================================
+# OS
+# ===========================================================================
+.DS_Store
+Thumbs.db
+
+# ===========================================================================
 # Environment / secrets — NEVER commit
+# ===========================================================================
 env/*.json
-!env/.gitkeep
+!env/*.example.json
 .env
 .env.local
-*.keystore
-*.jks
-ios/Runner/GoogleService-Info.plist
-android/app/google-services.json
 
-# OS
-Thumbs.db
+# ===========================================================================
+# Firebase / Branch — platform config files (per-flavor, never commit)
+# ===========================================================================
+ios/Runner/GoogleService-Info.plist
+ios/Runner/dev/GoogleService-Info.plist
+ios/Runner/staging/GoogleService-Info.plist
+ios/Runner/prod/GoogleService-Info.plist
+
+# ===========================================================================
+# Generated code — KEEP COMMITTED per Q7 (smoother onboarding)
+# (No exclusions for *.g.dart / *.freezed.dart / *.gr.dart)
+# ===========================================================================
