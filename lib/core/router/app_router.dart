@@ -30,8 +30,9 @@ import '../../features/profile/pre_booking_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/profile/referral_details_screen.dart';
 import '../../features/profile/wallet_history_screen.dart';
+import '../../features/gamification/card_unboxing_screen.dart';
+import '../../features/gamification/reflection_screen.dart';
 import '../../features/reactivation/reactivation_screen.dart';
-import '../../features/recap/reflection_screen.dart';
 import '../../features/session/pre_book_screen.dart';
 import '../../features/sessions/session_qr_screen.dart';
 import '../../features/sessions/session_start_screen.dart';
@@ -324,8 +325,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/reflection/:sessionId',
         name: 'reflection',
+        parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) =>
             ReflectionScreen(sessionId: state.pathParameters['sessionId']!),
+      ),
+
+      // ── Hero card unboxing (entered from healthy_bite_distribute) ─────
+      GoRoute(
+        path: '/cards/unbox/:collectionId',
+        name: 'card_unbox',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => CardUnboxingScreen(
+          collectionId: state.pathParameters['collectionId']!,
+        ),
       ),
 
       // ── Bottom-nav shell with 4 main tabs ─────────────────────────────
