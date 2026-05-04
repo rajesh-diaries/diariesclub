@@ -14,7 +14,22 @@ import '../../features/onboarding/add_child_screen.dart';
 import '../../features/onboarding/child_details_screen.dart';
 import '../../features/onboarding/family_name_screen.dart';
 import '../../features/onboarding/hero_pick_screen.dart';
+import '../../features/profile/add_child_screen.dart' as profile_add_child;
+import '../../features/profile/delete_account_screen.dart';
+import '../../features/profile/edit_child_screen.dart';
+import '../../features/profile/farewell_screen.dart';
+import '../../features/profile/help_screen.dart';
+import '../../features/profile/language_screen.dart';
+import '../../features/profile/notifications_settings_screen.dart';
+import '../../features/profile/past_birthdays_screen.dart';
+import '../../features/profile/past_orders_screen.dart';
+import '../../features/profile/past_session_detail_screen.dart';
+import '../../features/profile/past_sessions_screen.dart';
+import '../../features/profile/past_workshops_screen.dart';
+import '../../features/profile/pre_booking_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/profile/referral_details_screen.dart';
+import '../../features/profile/wallet_history_screen.dart';
 import '../../features/reactivation/reactivation_screen.dart';
 import '../../features/recap/reflection_screen.dart';
 import '../../features/session/pre_book_screen.dart';
@@ -30,8 +45,14 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
 // Routes the user can hit while signed out. Anything else is redirected to
-// /auth/phone by the redirect callback.
-const _publicPathPrefixes = <String>['/auth/', '/update-required', '/welcome-back'];
+// /auth/phone by the redirect callback. /farewell is the post-deletion
+// landing — by definition the user is signed out by the time they see it.
+const _publicPathPrefixes = <String>[
+  '/auth/',
+  '/update-required',
+  '/welcome-back',
+  '/farewell',
+];
 
 bool _isPublic(String location) {
   if (location == '/') return true; // Splash always public.
@@ -138,6 +159,102 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/welcome-back',
         name: 'reactivation_welcome',
         builder: (context, state) => const ReactivationWelcomeScreen(),
+      ),
+
+      // ── Profile sub-screens (Session 5b) ──────────────────────────────
+      GoRoute(
+        path: '/profile/add-child',
+        name: 'profile_add_child',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const profile_add_child.AddChildScreen(),
+      ),
+      GoRoute(
+        path: '/profile/child/:childId',
+        name: 'profile_edit_child',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => EditChildScreen(
+          childId: state.pathParameters['childId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/profile/referral-details',
+        name: 'profile_referral_details',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ReferralDetailsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/wallet-history',
+        name: 'profile_wallet_history',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const WalletHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/profile/pre-book',
+        name: 'profile_pre_book',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PreBookingScreen(),
+      ),
+      GoRoute(
+        path: '/profile/sessions',
+        name: 'profile_sessions',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PastSessionsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/sessions/:sessionId',
+        name: 'profile_session_detail',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => PastSessionDetailScreen(
+          sessionId: state.pathParameters['sessionId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/profile/orders',
+        name: 'profile_orders',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PastOrdersScreen(),
+      ),
+      GoRoute(
+        path: '/profile/workshops',
+        name: 'profile_workshops',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PastWorkshopsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/birthdays',
+        name: 'profile_birthdays',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PastBirthdaysScreen(),
+      ),
+      GoRoute(
+        path: '/profile/notifications-settings',
+        name: 'profile_notifications_settings',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const NotificationsSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/language',
+        name: 'profile_language',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const LanguageScreen(),
+      ),
+      GoRoute(
+        path: '/profile/help',
+        name: 'profile_help',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const HelpScreen(),
+      ),
+      GoRoute(
+        path: '/profile/delete-account',
+        name: 'profile_delete_account',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const DeleteAccountScreen(),
+      ),
+      GoRoute(
+        path: '/farewell',
+        name: 'farewell',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const FarewellScreen(),
       ),
 
       // ── Birthday funnel ───────────────────────────────────────────────
