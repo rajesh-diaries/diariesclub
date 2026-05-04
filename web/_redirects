@@ -1,0 +1,3 @@
+# SPA fallback: everything that isn't a real file → index.html (200 OK,
+# not a 301) so go_router can resolve the deep link client-side.
+/*    /index.html   200

@@ -1,0 +1,25 @@
+# Cloudflare Pages config for the admin web flavor.
+#
+# Build locally:
+#   flutter build web --release \
+#     -t lib/main_admin_prod.dart \
+#     --dart-define-from-file=env/admin_prod.json
+#
+# Deploy:
+#   npx wrangler pages deploy build/web --project-name=diariesclub-admin
+#
+# (admin_prod.dart entry + env/admin_prod.json to be added in the
+# pre-launch session; this file lands now so Cloudflare config is checked
+# in alongside the rest of Session 11's surface area.)
+
+name = "diariesclub-admin"
+compatibility_date = "2026-05-04"
+
+pages_build_output_dir = "build/web"
+
+# Single-page app routing: every unmatched URL serves index.html so go_router
+# can resolve client-side. Cloudflare Pages reads this from web/_redirects;
+# the entry below mirrors it for the wrangler CLI.
+[[routes]]
+pattern = "/*"
+script = "index.html"

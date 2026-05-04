@@ -7,6 +7,11 @@ enum Flavor {
   // StaffApp instead of DiariesClubApp; see lib/app.dart.
   staffDev,
   staffProd,
+  // Admin web flavors (Session 11). Web-first; bundle id
+  // com.diariesclub.admin reserved for a future Electron wrap. Admin
+  // flavors render AdminApp.
+  adminDev,
+  adminProd,
 }
 
 /// OTP delivery mode (Session 4).
@@ -46,12 +51,22 @@ class FlavorConfig {
     required this.otpMode,
   });
 
-  bool get isProd => flavor == Flavor.prod || flavor == Flavor.staffProd;
-  bool get isDev => flavor == Flavor.dev || flavor == Flavor.staffDev;
+  bool get isProd =>
+      flavor == Flavor.prod ||
+      flavor == Flavor.staffProd ||
+      flavor == Flavor.adminProd;
+  bool get isDev =>
+      flavor == Flavor.dev ||
+      flavor == Flavor.staffDev ||
+      flavor == Flavor.adminDev;
   bool get isStaff =>
       flavor == Flavor.staffDev || flavor == Flavor.staffProd;
   bool get isStaffDev => flavor == Flavor.staffDev;
   bool get isStaffProd => flavor == Flavor.staffProd;
+  bool get isAdmin =>
+      flavor == Flavor.adminDev || flavor == Flavor.adminProd;
+  bool get isAdminDev => flavor == Flavor.adminDev;
+  bool get isAdminProd => flavor == Flavor.adminProd;
   bool get isMockOtp => otpMode == OtpMode.mock;
   bool get isMockRazorpay => razorpayMode == RazorpayMode.mock;
   String get name => flavor.name;

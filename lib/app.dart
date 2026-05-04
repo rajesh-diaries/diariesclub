@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app_admin.dart';
 import 'app_staff.dart';
 import 'core/providers/app_theme_mode_provider.dart';
 import 'core/router/app_router.dart';
@@ -13,9 +14,10 @@ class DiariesClubApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Staff flavors render the staff shell; everything else is the customer
-    // app. Splits the bundle at the topmost widget so the two apps share
-    // bootstrap + Supabase init but nothing in the widget tree.
+    // Three apps share bootstrap + Supabase init; the widget tree branches
+    // here. Admin checked first because admin flavors imply web build, and
+    // we want a hard fast-path before the customer router boots.
+    if (F.isAdmin) return const AdminApp();
     if (F.isStaff) return const StaffApp();
 
     final themeMode = ref.watch(appThemeModeProvider);

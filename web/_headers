@@ -1,0 +1,15 @@
+# Cloudflare Pages security headers for the admin web build.
+# Format: <pattern> followed by indented Header-Name: value lines.
+
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+
+# CSP — Supabase + Google Fonts only. Tighten further before production
+# launch (the inline-script allowance is required by the Flutter web
+# bootstrap and could be replaced with a hashed allow-list later).
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https://*.supabase.co https://placehold.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'

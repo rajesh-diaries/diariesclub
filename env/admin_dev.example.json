@@ -1,0 +1,11 @@
+{
+  "SUPABASE_URL": "https://<your-project-ref>.supabase.co",
+  "SUPABASE_ANON_KEY": "<anon-key-from-Supabase-dashboard>",
+  "RAZORPAY_KEY_ID": "",
+  "RAZORPAY_MODE": "mock",
+  "BRANCH_KEY": "",
+  "SENTRY_DSN": "",
+  "OTP_MODE": "mock",
+  "ENV": "admin_dev",
+  "ADMIN_WEB": "true"
+}
