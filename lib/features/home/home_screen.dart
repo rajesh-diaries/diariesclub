@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../core/notifications/fcm_lifecycle_provider.dart';
 import '../../core/providers/home_state_provider.dart';
 import '../../core/providers/recent_activity_provider.dart';
 import '../../core/widgets/error_screen.dart';
@@ -33,6 +35,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       homeStateProvider,
       (_, __) => ref.invalidate(recentActivityProvider),
     );
+
+    // Cold-start FCM tap → consume the deep link saved by FcmSetup once
+    // we've reached Home (the safe, signed-in landing point).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final deepLink = consumePendingFcmDeepLink();
+      if (deepLink != null && mounted) {
+        context.push(deepLink);
+      }
+    });
   }
 
   @override

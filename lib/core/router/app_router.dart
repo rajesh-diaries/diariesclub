@@ -26,6 +26,7 @@ import '../../features/profile/add_child_screen.dart' as profile_add_child;
 import '../../features/profile/delete_account_screen.dart';
 import '../../features/profile/edit_child_screen.dart';
 import '../../features/profile/farewell_screen.dart';
+import '../../features/profile/fcm_debug_screen.dart';
 import '../../features/profile/help_screen.dart';
 import '../../features/profile/language_screen.dart';
 import '../../features/profile/notifications_settings_screen.dart';
@@ -251,6 +252,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'profile_help',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const HelpScreen(),
+      ),
+      // Dev-only FCM debug. The screen self-gates on F.isDev so this
+      // route is harmless if hit on prod (renders a "dev only" stub).
+      GoRoute(
+        path: '/profile/fcm-debug',
+        name: 'profile_fcm_debug',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const FcmDebugScreen(),
       ),
       GoRoute(
         path: '/profile/delete-account',

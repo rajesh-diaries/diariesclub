@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -113,6 +114,18 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
     final idem = const Uuid().v4();
     _idempotencyKey = idem;
 
+    Sentry.addBreadcrumb(Breadcrumb(
+      category: 'razorpay',
+      type: 'user',
+      level: SentryLevel.info,
+      message: 'create_order initiate',
+      data: {
+        'amount_paise': _selectedAmountPaise,
+        'bonus_paise': _selectedBonusPaise ?? 0,
+        'mock_mode': F.isMockRazorpay,
+      },
+    ));
+
     try {
       // 1) Ask the Edge Function to create an order.
       final res = await Supabase.instance.client.functions.invoke(
@@ -127,12 +140,24 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
 
       final data = (res.data as Map?)?.cast<String, dynamic>() ?? {};
       if (data['ok'] != true) {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'razorpay',
+          level: SentryLevel.warning,
+          message: 'create_order rejected',
+          data: {'error': data['error']},
+        ));
         _failProcessing(_mapError(data['error'] as String?));
         return;
       }
 
       _orderId = data['order_id'] as String?;
       final mock = data['mock'] == true || F.isMockRazorpay;
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'razorpay',
+        level: SentryLevel.info,
+        message: 'create_order ok',
+        data: {'mock': mock},
+      ));
 
       // Subscribe to wallet_transactions BEFORE confirming — this way we
       // never miss a row inserted between confirm() and the listener.
@@ -144,9 +169,17 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
       } else {
         _openRazorpay();
       }
-    } on FunctionException catch (e) {
+    } on FunctionException catch (e, st) {
+      Sentry.captureException(e, stackTrace: st, withScope: (scope) {
+        scope.setTag('integration', 'razorpay');
+        scope.setTag('step', 'create_order');
+      });
       _failProcessing(_mapError(e.details?.toString()));
-    } catch (_) {
+    } catch (e, st) {
+      Sentry.captureException(e, stackTrace: st, withScope: (scope) {
+        scope.setTag('integration', 'razorpay');
+        scope.setTag('step', 'create_order_unknown');
+      });
       _failProcessing("Couldn't reach the server. Please try again.");
     }
   }
@@ -201,6 +234,15 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
   }
 
   Future<void> _onPaymentSuccess(PaymentSuccessResponse res) async {
+    Sentry.addBreadcrumb(Breadcrumb(
+      category: 'razorpay',
+      level: SentryLevel.info,
+      message: 'sheet success',
+      // Don't log payment_id — Razorpay's id is not PII but tying our
+      // logs to it offers little debug value vs. the idempotency_key
+      // that's already in the create_order breadcrumb.
+      data: {'has_signature': res.signature?.isNotEmpty ?? false},
+    ));
     try {
       final result = await Supabase.instance.client.functions.invoke(
         'razorpay-topup',
@@ -214,10 +256,23 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
       );
       final data = (result.data as Map?)?.cast<String, dynamic>() ?? {};
       if (data['ok'] != true) {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'razorpay',
+          level: SentryLevel.error,
+          message: 'confirm rejected',
+          data: {'error': data['error']},
+        ));
         _failProcessing(_mapError(data['error'] as String?));
       }
       // The wallet_transactions listener handles success.
-    } catch (_) {
+    } catch (e, st) {
+      Sentry.captureException(e, stackTrace: st, withScope: (scope) {
+        scope.setTag('integration', 'razorpay');
+        scope.setTag('step', 'confirm');
+        // Reconciliation cron (Session 13) backfills wallet credit if
+        // the webhook arrives but we miss this confirm; surface that
+        // expectation in the UI.
+      });
       _failProcessing(
         "Payment received but couldn't credit wallet. It will appear shortly.",
       );
@@ -225,6 +280,15 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
   }
 
   void _onPaymentError(PaymentFailureResponse res) {
+    // Razorpay error codes: BAD_REQUEST_ERROR (user cancelled),
+    // GATEWAY_ERROR, NETWORK_ERROR, SERVER_ERROR. Most are user-side; we
+    // log them as breadcrumb, not exception, to avoid Sentry noise.
+    Sentry.addBreadcrumb(Breadcrumb(
+      category: 'razorpay',
+      level: SentryLevel.warning,
+      message: 'sheet failure',
+      data: {'code': res.code, 'message': res.message},
+    ));
     _failProcessing(res.message ?? 'Payment failed.');
   }
 

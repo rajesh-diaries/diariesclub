@@ -1,0 +1,11 @@
+{
+  "_comment": "Customer app — prod flavor. Real OTP + Razorpay LIVE keys.",
+  "SUPABASE_URL": "https://<your-project-ref>.supabase.co",
+  "SUPABASE_ANON_KEY": "<anon-key-from-Supabase-dashboard>",
+  "RAZORPAY_KEY_ID": "rzp_live_xxxxxxxxxxxxxx",
+  "RAZORPAY_MODE": "live",
+  "BRANCH_KEY": "",
+  "SENTRY_DSN": "<customer-app-sentry-dsn>",
+  "OTP_MODE": "real",
+  "ENV": "prod"
+}

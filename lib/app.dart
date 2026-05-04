@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_admin.dart';
 import 'app_staff.dart';
+import 'core/notifications/fcm_lifecycle_provider.dart';
 import 'core/providers/app_theme_mode_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -22,6 +23,10 @@ class DiariesClubApp extends ConsumerWidget {
 
     final themeMode = ref.watch(appThemeModeProvider);
     final router = ref.watch(appRouterProvider);
+    // Watch the FCM lifecycle so its auth listener stays alive for the
+    // life of the customer app. The provider returns void; the side
+    // effect (token persist + sign-out clear) is what we care about.
+    ref.watch(fcmLifecycleProvider);
 
     return MaterialApp.router(
       title: 'Diaries Club',
