@@ -8,7 +8,11 @@ import '../../features/adventure/wall_of_legends_screen.dart';
 import '../../features/auth/otp_verify_screen.dart';
 import '../../features/auth/phone_entry_screen.dart';
 import '../../features/auth/splash_screen.dart';
-import '../../features/birthday/birthday_screens.dart';
+import '../../features/birthday/birthday_album_screen.dart';
+import '../../features/birthday/birthday_discovery_screen.dart';
+import '../../features/birthday/birthday_packages_screen.dart';
+import '../../features/birthday/package_detail_screen.dart';
+import '../../features/birthday/reservation_status_screen.dart';
 import '../../features/club/club_screen.dart';
 import '../../features/club/order_tracking_screen.dart';
 import '../../features/club/workshop_detail_screen.dart';
@@ -275,14 +279,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/birthday/reserve/:packageId',
         name: 'birthday_reserve',
-        builder: (context, state) => BirthdayReserveScreen(
+        builder: (context, state) => PackageDetailScreen(
           packageId: state.pathParameters['packageId']!,
+          triggeredBy: state.uri.queryParameters['trigger'],
         ),
       ),
       GoRoute(
         path: '/birthday/status/:reservationId',
         name: 'birthday_status',
-        builder: (context, state) => BirthdayStatusScreen(
+        builder: (context, state) => ReservationStatusScreen(
           reservationId: state.pathParameters['reservationId']!,
         ),
       ),

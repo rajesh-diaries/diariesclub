@@ -58,7 +58,7 @@ final upcomingBirthdaysProvider =
         .from('birthday_reservations')
         .select()
         .eq('child_id', child['id'] as String)
-        .inFilter('status', ['reserved', 'deposit_paid', 'confirmed'])
+        .inFilter('status', ['interested', 'admin_contacted', 'confirmed'])
         .maybeSingle();
 
     results.add(UpcomingBirthday(
