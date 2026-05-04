@@ -8,6 +8,8 @@ import '../../features/auth/phone_entry_screen.dart';
 import '../../features/auth/splash_screen.dart';
 import '../../features/birthday/birthday_screens.dart';
 import '../../features/club/club_screen.dart';
+import '../../features/club/order_tracking_screen.dart';
+import '../../features/club/workshop_detail_screen.dart';
 import '../../features/force_update/force_update_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/onboarding/add_child_screen.dart';
@@ -337,6 +339,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => CardUnboxingScreen(
           collectionId: state.pathParameters['collectionId']!,
+        ),
+      ),
+
+      // ── Club: order tracking + workshop detail (Session 7) ────────────
+      GoRoute(
+        path: '/club/order/:orderId',
+        name: 'club_order_tracking',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => OrderTrackingScreen(
+          orderId: state.pathParameters['orderId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/club/workshop/:workshopId',
+        name: 'club_workshop_detail',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => WorkshopDetailScreen(
+          workshopId: state.pathParameters['workshopId']!,
         ),
       ),
 
