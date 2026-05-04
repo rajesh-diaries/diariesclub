@@ -3,29 +3,51 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/adventure/adventure_screen.dart';
-import '../../features/auth/auth_screens.dart';
+import '../../features/auth/otp_verify_screen.dart';
+import '../../features/auth/phone_entry_screen.dart';
+import '../../features/auth/splash_screen.dart';
 import '../../features/birthday/birthday_screens.dart';
 import '../../features/club/club_screen.dart';
 import '../../features/force_update/force_update_screen.dart';
 import '../../features/home/home_screen.dart';
-import '../../features/onboarding/onboarding_screens.dart';
+import '../../features/onboarding/add_child_screen.dart';
+import '../../features/onboarding/child_details_screen.dart';
+import '../../features/onboarding/family_name_screen.dart';
+import '../../features/onboarding/hero_pick_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/reactivation/reactivation_screen.dart';
 import '../../features/recap/reflection_screen.dart';
 import '../../features/session/pre_book_screen.dart';
 import '../../features/wall_of_legends/wall_of_legends_screen.dart';
 import '../providers/app_version_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/error_screen.dart';
 import 'app_shell.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
-/// GoRouter wired to Riverpod for auth + version-gate redirects.
+// Routes the user can hit while signed out. Anything else is redirected to
+// /auth/phone by the redirect callback.
+const _publicPathPrefixes = <String>['/auth/', '/update-required', '/welcome-back'];
+
+bool _isPublic(String location) {
+  if (location == '/') return true; // Splash always public.
+  for (final p in _publicPathPrefixes) {
+    if (location == p || location.startsWith(p)) return true;
+  }
+  return false;
+}
+
+/// GoRouter wired to Riverpod for force-update + auth redirects.
+///
+/// Splash (`/`) does the smart routing on cold start; this redirect just
+/// keeps direct navigation safe (e.g. signed-out user deep-linking to
+/// `/home`).
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/home',
+    initialLocation: '/',
     debugLogDiagnostics: true,
     errorBuilder: (context, state) => FriendlyErrorScreen(
       code: 'E-ROUTE',
@@ -33,42 +55,72 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       technicalDetails: state.error?.toString(),
     ),
     redirect: (context, state) {
-      // Force-update gate. Read the cached value; if the future is still
-      // loading we don't redirect (avoids flashing the gate before data lands).
+      // 1) Force-update gate.
       final version = ref.read(appVersionStatusProvider).valueOrNull;
       final isOnUpdate = state.matchedLocation == '/update-required';
       if (version?.status == AppVersionStatus.forceUpdate && !isOnUpdate) {
         return '/update-required';
       }
       if (version?.status != AppVersionStatus.forceUpdate && isOnUpdate) {
-        return '/home';
+        return '/';
       }
-      // Auth + onboarding gates wired in Session 4.
+
+      // 2) Auth gate. Signed-out + protected route → /auth/phone.
+      final familyId = ref.read(currentFamilyIdProvider);
+      final loc = state.matchedLocation;
+      if (familyId == null && !_isPublic(loc)) {
+        return '/auth/phone';
+      }
+
       return null;
     },
     routes: [
+      // ── Splash (initial) ──────────────────────────────────────────────
+      GoRoute(
+        path: '/',
+        name: 'splash',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SplashScreen(),
+      ),
+
       // ── Auth (Session 4) ──────────────────────────────────────────────
       GoRoute(
         path: '/auth/phone',
         name: 'auth_phone',
-        builder: (context, state) => const PhoneAuthScreen(),
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PhoneEntryScreen(),
       ),
       GoRoute(
         path: '/auth/otp',
         name: 'auth_otp',
-        builder: (context, state) => const OtpScreen(),
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const OtpVerifyScreen(),
       ),
 
       // ── Onboarding (Session 4) ────────────────────────────────────────
       GoRoute(
-        path: '/onboarding/name',
-        name: 'onboarding_name',
-        builder: (context, state) => const OnboardingNameScreen(),
+        path: '/onboarding/family-name',
+        name: 'onboarding_family_name',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const FamilyNameScreen(),
       ),
       GoRoute(
-        path: '/onboarding/child',
-        name: 'onboarding_child',
-        builder: (context, state) => const OnboardingChildScreen(),
+        path: '/onboarding/add-child',
+        name: 'onboarding_add_child',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AddChildScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding/child-details',
+        name: 'onboarding_child_details',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ChildDetailsScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding/hero-pick',
+        name: 'onboarding_hero_pick',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const HeroPickScreen(),
       ),
 
       // ── Force-update gate ─────────────────────────────────────────────

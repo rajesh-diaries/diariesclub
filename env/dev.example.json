@@ -4,5 +4,6 @@
   "RAZORPAY_KEY_ID": "rzp_test_xxxxxxxxxxxxxx",
   "BRANCH_KEY": "key_test_xxxxxxxxxxxxxxxxxxxxxxxxxx",
   "SENTRY_DSN": "https://xxxxxxxx@sentry.io/xxxxxxx",
+  "OTP_MODE": "mock",
   "ENV": "dev"
 }
