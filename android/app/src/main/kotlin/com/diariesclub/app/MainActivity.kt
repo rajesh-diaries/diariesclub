@@ -1,4 +1,4 @@
-package com.diariesclub.diaries_club
+package com.diariesclub.app
 
 import io.flutter.embedding.android.FlutterActivity
 
