@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/adventure/adventure_screen.dart';
+import '../../features/adventure/per_trait_detail_screen.dart';
+import '../../features/adventure/wall_of_legends_screen.dart';
 import '../../features/auth/otp_verify_screen.dart';
 import '../../features/auth/phone_entry_screen.dart';
 import '../../features/auth/splash_screen.dart';
@@ -38,7 +40,6 @@ import '../../features/reactivation/reactivation_screen.dart';
 import '../../features/session/pre_book_screen.dart';
 import '../../features/sessions/session_qr_screen.dart';
 import '../../features/sessions/session_start_screen.dart';
-import '../../features/wall_of_legends/wall_of_legends_screen.dart';
 import '../providers/app_version_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/error_screen.dart';
@@ -316,13 +317,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // ── Wall of Legends ───────────────────────────────────────────────
-      GoRoute(
-        path: '/wall-of-legends',
-        name: 'wall_of_legends',
-        builder: (context, state) => const WallOfLegendsScreen(),
-      ),
-
       // ── Reflection (entered from Hero Recap card tap) ─────────────────
       GoRoute(
         path: '/reflection/:sessionId',
@@ -340,6 +334,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => CardUnboxingScreen(
           collectionId: state.pathParameters['collectionId']!,
         ),
+      ),
+
+      // ── Adventure: per-trait detail + Wall of Legends (Session 8) ─────
+      GoRoute(
+        path: '/adventure/trait/:childId/:hero',
+        name: 'adventure_trait_detail',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => PerTraitDetailScreen(
+          childId: state.pathParameters['childId']!,
+          hero: state.pathParameters['hero']!,
+        ),
+      ),
+      GoRoute(
+        path: '/adventure/wall-of-legends',
+        name: 'adventure_wall_of_legends',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const WallOfLegendsScreen(),
       ),
 
       // ── Club: order tracking + workshop detail (Session 7) ────────────
