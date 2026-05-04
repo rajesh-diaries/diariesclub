@@ -10,6 +10,9 @@ void main() async {
       'RAZORPAY_KEY_ID',
       defaultValue: 'rzp_test_placeholder',
     ),
+    razorpayMode: razorpayModeFrom(
+      const String.fromEnvironment('RAZORPAY_MODE', defaultValue: 'mock'),
+    ),
     sentryDsn: const String.fromEnvironment('SENTRY_DSN'),
     branchKey: const String.fromEnvironment('BRANCH_KEY'),
     sentryEnabled: false,

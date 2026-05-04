@@ -2,6 +2,7 @@
   "SUPABASE_URL": "https://<your-project-ref>.supabase.co",
   "SUPABASE_ANON_KEY": "<anon-key-from-Supabase-dashboard>",
   "RAZORPAY_KEY_ID": "rzp_test_xxxxxxxxxxxxxx",
+  "RAZORPAY_MODE": "mock",
   "BRANCH_KEY": "key_test_xxxxxxxxxxxxxxxxxxxxxxxxxx",
   "SENTRY_DSN": "https://xxxxxxxx@sentry.io/xxxxxxx",
   "OTP_MODE": "mock",

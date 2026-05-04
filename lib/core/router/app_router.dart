@@ -18,6 +18,8 @@ import '../../features/profile/profile_screen.dart';
 import '../../features/reactivation/reactivation_screen.dart';
 import '../../features/recap/reflection_screen.dart';
 import '../../features/session/pre_book_screen.dart';
+import '../../features/sessions/session_qr_screen.dart';
+import '../../features/sessions/session_start_screen.dart';
 import '../../features/wall_of_legends/wall_of_legends_screen.dart';
 import '../providers/app_version_provider.dart';
 import '../providers/auth_provider.dart';
@@ -176,6 +178,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/session/pre-book',
         name: 'session_pre_book',
         builder: (context, state) => const SessionPreBookScreen(),
+      ),
+
+      // ── Session lifecycle (Session 5) ─────────────────────────────────
+      GoRoute(
+        path: '/session/start',
+        name: 'session_start',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SessionStartScreen(),
+      ),
+      GoRoute(
+        path: '/session/qr/:sessionId',
+        name: 'session_qr',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => SessionQrScreen(
+          sessionId: state.pathParameters['sessionId']!,
+        ),
       ),
 
       // ── Wall of Legends ───────────────────────────────────────────────
