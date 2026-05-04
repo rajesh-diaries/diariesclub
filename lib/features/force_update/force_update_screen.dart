@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -20,6 +19,11 @@ class ForceUpdateScreen extends ConsumerWidget {
       'https://apps.apple.com/in/app/diaries-club/id000000000';
   static const _playStoreUrl =
       'https://play.google.com/store/apps/details?id=com.diariesclub.app';
+
+  /// Web-safe iOS detection. dart:io Platform throws on web; this routes
+  /// web visitors to the Play Store as a sensible default (BUG-001).
+  static bool _isIOS() =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -59,11 +63,11 @@ class ForceUpdateScreen extends ConsumerWidget {
               ],
               const SizedBox(height: 40),
               PrimaryButton(
-                label: Platform.isIOS
+                label: _isIOS()
                     ? 'Update on App Store'
                     : 'Update on Play Store',
                 onPressed: () => launchUrl(
-                  Uri.parse(Platform.isIOS ? _appStoreUrl : _playStoreUrl),
+                  Uri.parse(_isIOS() ? _appStoreUrl : _playStoreUrl),
                   mode: LaunchMode.externalApplication,
                 ),
               ),

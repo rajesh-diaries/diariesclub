@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pub_semver/pub_semver.dart';
@@ -30,12 +29,25 @@ class AppVersionResult {
 
 /// Compares the running app version against `venue_config.{platform}_*_version`.
 /// Used by the router to gate the app behind /update-required when below min.
+///
+/// Web builds short-circuit to `upToDate` — there's no app store to direct
+/// users to, and `dart:io Platform` throws on web (BUG-001 in BUGS.md).
 final appVersionStatusProvider = FutureProvider<AppVersionResult>((ref) async {
   final info = await PackageInfo.fromPlatform();
-  final platform = Platform.isIOS ? 'ios' : 'android';
 
   // Strip Flutter build suffix (1.0.0+1 → 1.0.0)
   final currentRaw = info.version.split('+').first;
+
+  if (kIsWeb) {
+    return AppVersionResult(
+      status: AppVersionStatus.upToDate,
+      currentVersion: currentRaw,
+      minVersion: '0.0.0',
+      latestVersion: currentRaw,
+    );
+  }
+
+  final platform = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
 
   try {
     final config = await Supabase.instance.client
