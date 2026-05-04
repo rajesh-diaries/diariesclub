@@ -1,4 +1,13 @@
-enum Flavor { dev, staging, prod }
+enum Flavor {
+  dev,
+  staging,
+  prod,
+  // Staff app flavors (Session 10). Same Flutter codebase, separate build
+  // target → bundle id com.diariesclub.staff(.dev). Staff flavors render
+  // StaffApp instead of DiariesClubApp; see lib/app.dart.
+  staffDev,
+  staffProd,
+}
 
 /// OTP delivery mode (Session 4).
 /// * `mock` — auth-otp Edge Function accepts only "123456"; no SMS sent.
@@ -37,8 +46,12 @@ class FlavorConfig {
     required this.otpMode,
   });
 
-  bool get isProd => flavor == Flavor.prod;
-  bool get isDev => flavor == Flavor.dev;
+  bool get isProd => flavor == Flavor.prod || flavor == Flavor.staffProd;
+  bool get isDev => flavor == Flavor.dev || flavor == Flavor.staffDev;
+  bool get isStaff =>
+      flavor == Flavor.staffDev || flavor == Flavor.staffProd;
+  bool get isStaffDev => flavor == Flavor.staffDev;
+  bool get isStaffProd => flavor == Flavor.staffProd;
   bool get isMockOtp => otpMode == OtpMode.mock;
   bool get isMockRazorpay => razorpayMode == RazorpayMode.mock;
   String get name => flavor.name;

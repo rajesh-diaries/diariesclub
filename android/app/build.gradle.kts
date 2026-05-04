@@ -48,6 +48,21 @@ android {
             dimension = "default"
             resValue("string", "app_name", "Diaries Club")
         }
+        // Staff flavors (Session 10). Different applicationId from the
+        // customer app so both can coexist on the same tablet during dev.
+        create("staffDev") {
+            dimension = "default"
+            applicationId = "com.diariesclub.staff"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-staff-dev"
+            resValue("string", "app_name", "Diaries Staff Dev")
+        }
+        create("staffProd") {
+            dimension = "default"
+            applicationId = "com.diariesclub.staff"
+            versionNameSuffix = "-staff"
+            resValue("string", "app_name", "Diaries Club Staff")
+        }
     }
 
     buildTypes {

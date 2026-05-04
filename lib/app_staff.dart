@@ -2,33 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'app_staff.dart';
 import 'core/providers/app_theme_mode_provider.dart';
-import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
-import 'flavors.dart';
+import 'staff/staff_router.dart';
 
-class DiariesClubApp extends ConsumerWidget {
-  const DiariesClubApp({super.key});
+/// Staff app shell. Lives at the root of the staff flavor; identical
+/// theme/localisation wiring as DiariesClubApp but routes through the
+/// staff-only router and clamps text scale tighter (tablet KDS cards).
+class StaffApp extends ConsumerWidget {
+  const StaffApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Staff flavors render the staff shell; everything else is the customer
-    // app. Splits the bundle at the topmost widget so the two apps share
-    // bootstrap + Supabase init but nothing in the widget tree.
-    if (F.isStaff) return const StaffApp();
-
     final themeMode = ref.watch(appThemeModeProvider);
-    final router = ref.watch(appRouterProvider);
+    final router = ref.watch(staffRouterProvider);
 
     return MaterialApp.router(
-      title: 'Diaries Club',
+      title: 'Diaries Club Staff',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
       routerConfig: router,
-      // Indian locale baseline.
       locale: const Locale('en', 'IN'),
       supportedLocales: const [Locale('en', 'IN'), Locale('en', 'US')],
       localizationsDelegates: const [
@@ -36,12 +31,14 @@ class DiariesClubApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      // Clamp Dynamic Type to 1.5× so layouts don't shatter at extreme sizes.
+      // Tablets render at higher density; staff don't need the same Dynamic
+      // Type headroom parents do. 1.3× cap keeps KDS cards readable without
+      // breaking 4-up grids.
       builder: (context, child) {
         final mq = MediaQuery.of(context);
         return MediaQuery(
           data: mq.copyWith(
-            textScaler: mq.textScaler.clamp(maxScaleFactor: 1.5),
+            textScaler: mq.textScaler.clamp(maxScaleFactor: 1.3),
           ),
           child: child ?? const SizedBox.shrink(),
         );
