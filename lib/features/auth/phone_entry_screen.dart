@@ -70,6 +70,10 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
       await prefs.setString('pending_otp_phone', phone);
 
       if (!mounted) return;
+      // Clear loading before pushing — this screen stays alive in the route
+      // stack, so if the user pops back (Wrong number? / browser back) the
+      // submit button must show its label, not a stuck spinner.
+      setState(() => _isLoading = false);
       context.push('/auth/otp');
     } on FunctionException catch (e) {
       setState(() {

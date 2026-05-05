@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -76,7 +75,7 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
         maxHeight: 1080,
       );
       if (picked == null) return;
-      final raw = await File(picked.path).readAsBytes();
+      final raw = await picked.readAsBytes();
       final compressed = await PhotoCompressService.compress(raw);
       if (!mounted) return;
       setState(() => _photoBytes = compressed);
