@@ -85,6 +85,39 @@ Replaces Module 2.1's view-only `/admin/catalog/coffee` with full create / edit 
 
 ---
 
+## Module 2.8: Config admin UI (SHIPPED 2026-05-05)
+Surface the venue_config knobs that already lived in DB but had no edit UI, plus admin CRUD for two existing content tables (`reflection_moments`, `hero_card_definitions`).
+
+- **Migration 0042** — three RPC additions:
+  - `admin_set_venue_config` whitelist expanded from ~20 keys to ~70: pricing JSONB knobs (`session_extension_options`, `pre_booking_slots_per_day`), full XP economy (`xp_*`, `stage_thresholds_per_trait`, `level_thresholds`), `visit_milestones`, all birthday parameters, all session timing, contact + legal URLs, all feature flags. Function body now branches on column data_type — JSONB columns assigned via `$1->key` (preserves structure), scalars via `($1->>key)::type` cast.
+  - `admin_reflection_moment_upsert` — NULL p_id creates, otherwise updates by id with COALESCE semantics. Validates `primary_trait` ∈ {rafi, ellie, gerry, zena}.
+  - `admin_hero_card_upsert` — same shape; validates `hero` ∈ {rafi, ellie, gerry, zena}.
+- **Admin UI** — `config_screen.dart` rewritten as 11 collapsible sections:
+  - Pricing (session prices + extension options JSONB editor + pre-booking slots)
+  - GST (with CA-confirmation banner)
+  - Topup offers (4-field row editor: amount, bonus, label, badge)
+  - Cashback / referrals / reactivation (cashback %, low-balance, reactivation credit/expiry, churn threshold, all 3 referral knobs)
+  - XP economy (all 11 xp_* keys + stage/level thresholds as JSON textareas; validates 5-int stage shape)
+  - Visit milestones (3-field row editor: visits, reward_xp, reward_paise)
+  - Birthday (booking enabled, autocancel/threshold/interest TTL hours, child birthday wish toggle + time + 2 copy fields)
+  - Session timing (10 int fields + pre-booking hold percent)
+  - App version control (iOS/Android min+latest + force-update message)
+  - Contact + legal URLs (9 URL/text fields)
+  - Feature flags (7 boolean toggles)
+- Each section has its own Save button → audit-logged via `admin_set_venue_config`. JSONB editors use a controller-pattern shared `_rows` list so snapshot at save time reads the current edits.
+- **Content screens** — replaces `/admin/content` stub:
+  - `/admin/content` — index card grid (Reflection moments / Hero cards / FAQ-coming-soon).
+  - `/admin/content/reflection-moments` — list with trait chips + sort order + XP weight; tap row to edit in dialog (display_text, tag, icon, primary_trait, xp_weight, sort_order, is_active). New button creates.
+  - `/admin/content/hero-cards` — card grid (image + name + hero + rare/birthday/hidden chips); tap to edit in dialog (name, hero, description, image_url, is_rare, is_birthday_exclusive, is_active).
+- Sidebar nav: Content's "soon" dot removed.
+- **Deferred to v1.1**:
+  - Notification copy templates — current call sites use hardcoded strings; making them admin-editable requires a `sendNotification` refactor + template-resolver layer. Out of scope for this module.
+  - Reactivation campaign defaults — paired with the Session 13 cron + MSG91 plumbing.
+
+flutter analyze (whole project): clean.
+
+---
+
 ## Module 2.7: Birthday packages rich CRUD + PDF (SHIPPED 2026-05-05)
 Replaces Module 2.1's view-only `/admin/packages` with full CRUD + JSONB-driven menu options + PDF generation.
 

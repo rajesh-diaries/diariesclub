@@ -17,6 +17,9 @@ import 'catalog/fit_template_edit_screen.dart';
 import 'catalog/fit_waitlist_screen.dart';
 import 'catalog/menu_item_edit_screen.dart';
 import 'config/config_screen.dart';
+import 'content/content_index_screen.dart';
+import 'content/hero_cards_screen.dart';
+import 'content/reflection_moments_screen.dart';
 import 'customers/customer_detail_screen.dart';
 import 'customers/customers_screen.dart';
 import 'live_ops/live_ops_screen.dart';
@@ -192,18 +195,19 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             builder: (_, state) =>
                 AnnouncementEditScreen(id: state.pathParameters['id']),
           ),
-          // Stubs.
           GoRoute(
             path: '/admin/content',
-            builder: (_, __) => const ComingSoonScreen(
-              title: 'Content',
-              description: 'FAQ / reflection moments / hero cards',
-              icon: PhosphorIconsRegular.fileText,
-              rationale:
-                  'FAQ table seed in 0017; reflection moment editor + hero '
-                  'card image upload follow.',
-            ),
+            builder: (_, __) => const ContentIndexScreen(),
           ),
+          GoRoute(
+            path: '/admin/content/reflection-moments',
+            builder: (_, __) => const ReflectionMomentsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/content/hero-cards',
+            builder: (_, __) => const HeroCardsScreen(),
+          ),
+          // Stubs.
           GoRoute(
             path: '/admin/reports',
             builder: (_, __) => const ComingSoonScreen(
