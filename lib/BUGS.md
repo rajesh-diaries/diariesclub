@@ -125,6 +125,22 @@ When customer taps "Not this year":
 
 ---
 
+## BUG-017: +30 min session extension fails, +60 min works (FIXED)
+- Discovered: 2026-05-05 Phase 1A web testing
+- Severity: 🟡 IMPORTANT (revenue path — every short-extend attempt failed)
+- App: Customer Web + Mobile
+- Location: supabase/migrations/0003_rpc_functions.sql:440 (session_extend body); lib/features/sessions/widgets/extend_session_sheet.dart
+- Root cause: PostgreSQL integer division. `v_amount := session_extension_per_hour_paise * (p_duration_minutes / 60)` truncated 30/60 → 0, raised `invalid_duration`. Only +60 worked because 60/60 = 1.
+- Fix applied:
+  - Migration 0027 — adds `venue_config.session_extension_options` JSONB column with default `[{minutes:30,price_paise:15000,label:"+30 min"},{minutes:60,price_paise:30000,label:"+60 min"}]`. Preserves current effective prices.
+  - Migration 0028 — `session_extend` v2 looks up `price_paise` from the JSONB list by `minutes`. Drops the formula entirely. Signature unchanged.
+  - Client (`extend_session_sheet.dart`) renders one tile per option dynamically; falls back to the same hardcoded defaults if venue_config hasn't loaded.
+  - Legacy `session_extension_per_hour_paise` column kept for back-compat with admin web's Config screen; cleanup deferred to Phase 2.
+- Smoke test: spoofed auth.uid() inside BEGIN/ROLLBACK, called session_extend with both 30 and 60 — both returned `success:true` with correct amounts (₹150, ₹300). expires_at advanced 30+60=90 min as expected.
+- Status: FIXED 2026-05-05. Admin can extend the option list (90, 120, etc.) via the Phase 2 admin Config UI without code changes.
+
+---
+
 ## BUG-016: SessionQrScreen doesn't auto-dismiss after staff scan (FIXED)
 - Discovered: 2026-05-05 Phase 1A web testing (during BUG-004 verification via SQL bypass)
 - Severity: 🟡 IMPORTANT (UX confusion — customer doesn't know scan worked)
