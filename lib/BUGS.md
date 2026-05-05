@@ -6,6 +6,27 @@ Running log of post-merge bugs. New entries at the top.
 
 # Phase 2: Admin web — modules
 
+## ARCHITECTURE-001: Storage bucket public/private split (DECIDED 2026-05-05)
+
+Marketing content uses **public** buckets; user-uploaded sensitive content stays **private**.
+
+| Bucket | Visibility | Rationale |
+|---|---|---|
+| `workshop-photos` | **public** (0035) | Promotional. UUID filenames. Linkable from push deep-links, WhatsApp shares. |
+| `menu-photos` | **public** (0035) | Same as above. |
+| `package-photos` | **public** (0035) | Same. Created in 0035. |
+| `hero-recaps` | **public** (pre-existing) | Rendered session-recap PNGs (no faces — child name + duration + XP). Social-shareable. |
+| `hero-cards` | **public** (pre-existing) | Rendered hero-card art including kid photo. **Worth a privacy review** — UUID filenames are unguessable but the bucket is publicly listable. Decision pending. |
+| `birthday-photos` | private | Customer-uploaded kid photos. Signed URLs via `signed_birthday_photo_url_provider`. |
+| `child-photos` | private | Per-child profile photos. Signed URLs. |
+| `invoices` | private | Financial documents. Service-role only. |
+
+Implication: workshop / menu / package CRUD can return `getPublicUrl()` directly without per-module signed-URL plumbing. This retroactively fixed the BUG-022-shape concern flagged at end of Module 2.2 (workshops customer reads would 401 with private bucket). RLS policies for writes are unchanged (service-role only); the bucket-level `public=TRUE` flag makes reads work via the storage HTTP gateway, bypassing RLS.
+
+Reversibility: see migration 0035 header.
+
+
+
 ## Module 2.1: View-only stubs (SHIPPED 2026-05-05)
 Stepping-stone read-only list screens for the five admin domains added since Session 11.
 
