@@ -85,6 +85,24 @@ Replaces Module 2.1's view-only `/admin/catalog/coffee` with full create / edit 
 
 ---
 
+## Cart unification (Module 2.5/2.6 follow-up — SHIPPED 2026-05-05)
+
+Resolves the split-cart problem from Module 2.5 (FIT meals previously bypassed the cart) + the combo XOR limitation in Module 2.6.
+
+- **Cart model refactored** (`lib/features/club/providers/cart_provider.dart`):
+  - New sealed `CartLine` hierarchy: `MenuItemLine` / `ComboLine` / `FitMealLine`. Each has `id`, `unitPricePaise`, `quantity`, `linePaise`, `displayName`, `copyWithQuantity()`.
+  - `CartState.lines` is a single heterogeneous list. `isEmpty` / `totalItemCount` / `totalPaise` aggregate across all line types.
+  - `CartNotifier` API: `addMenuItem` / `addCombo` (both merge by id), `addFitMeal` (always appends — different selections = different lines), `changeQuantityById`, `removeLineById`, `clear`. Backward-compat shims for `addItem` / `applyCombo` / `removeCombo` / `changeQuantity`.
+- **Combo flow simplified** — `combo_card.dart` no longer shows "Replace bag?" dialog. Tapping Add appends a `ComboLine` with quantity 1; subsequent taps stack quantity.
+- **FIT builder** writes to client cart instead of `fit_meal_order_create` directly. Server-authoritative price still computed via `fit_meal_compute_price` at add time. Selections JSONB + human-readable summary stored on the line for cart-card display.
+- **Cart sheet** now renders a single `_LineList` with type-aware accent + icon + label. Combo lines show included-item names; FIT lines show selections summary.
+- **Migration 0039** — `order_items` extended (`line_type` CHECK, nullable `combo_id` / `fit_meal_order_id` / `selections_jsonb`, `menu_item_id` loosened to nullable). `fit_meal_orders.order_id` added. New `order_place` body walks heterogeneous `p_items` array, validates each line by type (`menu_item` / `combo` / `fit_meal`), accumulates subtotal, then snapshots into `order_items` + creates `fit_meal_orders` rows linked to the parent. Backward compat: legacy entries lacking `type` default to `menu_item`. Combo discount math removed — combos are flat-priced lines now.
+- **Cart persistence across restart** deferred to v1.1 (cart still client-side only).
+
+flutter analyze (whole project): clean.
+
+---
+
 ## Module 2.6: Combos CRUD (SHIPPED 2026-05-05)
 Replaces Module 2.1's view-only `/admin/catalog/combos` with full CRUD.
 

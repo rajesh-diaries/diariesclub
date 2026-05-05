@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../../core/widgets/primary_button.dart';
+import 'providers/cart_provider.dart';
 
 /// FIT meal builder. Loads template + linked categories + options, renders
 /// single/multi selectors per category, and shows a sticky total bar.
@@ -62,26 +63,61 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
     }
   }
 
-  Future<void> _addToCart(int finalPrice) async {
+  Future<void> _addToCart(_BuilderData data, int finalPrice) async {
     setState(() {
       _busy = true;
       _errorText = null;
     });
     try {
-      await Supabase.instance.client.rpc<dynamic>(
-        'fit_meal_order_create',
+      // Server-authoritative price re-validation. Throws on bad selections.
+      final priced = await Supabase.instance.client
+          .rpc<Map<String, dynamic>>(
+        'fit_meal_compute_price',
         params: {
           'p_template_id': widget.templateId,
           'p_selections': _selections,
         },
       );
+      final unit = (priced['final_price_paise'] as int?) ?? finalPrice;
+
+      // Build human-readable summary of selections for the cart card.
+      final summary = <String>[];
+      for (final lc in data.linkedCategories) {
+        final catId = lc.category['id'] as String;
+        final sel = _selections[catId];
+        if (sel == null) continue;
+        if (sel is String) {
+          final opt = lc.options.firstWhere(
+            (o) => o['id'] == sel, orElse: () => const {},
+          );
+          if (opt.isNotEmpty) summary.add(opt['name'] as String? ?? '');
+        } else if (sel is List) {
+          for (final id in sel) {
+            final opt = lc.options.firstWhere(
+              (o) => o['id'] == id, orElse: () => const {},
+            );
+            if (opt.isNotEmpty) summary.add(opt['name'] as String? ?? '');
+          }
+        }
+      }
+
+      ref.read(cartProvider.notifier).addFitMeal(
+            FitMealLine.create(
+              templateId: widget.templateId,
+              templateName: (data.template['name'] as String?) ?? 'FIT meal',
+              unitPricePaise: unit,
+              quantity: 1,
+              selectionsJsonb: Map<String, dynamic>.from(_selections),
+              selectionsSummary: summary,
+              imageUrl: data.template['photo_url'] as String?,
+            ),
+          );
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.activeGreen,
-          content: Text(
-            'Added to cart · ${Money.fromPaise(finalPrice)}',
-          ),
+          content: Text('Added to cart · ${Money.fromPaise(unit)}'),
         ),
       );
       context.pop();
@@ -234,8 +270,9 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                 child: PrimaryButton(
                   label: 'Add to cart',
                   loading: _busy,
-                  onPressed:
-                      allRequiredFilled && !_busy ? () => _addToCart(final_) : null,
+                  onPressed: allRequiredFilled && !_busy
+                      ? () => _addToCart(data, final_)
+                      : null,
                 ),
               ),
             ],

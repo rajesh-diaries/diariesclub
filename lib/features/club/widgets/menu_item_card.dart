@@ -28,8 +28,11 @@ class MenuItemCard extends ConsumerWidget {
     final imageUrl = item['image_url'] as String?;
     final disabled = item['is_available'] != true;
 
-    final inCart =
-        cart.items.where((i) => i.menuItemId == id).cast<CartItem?>().firstOrNull;
+    final inCart = cart.lines
+        .whereType<MenuItemLine>()
+        .where((l) => l.menuItemId == id)
+        .cast<MenuItemLine?>()
+        .firstOrNull;
     final brandColor =
         brand == 'coffee' ? AppColors.coffeeBrown : AppColors.fitGreen;
 
@@ -147,21 +150,19 @@ class MenuItemCard extends ConsumerWidget {
                         )
                       else
                         OutlinedButton(
-                          onPressed: cart.isCombo
-                              ? null
-                              : () {
-                                  HapticFeedback.lightImpact();
-                                  ref.read(cartProvider.notifier).addItem(
-                                        CartItem(
-                                          menuItemId: id,
-                                          name: name,
-                                          brand: brand,
-                                          unitPricePaise: pricePaise,
-                                          quantity: 1,
-                                          imageUrl: imageUrl,
-                                        ),
-                                      );
-                                },
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            ref.read(cartProvider.notifier).addMenuItem(
+                                  MenuItemLine.create(
+                                    menuItemId: id,
+                                    name: name,
+                                    brand: brand,
+                                    unitPricePaise: pricePaise,
+                                    quantity: 1,
+                                    imageUrl: imageUrl,
+                                  ),
+                                );
+                          },
                           child: const Text('Add'),
                         ),
                     ],

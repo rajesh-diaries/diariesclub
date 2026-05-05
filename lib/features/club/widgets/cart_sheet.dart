@@ -49,13 +49,33 @@ class _CartSheetState extends ConsumerState<CartSheet> {
       _errorText = null;
     });
 
-    final items = cart.isCombo ? cart.comboItems : cart.items;
-    final body = items
-        .map((i) => {
-              'menu_item_id': i.menuItemId,
-              'quantity': i.quantity,
-            })
-        .toList();
+    // Build heterogeneous p_lines payload — each entry tagged with type.
+    // The order_place RPC (extended in 0039) walks this and emits the
+    // right downstream rows per type.
+    final body = <Map<String, dynamic>>[];
+    for (final l in cart.lines) {
+      switch (l) {
+        case MenuItemLine m:
+          body.add({
+            'type': 'menu_item',
+            'menu_item_id': m.menuItemId,
+            'quantity': m.quantity,
+          });
+        case ComboLine c:
+          body.add({
+            'type': 'combo',
+            'combo_id': c.comboId,
+            'quantity': c.quantity,
+          });
+        case FitMealLine f:
+          body.add({
+            'type': 'fit_meal',
+            'template_id': f.templateId,
+            'quantity': f.quantity,
+            'selections': f.selectionsJsonb,
+          });
+      }
+    }
     final idem = const Uuid().v4();
 
     try {
@@ -66,7 +86,7 @@ class _CartSheetState extends ConsumerState<CartSheet> {
         'p_items': body,
         'p_fulfillment_mode': fulfillment.rpcValue,
         'p_payment_method': payment.rpcValue,
-        'p_combo_id': cart.comboId,
+        'p_combo_id': null,
         'p_idempotency_key': idem,
       });
       final orderId = result['order_id'] as String?;
@@ -177,15 +197,7 @@ class _CartSheetState extends ConsumerState<CartSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Column(
                 children: [
-                  if (cart.isCombo)
-                    _ComboSection(
-                      comboName: cart.comboName ?? 'Combo',
-                      items: cart.comboItems,
-                      onRemove: () =>
-                          ref.read(cartProvider.notifier).removeCombo(),
-                    )
-                  else
-                    _BrandSections(items: cart.items),
+                  _LineList(lines: cart.lines),
                   const SizedBox(height: 16),
                   _Summary(
                     subtotalPaise: subtotal,
@@ -241,95 +253,108 @@ class _CartSheetState extends ConsumerState<CartSheet> {
 }
 
 // ---------------------------------------------------------------------------
-//  Brand grouping
+//  Heterogeneous line list — switches on CartLine type.
 // ---------------------------------------------------------------------------
-class _BrandSections extends ConsumerWidget {
-  final List<CartItem> items;
-  const _BrandSections({required this.items});
+class _LineList extends ConsumerWidget {
+  final List<CartLine> lines;
+  const _LineList({required this.lines});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final byBrand = <String, List<CartItem>>{};
-    for (final i in items) {
-      byBrand.putIfAbsent(i.brand, () => []).add(i);
-    }
     return Column(
       children: [
-        if (byBrand['coffee'] != null) ...[
-          _BrandSection(brand: 'coffee', items: byBrand['coffee']!),
-          if (byBrand['fit'] != null) const SizedBox(height: 12),
+        for (final l in lines) ...[
+          _LineCard(line: l),
+          const SizedBox(height: 8),
         ],
-        if (byBrand['fit'] != null)
-          _BrandSection(brand: 'fit', items: byBrand['fit']!),
       ],
     );
   }
 }
 
-class _BrandSection extends ConsumerWidget {
-  final String brand;
-  final List<CartItem> items;
-  const _BrandSection({required this.brand, required this.items});
+class _LineCard extends ConsumerWidget {
+  final CartLine line;
+  const _LineCard({required this.line});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final color = brand == 'coffee' ? AppColors.coffeeBrown : AppColors.fitGreen;
-    final bg = color.withValues(alpha: 0.08);
+    final notifier = ref.read(cartProvider.notifier);
+    final (Color accent, IconData icon, String typeLabel) = switch (line) {
+      MenuItemLine m when m.brand == 'coffee' => (
+          AppColors.coffeeBrown,
+          PhosphorIconsRegular.coffee,
+          'COFFEE',
+        ),
+      MenuItemLine _ => (
+          AppColors.fitGreen,
+          PhosphorIconsRegular.carrot,
+          'FIT',
+        ),
+      ComboLine _ => (
+          AppColors.gold,
+          PhosphorIconsFill.gift,
+          'COMBO',
+        ),
+      FitMealLine _ => (
+          AppColors.fitGreen,
+          PhosphorIconsRegular.bowlFood,
+          'FIT MEAL',
+        ),
+    };
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: bg,
+        color: accent.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.20)),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                brand == 'coffee'
-                    ? PhosphorIconsRegular.coffee
-                    : PhosphorIconsRegular.carrot,
-                color: color,
-                size: 16,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                brand.toUpperCase(),
-                style: AppTextStyles.caption(context, color: color).copyWith(
-                  letterSpacing: 1.4,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          for (final i in items) _CartLine(item: i),
-        ],
-      ),
-    );
-  }
-}
-
-class _CartLine extends ConsumerWidget {
-  final CartItem item;
-  const _CartLine({required this.item});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
+          Icon(icon, color: accent, size: 18),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${item.name} × ${item.quantity}',
-                    style: AppTextStyles.body(context)),
                 Text(
-                  Money.fromPaise(item.linePaise),
+                  typeLabel,
+                  style: AppTextStyles.caption(context, color: accent)
+                      .copyWith(
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(line.displayName, style: AppTextStyles.body(context)),
+                if (line case ComboLine(includedItemNames: final names)
+                    when names.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      names.join(' · '),
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ),
+                if (line case FitMealLine(selectionsSummary: final summary)
+                    when summary.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      summary.join(' · '),
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Text(
+                  Money.fromPaise(line.linePaise),
                   style: AppTextStyles.caption(
                     context,
                     color: AppColors.lightTextSecondary,
@@ -339,81 +364,16 @@ class _CartLine extends ConsumerWidget {
             ),
           ),
           IconButton(
-            onPressed: () =>
-                ref.read(cartProvider.notifier).changeQuantity(item.menuItemId, -1),
+            onPressed: () => notifier.changeQuantityById(line.id, -1),
             icon: const Icon(Icons.remove_circle_outline),
             visualDensity: VisualDensity.compact,
           ),
-          Text('${item.quantity}', style: AppTextStyles.bodyLarge(context)),
+          Text('${line.quantity}', style: AppTextStyles.bodyLarge(context)),
           IconButton(
-            onPressed: () =>
-                ref.read(cartProvider.notifier).changeQuantity(item.menuItemId, 1),
+            onPressed: () => notifier.changeQuantityById(line.id, 1),
             icon: const Icon(Icons.add_circle_outline),
             visualDensity: VisualDensity.compact,
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ComboSection extends StatelessWidget {
-  final String comboName;
-  final List<CartItem> items;
-  final VoidCallback onRemove;
-  const _ComboSection({
-    required this.comboName,
-    required this.items,
-    required this.onRemove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.gold.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.40)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                PhosphorIconsFill.gift,
-                color: AppColors.gold,
-                size: 18,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'COMBO · $comboName'.toUpperCase(),
-                style: AppTextStyles.caption(context, color: AppColors.gold)
-                    .copyWith(
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: onRemove,
-                child: const Text('Remove'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          for (final i in items)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(
-                children: [
-                  const Icon(Icons.check, size: 16, color: AppColors.activeGreen),
-                  const SizedBox(width: 6),
-                  Expanded(child: Text(i.name)),
-                ],
-              ),
-            ),
         ],
       ),
     );

@@ -26,7 +26,9 @@ class ComboCard extends ConsumerWidget {
     final price = (combo['price_paise'] as int?) ?? 0;
     final inclusions = (combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
         const <String, dynamic>{};
-    final isInCart = cart.comboId == id;
+    final isInCart = cart.lines.any(
+      (l) => l is ComboLine && l.comboId == id,
+    );
     final menuItemIds = ((inclusions['menu_item_ids'] as List?) ?? const [])
         .cast<String>();
     final sessionMinutes = inclusions['session_minutes'] as int?;
@@ -150,8 +152,9 @@ class ComboCard extends ConsumerWidget {
                 const SizedBox(height: 16),
                 if (isInCart)
                   OutlinedButton.icon(
-                    onPressed: () =>
-                        ref.read(cartProvider.notifier).removeCombo(),
+                    onPressed: () => ref
+                        .read(cartProvider.notifier)
+                        .removeLineById('combo:$id'),
                     icon: const Icon(Icons.remove_circle_outline),
                     label: const Text('Remove from bag'),
                   )
@@ -182,45 +185,23 @@ class ComboCard extends ConsumerWidget {
     WidgetRef ref, {
     required List<Map<String, dynamic>> menuItems,
   }) async {
-    final cart = ref.read(cartProvider);
-    if (!cart.isEmpty) {
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Replace bag?'),
-          content: const Text(
-            'Adding a combo replaces what you have in the bag right now.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Keep bag'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Replace'),
-            ),
-          ],
-        ),
-      );
-      if (ok != true) return;
-    }
+    // Module 2.5/2.6 follow-up: combos are now regular line items that
+    // coexist freely with à-la-carte and FIT meals. No more "replace bag"
+    // confirmation; addCombo merges by combo_id (quantity stack).
     HapticFeedback.mediumImpact();
-    final cartItems = menuItems
-        .map((it) => CartItem(
-              menuItemId: it['id'] as String,
-              name: (it['name'] as String?) ?? '',
-              brand: (it['brand'] as String?) ?? 'coffee',
-              unitPricePaise: (it['price_paise'] as int?) ?? 0,
-              quantity: 1,
-              imageUrl: it['image_url'] as String?,
-            ))
+    final names = menuItems
+        .map((it) => (it['name'] as String?) ?? '')
+        .where((n) => n.isNotEmpty)
         .toList();
-    ref.read(cartProvider.notifier).applyCombo(
-          comboId: combo['id'] as String,
-          comboName: (combo['name'] as String?) ?? 'Combo',
-          comboPricePaise: (combo['price_paise'] as int?) ?? 0,
-          comboItems: cartItems,
+    ref.read(cartProvider.notifier).addCombo(
+          ComboLine.create(
+            comboId: combo['id'] as String,
+            name: (combo['name'] as String?) ?? 'Combo',
+            unitPricePaise: (combo['price_paise'] as int?) ?? 0,
+            quantity: 1,
+            imageUrl: combo['cover_image_url'] as String?,
+            includedItemNames: names,
+          ),
         );
   }
 }
