@@ -32,6 +32,17 @@ Replaces Module 2.1's view-only `/admin/workshops` with full create / edit / unp
 - Admin UI: list shows is_published in status column (greyed strikethrough when unpublished); + New / Edit / Unpublish actions; new `WorkshopEditScreen` form with photo upload (XFile.readAsBytes → workshop-photos bucket via the admin's authenticated session).
 - Routes added: `/admin/workshops/new`, `/admin/workshops/:id/edit`.
 
+## Module 2.3: Announcements module (SHIPPED 2026-05-05)
+Multi-feed customer-home cards (max 5) + admin CRUD + workshop auto-create trigger.
+
+- Migration 0032 — `announcements` table (id, venue_id, title, body, type, cta_label, cta_route, photo_url, visible_from, visible_until, is_published, source_workshop_id, created_by, timestamps). Type CHECK: workshop / general / event / promo / closure. Partial index on (venue_id, visible_from, visible_until) WHERE is_published. UNIQUE(source_workshop_id) ensures one auto-row per workshop. RLS: customer reads only published+visible; admin reads/writes all. Realtime publication added.
+- **Workshop sync trigger**: AFTER INSERT/UPDATE on workshops fires `workshop_announcement_sync()`. When `is_published AND scheduled_at <= now()+14d`, upserts an announcement (title = "<workshop> — Dy Mon DD" IST, body = LEFT(description,100)+ellipsis, CTA = "Book your spot" → /club/workshops, visible_until = scheduled_at+1h). When `is_published=false`, the corresponding announcement is unpublished. ON DELETE CASCADE handles workshop deletion.
+- Migration 0033 — three SECURITY DEFINER RPCs (`admin_announcement_create`, `admin_announcement_update`, `admin_announcement_delete`) gated on `_assert_active_admin()`. Soft-delete via `is_published=false`.
+- Admin UI: `AnnouncementsListScreen` with status badge (Active / Scheduled / Expired / Unpublished), source badge ("Auto · workshop" vs "Manual"), warning banner when active count > 5. `AnnouncementEditScreen` for create/edit with type dropdown, CTA route picker, datetime pickers for visible_from/until, photo URL field, is_published switch. Workshop-sourced rows show a banner explaining the link.
+- Customer UI: `AnnouncementsFeed` widget at `lib/features/home/widgets/announcements_feed.dart`. Realtime stream from announcements; client-side filter for visible-now + cap at 5 + sort by type-priority (workshop > promo > event > general > closure) then recency. Cards show photo (if any), type pill, title, body excerpt, CTA. Wired into `IdleHomeView` between BirthdayCardList and MarketingConsentCard. Renders nothing when no active rows.
+- Sidebar: new "Announcements" entry between Packages and Config (15 nav items).
+- Routes: `/admin/announcements`, `/admin/announcements/new`, `/admin/announcements/:id/edit`.
+
 ## Module 2.5: FIT meal builder — LOCKED SPEC
 Normalized 4-table schema: `fit_meal_templates`, `fit_meal_categories`, `fit_meal_options` (FK→categories), `fit_meal_template_categories` (linker), plus `fit_meal_orders` and `fit_subscription_waitlist`. Effort estimate ~12–14h. Full schema + admin/customer UI breakdown captured in conversation transcript dated 2026-05-05; will be applied verbatim when Module 2.5 ships. (`SCOPE_LOCKED.md` was referenced but doesn't yet exist in the repo — to be created when other locked specs accrete.)
 

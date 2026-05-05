@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/current_family_provider.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../widgets/announcements_feed.dart';
 import '../widgets/birthday_card.dart';
 import '../widgets/healthy_bite_widget.dart';
 import '../widgets/marketing_consent_card.dart';
@@ -51,6 +52,10 @@ class IdleHomeBody extends ConsumerWidget {
         const StartSessionCard(),
         const SizedBox(height: 16),
         const BirthdayCardList(),
+        const SizedBox(height: 16),
+        // Module 2.3: announcements section between birthday card and
+        // recent activity. Renders nothing when no active rows.
+        const AnnouncementsFeed(),
         const MarketingConsentCard(),
         const SizedBox(height: 16),
         const HealthyBiteWidget(),

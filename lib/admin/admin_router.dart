@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import 'announcements/announcement_edit_screen.dart';
+import 'announcements/announcements_list_screen.dart';
 import 'audit/audit_log_screen.dart';
 import 'birthday_crm/birthday_crm_screen.dart';
 import 'catalog/catalog_index_screen.dart';
@@ -124,6 +126,19 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/packages',
             builder: (_, __) => const PackagesListScreen(),
+          ),
+          GoRoute(
+            path: '/admin/announcements',
+            builder: (_, __) => const AnnouncementsListScreen(),
+          ),
+          GoRoute(
+            path: '/admin/announcements/new',
+            builder: (_, __) => const AnnouncementEditScreen(),
+          ),
+          GoRoute(
+            path: '/admin/announcements/:id/edit',
+            builder: (_, state) =>
+                AnnouncementEditScreen(id: state.pathParameters['id']),
           ),
           // Stubs.
           GoRoute(
