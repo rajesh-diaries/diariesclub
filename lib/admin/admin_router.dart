@@ -11,6 +11,7 @@ import 'catalog/catalog_index_screen.dart';
 import 'catalog/coffee_list_screen.dart';
 import 'catalog/combos_list_screen.dart';
 import 'catalog/fit_list_screen.dart';
+import 'catalog/menu_item_edit_screen.dart';
 import 'config/config_screen.dart';
 import 'customers/customer_detail_screen.dart';
 import 'customers/customers_screen.dart';
@@ -114,6 +115,17 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/catalog/coffee',
             builder: (_, __) => const CoffeeListScreen(),
+          ),
+          GoRoute(
+            path: '/admin/catalog/coffee/new',
+            builder: (_, state) => MenuItemEditScreen(
+              menuId: state.uri.queryParameters['menu_id'],
+            ),
+          ),
+          GoRoute(
+            path: '/admin/catalog/coffee/:id/edit',
+            builder: (_, state) =>
+                MenuItemEditScreen(itemId: state.pathParameters['id']),
           ),
           GoRoute(
             path: '/admin/catalog/fit',

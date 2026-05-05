@@ -43,6 +43,27 @@ Multi-feed customer-home cards (max 5) + admin CRUD + workshop auto-create trigg
 - Sidebar: new "Announcements" entry between Packages and Config (15 nav items).
 - Routes: `/admin/announcements`, `/admin/announcements/new`, `/admin/announcements/:id/edit`.
 
+## Module 2.4: Coffee menu CRUD (SHIPPED 2026-05-05)
+Replaces Module 2.1's view-only `/admin/catalog/coffee` with full create / edit / hide / sold-out toggle / reorder. Realtime keeps the customer cart in sync (already wired in Session 7).
+
+- Migration 0034:
+  - `menu_items.is_published` BOOLEAN DEFAULT TRUE — distinct from `is_available` (sold-out for the day). Soft-delete sets is_published=false.
+  - Partial index on (menu_id, category, sort_order) WHERE is_published.
+  - `menu-photos` private storage bucket + RLS (auth read, service-role write).
+  - Five SECURITY DEFINER RPCs gated on `_assert_active_admin()`:
+    - `admin_menu_item_create` — auto-appends sort_order at end of category if not provided.
+    - `admin_menu_item_update`.
+    - `admin_menu_item_delete` — soft via is_published=false, idempotent.
+    - `admin_menu_item_toggle_available` — quick-action for sold-out switch.
+    - `admin_menu_item_reorder` — direction 'up'/'down' swaps sort_order with the same-category neighbour. Both rows locked with FOR UPDATE.
+- Admin UI:
+  - `CoffeeListScreen` rewritten — DataTable with thumbnail, name (strikethrough when hidden), category, price, **Available switch** (Switch widget, disabled when hidden), status badge (Live / Sold out / Hidden), per-row actions: ↑ / ↓ / Edit / Hide.
+  - `MenuItemEditScreen` (new) — handles both create and edit. Photo picker (XFile.readAsBytes → menu-photos bucket), name, description, price (₹), category. Edit mode adds Available + Published switches.
+  - Routes: `/admin/catalog/coffee/new?menu_id=<uuid>`, `/admin/catalog/coffee/:id/edit`.
+- **Drag-to-reorder UX deferred** — ↑/↓ buttons are functionally equivalent against the swap RPC and avoid the DataTable→ReorderableListView shell switch. Reorder RPC accepts arbitrary sort_order writes if a future polish pass introduces full drag UI.
+
+---
+
 ## Module 2.5: FIT meal builder — LOCKED SPEC
 Normalized 4-table schema: `fit_meal_templates`, `fit_meal_categories`, `fit_meal_options` (FK→categories), `fit_meal_template_categories` (linker), plus `fit_meal_orders` and `fit_subscription_waitlist`. Effort estimate ~12–14h. Full schema + admin/customer UI breakdown captured in conversation transcript dated 2026-05-05; will be applied verbatim when Module 2.5 ships. (`SCOPE_LOCKED.md` was referenced but doesn't yet exist in the repo — to be created when other locked specs accrete.)
 
