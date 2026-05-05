@@ -116,8 +116,8 @@ flutter analyze: clean across the board.
 
 ---
 
-## Module 2.5: FIT meal builder — LOCKED SPEC
-Normalized 4-table schema: `fit_meal_templates`, `fit_meal_categories`, `fit_meal_options` (FK→categories), `fit_meal_template_categories` (linker), plus `fit_meal_orders` and `fit_subscription_waitlist`. Effort estimate ~12–14h. Full schema + admin/customer UI breakdown captured in conversation transcript dated 2026-05-05; will be applied verbatim when Module 2.5 ships. (`SCOPE_LOCKED.md` was referenced but doesn't yet exist in the repo — to be created when other locked specs accrete.)
+## Module 2.5: legacy LOCKED SPEC entry (superseded by SHIPPED entry above)
+The Module 2.5 spec has been implemented per the SHIPPED entry above. This placeholder is retained briefly so search/refs to "LOCKED SPEC" still surface a pointer. Safe to delete next time BUGS.md is touched.
 
 ---
 
