@@ -174,11 +174,35 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
         });
         if (newStatus != 'pending') {
           _stopTickers();
+          // BUG-016: when the server transitions us out of 'pending' (staff
+          // scan → 'active', or autocancel cron → 'cancelled_pre_scan'),
+          // celebrate briefly then send the customer to /home so they see
+          // the running session / refunded wallet without needing to back
+          // out manually.
+          if (oldStatus == 'pending') {
+            _autoDismissTo(newStatus);
+          }
         }
       }
     } catch (_) {
       // Transient error — next tick retries.
     }
+  }
+
+  Future<void> _autoDismissTo(String? newStatus) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final message = newStatus == 'active'
+        ? 'Session started! Have fun ✨'
+        : 'Session cancelled, hold released.';
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(milliseconds: 1400),
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 1500));
+    if (!mounted) return;
+    context.go('/home');
   }
 
   String _buildPayload(Map<String, dynamic> session) {

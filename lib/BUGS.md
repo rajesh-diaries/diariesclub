@@ -125,6 +125,20 @@ When customer taps "Not this year":
 
 ---
 
+## BUG-016: SessionQrScreen doesn't auto-dismiss after staff scan (FIXED)
+- Discovered: 2026-05-05 Phase 1A web testing (during BUG-004 verification via SQL bypass)
+- Severity: 🟡 IMPORTANT (UX confusion — customer doesn't know scan worked)
+- App: Customer Web + Mobile
+- Location: lib/features/sessions/session_qr_screen.dart
+- Symptom: After staff scans the QR, session.status flips to 'active' on the server but the QR screen stayed visible — customer had to back-nav manually to see the running session on Home.
+- Root cause: `_pollStatus` updated `_session` and stopped tickers when status left 'pending', but never navigated. The `_CancelledBody` rendered for 'cancelled_pre_scan' but required a manual tap.
+- Fix applied: `_pollStatus` now detects the pending → active and pending → cancelled_pre_scan transitions, shows a celebratory ("Session started! Have fun ✨") or informational ("Session cancelled, hold released.") snackbar, waits 1.5s for the user to register the message, then `context.go('/home')`. Manual cancel path is unchanged (it already navigates).
+- Status: FIXED 2026-05-05
+
+Note: BUG-004 hold-then-charge architecture verified working in this session via SQL — wallet held ₹300, released hold, debited ₹300 cleanly; status pending → active flow correct; realtime updates flowed to home (wallet, timer). The architecture is sound; only the QR-screen auto-dismiss UX was missing, now fixed as BUG-016.
+
+---
+
 ## BUG-015: Journey timeline shows on /birthday discovery without active reservation (FIXED)
 - Fix applied: lib/features/birthday/birthday_discovery_screen.dart no longer renders `JourneyProgressBar`. Discovery is by definition the no-reservation state (page redirects to status screen when an active reservation exists). The timeline widget itself was retained and updated for BUG-009 cadence in case future surfaces reuse it.
 - Discovered: 2026-05-05 Phase 1A web testing
