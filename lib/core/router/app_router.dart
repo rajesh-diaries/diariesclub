@@ -14,6 +14,7 @@ import '../../features/birthday/birthday_packages_screen.dart';
 import '../../features/birthday/package_detail_screen.dart';
 import '../../features/birthday/reservation_status_screen.dart';
 import '../../features/club/club_screen.dart';
+import '../../features/club/fit_builder_screen.dart';
 import '../../features/club/order_tracking_screen.dart';
 import '../../features/club/workshop_detail_screen.dart';
 import '../../features/force_update/force_update_screen.dart';
@@ -382,6 +383,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => WorkshopDetailScreen(
           workshopId: state.pathParameters['workshopId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/club/fit/builder/:templateId',
+        name: 'club_fit_builder',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => FitBuilderScreen(
+          templateId: state.pathParameters['templateId']!,
         ),
       ),
 

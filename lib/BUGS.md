@@ -85,18 +85,34 @@ Replaces Module 2.1's view-only `/admin/catalog/coffee` with full create / edit 
 
 ---
 
-## Module 2.5: FIT meal builder (IN PROGRESS — commit A: schema + RPCs SHIPPED 2026-05-05)
-Normalized 4-table builder + orders + waitlist. Pricing is server-authoritative.
+## Module 2.5: FIT meal builder (SHIPPED 2026-05-05)
+Normalized 4-table builder + orders + waitlist. Pricing server-authoritative. Two commits: schema/RPCs (A) and admin+customer UI bundled (B).
 
-**Commit A — schema (0036) + RPCs (0037)**: live.
+**Commit A — schema (0036) + RPCs (0037)** — `fbd1fa7`:
 - 6 tables: `fit_meal_categories`, `fit_meal_options`, `fit_meal_templates`, `fit_meal_template_categories` (linker), `fit_meal_orders`, `fit_subscription_waitlist`. RLS on all. Realtime publication on the four customer-visible tables.
-- Pricing helper `_fit_validate_and_price(template_id, selections_jsonb)` (service-role only) — validates required categories, single vs multi selection types, option availability; returns `{base_price_paise, total_upcharge_paise, final_price_paise}`. Customer-callable wrapper `fit_meal_compute_price` exposes it for live UI.
-- `fit_meal_order_create(template_id, selections_jsonb)` — customer-callable, server-authoritative pricing. Inserts with `status='in_cart'`. Cart integration shape decided in commit C.
+- Pricing helper `_fit_validate_and_price` (service-role) walks every linked category for the template, validates required + selection-type cardinality + option availability, sums upcharges. Customer-callable wrapper `fit_meal_compute_price` exposes it for live UI updates.
+- `fit_meal_order_create(template_id, selections_jsonb)` — server-authoritative pricing on add-to-cart. Inserts row with `status='in_cart'`.
 - `fit_subscription_waitlist_join(email)` — idempotent on family_id.
-- 11 admin RPCs gated on `_assert_active_admin()`: category create/update/delete, option create/update/delete + toggle_available, template create/update/delete + link_category/unlink_category, waitlist_update_status. Soft-delete on options + templates via `is_published=false`. Category delete refuses if any template references it.
-- Selections JSONB shape: `{ "<category_id>": "<option_id>" }` for single-select, `{ "<category_id>": ["<option_id>", ...] }` for multi.
+- 11 admin RPCs gated on `_assert_active_admin()`. Soft-delete via `is_published=false`. Category delete refuses if any template references it.
+- Selections JSONB shape: single → `{"<cat_id>":"<opt_id>"}`; multi → `{"<cat_id>":["<opt_id>",...]}`.
 
-Commits B (admin UI) and C (customer UI + cart integration) coming next.
+**Commit B — admin + customer UI bundled**:
+
+Admin (under `/admin/catalog/fit`):
+- `FitListScreen` — replaces the Module 2.1 stub. Templates DataTable with thumbnail / name / base price / category-count / status badge / Edit + Unpublish actions. Header buttons route to Categories and Waitlist. + New template button.
+- `FitTemplateEditScreen` — single form for create+edit. Photo picker (XFile.readAsBytes → public menu-photos bucket per ARCHITECTURE-001). Linked-categories editor: chip-tap to add unlinked cats, per-link Required checkbox + selection-type-override dropdown + Remove. Diff is computed on save (re-link present, unlink missing for edits).
+- `FitCategoriesScreen` — global categories + their options. ExpansionTile per category. Inline AlertDialogs for create/edit of categories + options. Per-option Available switch + Edit + Hide. Refuses category delete if templates reference it (server-side).
+- `FitWaitlistScreen` — read-only DataTable (family name, email, signed-up date) with status dropdown (interested → contacted → onboarded → not_interested) per row.
+- 5 routes added under `/admin/catalog/fit/*`.
+
+Customer:
+- `FitMenuTab` — replaces the BrandMenuTab-only wrapper. Three stacked sections: subscription waitlist banner (gradient card → modal email capture), "Build your meal" template cards, legacy menu_items section (`brand='fit'`) for backward compat with pre-Module-2.5 seed.
+- `FitBuilderScreen` at `/club/fit/builder/:templateId`. Loads template + linker rows + categories + options. Renders single-select (ChoiceChip) or multi-select (FilterChip) per category with required/optional pill. Sticky bottom bar shows server-computed total. CTA disabled until all required categories filled. `fit_meal_compute_price` invoked on every selection change for live total. Add-to-cart calls `fit_meal_order_create`, shows snackbar, pops back.
+- Decline modal + email validation client-side; server-side regex enforced.
+
+**Cart integration deferred** (TODO comment in `FitBuilderScreen`): FIT orders live in their own `fit_meal_orders` table with `status='in_cart'` rather than retrofitting into the existing menu_items cart. Surfacing them in a unified cart sheet is a follow-up.
+
+flutter analyze: clean across the board.
 
 ---
 

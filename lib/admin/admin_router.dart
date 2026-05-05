@@ -10,7 +10,10 @@ import 'birthday_crm/birthday_crm_screen.dart';
 import 'catalog/catalog_index_screen.dart';
 import 'catalog/coffee_list_screen.dart';
 import 'catalog/combos_list_screen.dart';
+import 'catalog/fit_categories_screen.dart';
 import 'catalog/fit_list_screen.dart';
+import 'catalog/fit_template_edit_screen.dart';
+import 'catalog/fit_waitlist_screen.dart';
 import 'catalog/menu_item_edit_screen.dart';
 import 'config/config_screen.dart';
 import 'customers/customer_detail_screen.dart';
@@ -130,6 +133,23 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/catalog/fit',
             builder: (_, __) => const FitListScreen(),
+          ),
+          GoRoute(
+            path: '/admin/catalog/fit/categories',
+            builder: (_, __) => const FitCategoriesScreen(),
+          ),
+          GoRoute(
+            path: '/admin/catalog/fit/waitlist',
+            builder: (_, __) => const FitWaitlistScreen(),
+          ),
+          GoRoute(
+            path: '/admin/catalog/fit/template/new',
+            builder: (_, __) => const FitTemplateEditScreen(),
+          ),
+          GoRoute(
+            path: '/admin/catalog/fit/template/:id/edit',
+            builder: (_, state) =>
+                FitTemplateEditScreen(templateId: state.pathParameters['id']),
           ),
           GoRoute(
             path: '/admin/catalog/combos',
