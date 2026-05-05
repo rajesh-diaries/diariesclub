@@ -23,7 +23,8 @@ For each bug, use this format:
 
 ## Features (planned, build in fix-batch)
 
-## FEATURE-001: Universal child birthday wishes (DECIDED — build in fix-batch)
+## FEATURE-001: Universal child birthday wishes (SHIPPED — Phase 3c)
+- Status: customer-facing UI shipped. Schema (0020) + cron (Phase 2) live. Notifications settings screen now has "Birthday wishes for my children" toggle backed by `families.notification_preferences.birthday_wish_enabled`. Per-child toggle remains v1.1 deferral.
 - Discovered: 2026-05-05 Phase 1A founder request
 - Severity: 🟢 BRAND FEATURE (high-impact differentiator)
 - App: Customer notification system + new cron
@@ -314,7 +315,8 @@ Status: v1 fix DECIDED, applies in fix-batch. v1.1 deferred.
 
 ---
 
-## BUG-004: Session starts + wallet deducted before staff QR scan (DECIDED)
+## BUG-004: Session starts + wallet deducted before staff QR scan (FIXED)
+- Status: shipped end-to-end. DB layer: wallets.held_paise + sessions.status extended (0022); session_create v2 holds instead of debits, qr_scan_validate v2 converts hold to debit, session_cancel_pending releases (0023). Edge layer: session-autocancel-pending-cron sweeps every minute (Phase 2). UI layer: SessionQrScreen now switches on status — pending shows "Auto-cancels in MM:SS" + cancel button, active stays as before, cancelled_pre_scan shows the released-hold confirmation. Countdown derives deadline from server-stamped `created_at`; client clock skew only affects the visual timer, not money math.
 - Resolution: Option 2 — Switch to hold-then-charge architecture
 - Implementation plan (defer to fix-batch phase):
   1. New session status: 'pending' (already exists, repurpose)

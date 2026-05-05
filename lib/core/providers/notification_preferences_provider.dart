@@ -14,6 +14,7 @@ class NotificationPreferences {
   final bool marketing;
   final bool streaksMilestones;
   final bool workshopReminders;
+  final bool birthdayWishEnabled;
 
   const NotificationPreferences({
     required this.sessionReminders,
@@ -24,6 +25,7 @@ class NotificationPreferences {
     required this.marketing,
     required this.streaksMilestones,
     required this.workshopReminders,
+    required this.birthdayWishEnabled,
   });
 
   factory NotificationPreferences.fromJson(Map<String, dynamic>? json) {
@@ -37,6 +39,7 @@ class NotificationPreferences {
       marketing: j['marketing'] as bool? ?? false,
       streaksMilestones: j['streaks_milestones'] as bool? ?? true,
       workshopReminders: j['workshop_reminders'] as bool? ?? true,
+      birthdayWishEnabled: j['birthday_wish_enabled'] as bool? ?? true,
     );
   }
 
@@ -49,6 +52,7 @@ class NotificationPreferences {
         'marketing': marketing,
         'streaks_milestones': streaksMilestones,
         'workshop_reminders': workshopReminders,
+        'birthday_wish_enabled': birthdayWishEnabled,
       };
 
   NotificationPreferences copyWith({
@@ -60,6 +64,7 @@ class NotificationPreferences {
     bool? marketing,
     bool? streaksMilestones,
     bool? workshopReminders,
+    bool? birthdayWishEnabled,
   }) =>
       NotificationPreferences(
         sessionReminders: sessionReminders ?? this.sessionReminders,
@@ -70,6 +75,7 @@ class NotificationPreferences {
         marketing: marketing ?? this.marketing,
         streaksMilestones: streaksMilestones ?? this.streaksMilestones,
         workshopReminders: workshopReminders ?? this.workshopReminders,
+        birthdayWishEnabled: birthdayWishEnabled ?? this.birthdayWishEnabled,
       );
 }
 

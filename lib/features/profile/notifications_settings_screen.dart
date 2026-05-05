@@ -139,6 +139,20 @@ class _NotificationsSettingsScreenState
                         ),
               ),
               _Toggle(
+                title: 'Birthday wishes for my children',
+                subtitle:
+                    'A short note from us on your kids\' birthdays — even if you celebrate elsewhere.',
+                value: prefs.birthdayWishEnabled,
+                onChanged: _busy
+                    ? null
+                    : (v) => _toggle(
+                          current: prefs,
+                          updated: prefs.copyWith(birthdayWishEnabled: v),
+                          key: 'birthday_wish_enabled',
+                          newValue: v,
+                        ),
+              ),
+              _Toggle(
                 title: 'Order status',
                 subtitle: 'Confirmations and ready-to-pickup pings.',
                 value: prefs.orderStatus,

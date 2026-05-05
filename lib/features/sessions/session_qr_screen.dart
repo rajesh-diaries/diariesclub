@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -16,8 +17,27 @@ import '../../core/utils/currency.dart';
 
 /// "Show this at the desk." Wakelock on, brightness boosted, large QR with
 /// gold border. The QR payload is currently a base64-encoded JSON stub
-/// containing { session_id, family_id, expires_at }; Session 10 will swap
-/// this for a signed JWT against `qr_nonces` once the staff scanner exists.
+/// containing { session_id, family_id, expires_at }; signed-JWT replacement
+/// is tracked as BUG-002 (deferred to v1.1).
+///
+/// Session 14 / BUG-004 — hold-then-charge:
+///   Customer-initiated wallet sessions are created in status='pending'.
+///   This screen renders a countdown ("Auto-cancels in MM:SS") and a
+///   cancel-now button while pending. When staff scans the QR,
+///   qr_scan_validate flips status to 'active' and converts the wallet
+///   hold to a debit. Polling every 2s catches the flip and re-renders.
+///   If the customer doesn't get scanned within
+///   venue_config.session_pre_scan_timeout_minutes (default 15), the
+///   session-autocancel-pending cron flips status to 'cancelled_pre_scan'
+///   and releases the hold; we detect that in the same poll.
+///
+/// Clock-skew note: the countdown is derived from session.created_at
+/// (server-stamped) + the venue timeout, then subtracted from
+/// DateTime.now(). On NTP-synced devices the visual countdown is within
+/// a couple of seconds of the server's actual deadline. If a client
+/// clock is far off, the *visual* countdown drifts but the server-side
+/// cancellation is unaffected — the next status poll catches the
+/// real state. No money math runs on the client.
 class SessionQrScreen extends ConsumerStatefulWidget {
   final String sessionId;
   const SessionQrScreen({super.key, required this.sessionId});
@@ -31,6 +51,12 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
   String? _qrPayload;
   String? _error;
 
+  Timer? _statusPoll;
+  Timer? _countdownTick;
+  Duration _remaining = Duration.zero;
+  DateTime? _deadline;
+  bool _cancelling = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,9 +67,9 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
 
   @override
   void dispose() {
+    _statusPoll?.cancel();
+    _countdownTick?.cancel();
     WakelockPlus.disable();
-    // Best-effort reset; failures are silent on platforms that don't
-    // support per-app brightness.
     ScreenBrightness().resetApplicationScreenBrightness().catchError((_) {});
     super.dispose();
   }
@@ -68,21 +94,97 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
         setState(() => _error = 'Session not found.');
         return;
       }
+
+      final session = Map<String, dynamic>.from(row);
+      final status = session['status'] as String?;
+
+      // Pending sessions need a deadline. Pull venue timeout once, derive
+      // deadline from server-stamped created_at, then run a 1Hz tick
+      // locally + 2s status poll for state change detection.
+      if (status == 'pending') {
+        final venueId = session['venue_id'] as String?;
+        if (venueId != null) {
+          final cfg = await Supabase.instance.client
+              .from('venue_config')
+              .select('session_pre_scan_timeout_minutes')
+              .eq('venue_id', venueId)
+              .maybeSingle();
+          if (!mounted) return;
+          final timeoutMin =
+              (cfg?['session_pre_scan_timeout_minutes'] as int?) ?? 15;
+          final createdAt = DateTime.tryParse(
+                (session['created_at'] as String?) ?? '',
+              )?.toUtc() ??
+              DateTime.now().toUtc();
+          _deadline = createdAt.add(Duration(minutes: timeoutMin));
+          _tickCountdown(); // seed _remaining
+          _startTickers();
+        }
+      }
+
       setState(() {
-        _session = Map<String, dynamic>.from(row);
-        _qrPayload = _buildPayload(_session!);
+        _session = session;
+        _qrPayload = _buildPayload(session);
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _error = "Couldn't load session.");
     }
   }
 
+  void _startTickers() {
+    _countdownTick?.cancel();
+    _statusPoll?.cancel();
+    _countdownTick =
+        Timer.periodic(const Duration(seconds: 1), (_) => _tickCountdown());
+    _statusPoll =
+        Timer.periodic(const Duration(seconds: 2), (_) => _pollStatus());
+  }
+
+  void _stopTickers() {
+    _countdownTick?.cancel();
+    _statusPoll?.cancel();
+    _countdownTick = null;
+    _statusPoll = null;
+  }
+
+  void _tickCountdown() {
+    if (_deadline == null) return;
+    final remaining = _deadline!.difference(DateTime.now().toUtc());
+    if (!mounted) return;
+    setState(() {
+      _remaining = remaining.isNegative ? Duration.zero : remaining;
+    });
+  }
+
+  Future<void> _pollStatus() async {
+    if (!mounted || _session == null) return;
+    try {
+      final row = await Supabase.instance.client
+          .from('sessions')
+          .select('status, started_at, expires_at, grace_force_close_at')
+          .eq('id', widget.sessionId)
+          .maybeSingle();
+      if (!mounted || row == null) return;
+      final newStatus = row['status'] as String?;
+      final oldStatus = _session?['status'] as String?;
+      if (newStatus != oldStatus) {
+        setState(() {
+          _session = {..._session!, ...Map<String, dynamic>.from(row)};
+        });
+        if (newStatus != 'pending') {
+          _stopTickers();
+        }
+      }
+    } catch (_) {
+      // Transient error — next tick retries.
+    }
+  }
+
   String _buildPayload(Map<String, dynamic> session) {
-    // Stub payload — staff scanning is Session 10. Sessions are already
-    // status='active' on creation (see session_create RPC), so the QR is
-    // really just a reference for staff to look up the session in their
-    // tablet app once that exists.
+    // Stub payload — signed-JWT replacement is BUG-002 (v1.1). The
+    // session_id is unguessable and qr_scan_validate enforces single-use
+    // via staff_scanned_at, so v1 trust holds for friends-and-family beta.
     final payload = {
       'v': 1,
       'session_id': session['id'],
@@ -92,7 +194,81 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
     return base64Url.encode(utf8.encode(jsonEncode(payload)));
   }
 
+  Future<void> _cancelNow() async {
+    if (_cancelling) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Cancel this session?'),
+        content: const Text(
+          "We'll release the hold on your wallet. You can start again "
+          'whenever you like.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text("Don't cancel"),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.adminRed),
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Cancel session'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _cancelling = true);
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'session_cancel_pending',
+        params: {'p_session_id': widget.sessionId},
+      );
+      if (!mounted) return;
+      _stopTickers();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Session cancelled, hold released.')),
+      );
+      context.go('/home');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _cancelling = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't cancel. Please try again.")),
+      );
+    }
+  }
+
   Future<void> _confirmExit() async {
+    final status = _session?['status'] as String?;
+    if (status == 'pending') {
+      // From the pending state, exit means "leave the QR open in the
+      // background" — explain that the cron will auto-cancel if no scan.
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Leave the QR screen?'),
+          content: Text(
+            "If you don't get scanned within the timeout, your hold will "
+            'be released automatically. You can come back from Home while '
+            'the session is still pending.',
+            style: AppTextStyles.body(context),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Stay here'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Leave'),
+            ),
+          ],
+        ),
+      );
+      if (ok == true && mounted) context.go('/home');
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -123,6 +299,7 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
     final iAmOwner = familyId != null &&
         session != null &&
         session['family_id'] == familyId;
+    final status = session?['status'] as String?;
 
     return PopScope(
       canPop: false,
@@ -131,7 +308,13 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Show this at the desk'),
+          title: Text(
+            status == 'pending'
+                ? 'Show this to staff'
+                : status == 'cancelled_pre_scan'
+                    ? 'Session cancelled'
+                    : 'Show this at the desk',
+          ),
           leading: IconButton(
             tooltip: 'Done',
             icon: const Icon(Icons.close),
@@ -152,11 +335,17 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
                 )
               : session == null
                   ? const Center(child: CircularProgressIndicator())
-                  : _Body(
-                      session: session,
-                      qrPayload: _qrPayload!,
-                      iAmOwner: iAmOwner,
-                    ),
+                  : status == 'cancelled_pre_scan'
+                      ? _CancelledBody(onHome: () => context.go('/home'))
+                      : _Body(
+                          session: session,
+                          qrPayload: _qrPayload!,
+                          iAmOwner: iAmOwner,
+                          isPending: status == 'pending',
+                          remaining: _remaining,
+                          cancelling: _cancelling,
+                          onCancelNow: _cancelNow,
+                        ),
         ),
       ),
     );
@@ -167,11 +356,26 @@ class _Body extends StatelessWidget {
   final Map<String, dynamic> session;
   final String qrPayload;
   final bool iAmOwner;
+  final bool isPending;
+  final Duration remaining;
+  final bool cancelling;
+  final VoidCallback onCancelNow;
+
   const _Body({
     required this.session,
     required this.qrPayload,
     required this.iAmOwner,
+    required this.isPending,
+    required this.remaining,
+    required this.cancelling,
+    required this.onCancelNow,
   });
+
+  String _formatRemaining(Duration d) {
+    final m = d.inMinutes.toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -179,7 +383,7 @@ class _Body extends StatelessWidget {
     final amount = session['amount_paise'] as int? ?? 0;
     final paymentMethod = (session['payment_method'] as String?) ?? '—';
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
@@ -207,7 +411,9 @@ class _Body extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            "Show this to staff. They'll scan to confirm.",
+            isPending
+                ? 'Show this to staff. Once they scan, your session starts and the wallet hold becomes a debit.'
+                : "Show this to staff. They'll scan to confirm.",
             style: AppTextStyles.body(
               context,
               color: AppColors.lightTextSecondary,
@@ -215,6 +421,40 @@ class _Body extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
+          if (isPending) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.10),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: 0.40),
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    PhosphorIconsFill.timer,
+                    color: AppColors.gold,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Auto-cancels in ${_formatRemaining(remaining)}',
+                      style: AppTextStyles.body(context).copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           Container(
             padding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -239,7 +479,7 @@ class _Body extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  '${Money.fromPaise(amount)} · $paymentMethod',
+                  '${Money.fromPaise(amount)} · ${isPending ? 'on hold' : paymentMethod}',
                   style: AppTextStyles.caption(
                     context,
                     color: AppColors.lightTextSecondary,
@@ -248,6 +488,22 @@ class _Body extends StatelessWidget {
               ],
             ),
           ),
+          if (isPending) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(PhosphorIconsRegular.xCircle),
+                label: Text(cancelling ? 'Cancelling…' : 'Cancel session'),
+                onPressed: cancelling ? null : onCancelNow,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.adminRed,
+                  side: const BorderSide(color: AppColors.adminRed),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
           if (!iAmOwner)
             Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -259,6 +515,48 @@ class _Body extends StatelessWidget {
                 ),
               ),
             ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+}
+
+class _CancelledBody extends StatelessWidget {
+  final VoidCallback onHome;
+  const _CancelledBody({required this.onHome});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 32),
+          const Icon(
+            PhosphorIconsFill.xCircle,
+            color: AppColors.adminRed,
+            size: 64,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Session cancelled',
+            style: AppTextStyles.h2(context),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "We didn't get a scan in time, so your wallet hold has been "
+            'released. Start a new session whenever you like.',
+            style: AppTextStyles.body(
+              context,
+              color: AppColors.lightTextSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          FilledButton(onPressed: onHome, child: const Text('Back to Home')),
         ],
       ),
     );
