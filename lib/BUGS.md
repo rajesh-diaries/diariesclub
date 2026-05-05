@@ -85,6 +85,21 @@ Replaces Module 2.1's view-only `/admin/catalog/coffee` with full create / edit 
 
 ---
 
+## Module 2.5: FIT meal builder (IN PROGRESS — commit A: schema + RPCs SHIPPED 2026-05-05)
+Normalized 4-table builder + orders + waitlist. Pricing is server-authoritative.
+
+**Commit A — schema (0036) + RPCs (0037)**: live.
+- 6 tables: `fit_meal_categories`, `fit_meal_options`, `fit_meal_templates`, `fit_meal_template_categories` (linker), `fit_meal_orders`, `fit_subscription_waitlist`. RLS on all. Realtime publication on the four customer-visible tables.
+- Pricing helper `_fit_validate_and_price(template_id, selections_jsonb)` (service-role only) — validates required categories, single vs multi selection types, option availability; returns `{base_price_paise, total_upcharge_paise, final_price_paise}`. Customer-callable wrapper `fit_meal_compute_price` exposes it for live UI.
+- `fit_meal_order_create(template_id, selections_jsonb)` — customer-callable, server-authoritative pricing. Inserts with `status='in_cart'`. Cart integration shape decided in commit C.
+- `fit_subscription_waitlist_join(email)` — idempotent on family_id.
+- 11 admin RPCs gated on `_assert_active_admin()`: category create/update/delete, option create/update/delete + toggle_available, template create/update/delete + link_category/unlink_category, waitlist_update_status. Soft-delete on options + templates via `is_published=false`. Category delete refuses if any template references it.
+- Selections JSONB shape: `{ "<category_id>": "<option_id>" }` for single-select, `{ "<category_id>": ["<option_id>", ...] }` for multi.
+
+Commits B (admin UI) and C (customer UI + cart integration) coming next.
+
+---
+
 ## Module 2.5: FIT meal builder — LOCKED SPEC
 Normalized 4-table schema: `fit_meal_templates`, `fit_meal_categories`, `fit_meal_options` (FK→categories), `fit_meal_template_categories` (linker), plus `fit_meal_orders` and `fit_subscription_waitlist`. Effort estimate ~12–14h. Full schema + admin/customer UI breakdown captured in conversation transcript dated 2026-05-05; will be applied verbatim when Module 2.5 ships. (`SCOPE_LOCKED.md` was referenced but doesn't yet exist in the repo — to be created when other locked specs accrete.)
 
