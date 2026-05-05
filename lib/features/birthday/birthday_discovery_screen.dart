@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers/family_children_provider.dart';
 import '../../core/providers/upcoming_birthdays_provider.dart';
@@ -10,7 +11,6 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/child_avatar.dart';
 import '../../core/widgets/primary_button.dart';
 import 'providers/reservation_providers.dart';
-import 'widgets/journey_progress_bar.dart';
 
 /// Birthday discovery hub. Hero section with the closest-upcoming child,
 /// the journey progress bar, the "see packages" CTA, and a help link.
@@ -77,8 +77,12 @@ class BirthdayDiscoveryScreen extends ConsumerWidget {
                   daysUntil: upcomingBirthday?.daysUntil,
                 ),
               const SizedBox(height: 16),
-              if (upcomingBirthday != null)
-                JourneyProgressBar(daysUntil: upcomingBirthday.daysUntil),
+              // BUG-015: timeline only ever rendered when an active
+              // reservation exists. Discovery is the no-reservation state
+              // (page redirects away above when one is found), so the
+              // timeline is intentionally absent here.
+              if (selectedChild != null)
+                _BirthdayInterestCard(child: selectedChild),
               const SizedBox(height: 16),
               _MainCta(
                 childName: (selectedChild?['name'] as String?) ?? 'your child',
@@ -237,6 +241,170 @@ class _PackagesTeaser extends StatelessWidget {
       ],
     );
   }
+}
+
+/// FEATURE-002: per-child birthday interest opt-out card. Two states:
+/// 'interested' (default) and 'not_this_year'. Picking 'not_this_year'
+/// fires the warm decline modal; the family-set RPC is idempotent so
+/// re-tapping the same option is a no-op.
+class _BirthdayInterestCard extends ConsumerStatefulWidget {
+  final Map<String, dynamic> child;
+  const _BirthdayInterestCard({required this.child});
+
+  @override
+  ConsumerState<_BirthdayInterestCard> createState() =>
+      _BirthdayInterestCardState();
+}
+
+class _BirthdayInterestCardState extends ConsumerState<_BirthdayInterestCard> {
+  bool _busy = false;
+
+  Future<void> _setState(String newState) async {
+    if (_busy) return;
+    final current =
+        widget.child['birthday_interest_state'] as String? ?? 'interested';
+    if (current == newState) return;
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'family_set_birthday_interest',
+        params: {
+          'p_child_id': widget.child['id'],
+          'p_interest_state': newState,
+        },
+      );
+      if (!mounted) return;
+      // Realtime stream on family_children_provider will reflect the new
+      // state — no manual invalidate needed.
+      if (newState == 'not_this_year') {
+        await _showDeclineModal(
+          context,
+          (widget.child['name'] as String?) ?? 'your child',
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't save. Please try again.")),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (widget.child['name'] as String?) ?? 'your child';
+    final state =
+        widget.child['birthday_interest_state'] as String? ?? 'interested';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      decoration: BoxDecoration(
+        color: AppColors.lightSurface,
+        border: Border.all(color: AppColors.lightBorder),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Tell us about $name's birthday",
+            style: AppTextStyles.h3(context),
+          ),
+          const SizedBox(height: 8),
+          RadioGroup<String>(
+            groupValue: state,
+            onChanged: (v) {
+              if (_busy || v == null) return;
+              _setState(v);
+            },
+            child: Column(
+              children: [
+                RadioListTile<String>(
+                  value: 'interested',
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    "Yes, we'd love to celebrate here",
+                    style: AppTextStyles.body(context),
+                  ),
+                ),
+                RadioListTile<String>(
+                  value: 'not_this_year',
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Not this year, thanks',
+                    style: AppTextStyles.body(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _showDeclineModal(BuildContext context, String childName) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetCtx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Got it.',
+              style: AppTextStyles.h2(sheetCtx),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Whatever you celebrate with this year, $childName is still '
+              'part of our Play Diaries family.',
+              style: AppTextStyles.body(sheetCtx),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "We'll just send a happy birthday wish on the day 🎂",
+              style: AppTextStyles.body(sheetCtx),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '(you can turn that off in Settings too if you’d like)',
+              style: AppTextStyles.caption(
+                sheetCtx,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(sheetCtx).pop(),
+                    child: const Text('Done'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: PrimaryButton(
+                    label: 'Browse other things to do',
+                    onPressed: () {
+                      Navigator.of(sheetCtx).pop();
+                      sheetCtx.go('/home');
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _HelpRow extends StatelessWidget {

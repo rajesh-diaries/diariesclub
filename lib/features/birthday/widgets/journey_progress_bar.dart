@@ -3,20 +3,19 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
-/// 6-step progress bar visualizing the parent's distance to the child's
+/// 5-step progress bar visualizing the parent's distance to the child's
 /// birthday. Pure presentation; the days-until value comes in from a
-/// caller. Steps: D-90, D-60, D-30, D-14, D-7, Day 0.
+/// caller. Steps (BUG-009 cadence): 4 weeks, 2 weeks, 1 week, 3 days, Today!
 class JourneyProgressBar extends StatelessWidget {
   final int daysUntil;
   const JourneyProgressBar({super.key, required this.daysUntil});
 
   static const _milestones = <(int, String)>[
-    (90, 'D-90'),
-    (60, 'D-60'),
-    (30, 'D-30'),
-    (14, 'D-14'),
-    (7, 'D-7'),
-    (0, 'Day 0'),
+    (28, '4 weeks'),
+    (14, '2 weeks'),
+    (7, '1 week'),
+    (3, '3 days'),
+    (0, 'Today!'),
   ];
 
   @override

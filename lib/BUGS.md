@@ -69,7 +69,8 @@ For each bug, use this format:
 
 ---
 
-## FEATURE-002: Birthday interest opt-out (DECIDED — build in fix-batch)
+## FEATURE-002: Birthday interest opt-out (SHIPPED — Phase 3b)
+- Status: customer-facing UI shipped. Schema (0021), RPC (`family_set_birthday_interest`), cron filter (birthday-journey-cron skips 'not_this_year') all live. Discovery page renders the radio card; "Not this year" triggers the warm decline modal with the verbatim copy from spec.
 - Discovered: 2026-05-05 Phase 1A founder request
 - Severity: 🟢 PRODUCT FEATURE (UX clarity + brand respect)
 - App: Customer Web + Mobile + birthday cron systems
@@ -123,7 +124,8 @@ When customer taps "Not this year":
 
 ---
 
-## BUG-015: Journey timeline shows on /birthday discovery without active reservation (OPEN)
+## BUG-015: Journey timeline shows on /birthday discovery without active reservation (FIXED)
+- Fix applied: lib/features/birthday/birthday_discovery_screen.dart no longer renders `JourneyProgressBar`. Discovery is by definition the no-reservation state (page redirects to status screen when an active reservation exists). The timeline widget itself was retained and updated for BUG-009 cadence in case future surfaces reuse it.
 - Discovered: 2026-05-05 Phase 1A web testing
 - Severity: 🟡 IMPORTANT (UX confusion + product clarity)
 - App: Customer Web + Mobile
@@ -157,7 +159,8 @@ When customer taps "Not this year":
 
 ---
 
-## BUG-013: Customer cancellation flow on Reservation status screen (OPEN — fix-batch)
+## BUG-013: Customer cancellation flow on Reservation status screen (FIXED)
+- Fix applied: lib/features/birthday/reservation_status_screen.dart kebab item is now conditional on status IN ('interested','admin_contacted'); confirmed/completed hide it. `_confirmCancel` replaced with the spec'd bottom sheet ("Cancel this reservation? You can submit again anytime." with "Keep it"/"Yes, cancel" buttons). RPC call switched to the new 1-arg signature; on success shows snackbar "Reservation cancelled" and `context.go('/birthday')` (replace stack). Old `_showWhatsAppSheet` helper removed.
 - Discovered: 2026-05-05 Phase 1A web testing
 - Severity: 🟡 IMPORTANT (customer needs self-serve cancellation pre-confirm)
 - App: Customer Web + Mobile
@@ -218,7 +221,8 @@ When customer taps "Not this year":
 
 ---
 
-## BUG-009: Birthday journey timeline shows internal D-N labels (DECIDED, SPLIT)
+## BUG-009: Birthday journey timeline shows internal D-N labels (FIXED v1)
+- v1 fix applied: lib/features/birthday/widgets/journey_progress_bar.dart milestones list is now `[(28,'4 weeks'),(14,'2 weeks'),(7,'1 week'),(3,'3 days'),(0,'Today!')]`. Edge function birthday-journey-cron updated to match (BUG-009 + dropped d_zero in favour of FEATURE-001's universal wishes). v1.1 admin-configurable milestones still deferred.
 - Discovered: 2026-05-05 Phase 1A web testing
 - Severity: 🟡 IMPORTANT
 - App: Customer Web + Mobile + Admin Web

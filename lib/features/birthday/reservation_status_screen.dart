@@ -48,13 +48,25 @@ class ReservationStatusScreen extends ConsumerWidget {
               if (v == 'help') {
                 _openWhatsApp();
               } else if (v == 'cancel' && reservation != null) {
-                await _confirmCancel(context, ref, reservation);
+                await _confirmCancel(context, reservation);
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'help', child: Text('Get help')),
-              PopupMenuItem(value: 'cancel', child: Text('Cancel reservation')),
-            ],
+            // BUG-013: only expose Cancel on pre-confirmation states. Anything
+            // past 'confirmed' goes through the admin refund flow — admin
+            // contacts customer on WhatsApp (not surfaced in app).
+            itemBuilder: (_) {
+              final status = async.valueOrNull?['status'] as String?;
+              final cancellable =
+                  status == 'interested' || status == 'admin_contacted';
+              return [
+                const PopupMenuItem(value: 'help', child: Text('Get help')),
+                if (cancellable)
+                  const PopupMenuItem(
+                    value: 'cancel',
+                    child: Text('Cancel reservation'),
+                  ),
+              ];
+            },
           ),
         ],
       ),
@@ -80,118 +92,74 @@ class ReservationStatusScreen extends ConsumerWidget {
 
   Future<void> _confirmCancel(
     BuildContext context,
-    WidgetRef ref,
     Map<String, dynamic> r,
   ) async {
-    final status = r['status'] as String?;
-    if (status == 'completed' ||
-        status == 'cancelled' ||
-        status == 'no_show') {
-      return;
-    }
-    if (status == 'confirmed') {
-      _showWhatsAppSheet(context);
-      return;
-    }
-    final reasonCtrl = TextEditingController();
-    final shouldCancel = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Cancel reservation?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "We'll let our team know. You can re-submit later if plans change.",
-              style: AppTextStyles.body(c),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Reason (optional)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(c).pop(false),
-            child: const Text('Keep it'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.adminRed),
-            onPressed: () => Navigator.of(c).pop(true),
-            child: const Text('Cancel reservation'),
-          ),
-        ],
-      ),
-    );
-    if (shouldCancel != true) return;
-
-    try {
-      await Supabase.instance.client
-          .rpc<dynamic>('birthday_reservation_cancel', params: {
-        'p_reservation_id': r['id'],
-        'p_reason':
-            reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim(),
-      });
-      if (!context.mounted) return;
-      context.go('/birthday');
-    } on PostgrestException catch (e) {
-      if (!context.mounted) return;
-      if (e.message.contains('cancel_requires_admin')) {
-        _showWhatsAppSheet(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Couldn't cancel. Please try again.")),
-        );
-      }
-    }
-  }
-
-  void _showWhatsAppSheet(BuildContext context) {
-    showModalBottomSheet<void>(
+    // BUG-013 spec: bottom-sheet with Keep it / Yes, cancel buttons. No
+    // free-text reason field; backend hardcodes cancelled_reason.
+    final shouldCancel = await showModalBottomSheet<bool>(
       context: context,
       builder: (c) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Text('Cancel this reservation?', style: AppTextStyles.h2(c)),
+              const SizedBox(height: 8),
               Text(
-                'Confirmed reservations need our team to cancel',
-                style: AppTextStyles.h3(c),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                "Send us a message and we'll handle the cancellation, "
-                'deposit refund, and any rebooking.',
+                'You can submit again anytime.',
                 style: AppTextStyles.body(
                   c,
                   color: AppColors.lightTextSecondary,
                 ),
-                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: PrimaryButton(
-                  label: 'Message us on WhatsApp',
-                  onPressed: () {
-                    Navigator.of(c).pop();
-                    _openWhatsApp();
-                  },
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(c).pop(false),
+                      child: const Text('Keep it'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.adminRed,
+                      ),
+                      onPressed: () => Navigator.of(c).pop(true),
+                      child: const Text('Yes, cancel'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
       ),
     );
+    if (shouldCancel != true || !context.mounted) return;
+
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'birthday_reservation_cancel',
+        params: {'p_reservation_id': r['id']},
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reservation cancelled')),
+      );
+      // Replace stack — back from /birthday should not return to a stale
+      // status screen showing the now-cancelled reservation.
+      context.go('/birthday');
+    } on PostgrestException {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't cancel. Please try again.")),
+      );
+    }
   }
 
   void _openWhatsApp() {
