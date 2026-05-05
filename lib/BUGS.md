@@ -4,6 +4,29 @@ Running log of post-merge bugs. New entries at the top.
 
 ---
 
+# Phase 2: Admin web — modules
+
+## Module 2.1: View-only stubs (SHIPPED 2026-05-05)
+Stepping-stone read-only list screens for the five admin domains added since Session 11.
+
+- `/admin/workshops` — DataTable: when, title, ages, capacity, spots-left, price, status badge.
+- `/admin/catalog` — hub with three tiles linking to Coffee / FIT / Combos.
+- `/admin/catalog/coffee` — DataTable filtered by `menus.brand='coffee'`.
+- `/admin/catalog/fit` — DataTable filtered by `menus.brand='fit'`. Banner notes the Module 2.5 meal-builder layer arriving on top.
+- `/admin/catalog/combos` — DataTable from `combos` table.
+- `/admin/packages` — card grid of birthday_packages (3 tiers, photographic emphasis).
+
+Reusable widget: `lib/admin/widgets/admin_list_scaffold.dart` (`AdminListScaffold` + `AdminListEmptyState`). All five screens use it for consistent header + "Create / Edit coming soon" banner + empty-state.
+
+Sidebar updates: stub dots removed from Workshops + Catalog; new Packages entry added (14 nav items total).
+
+CRUD ships per-domain in Modules 2.2 (workshops) / 2.4 (Coffee) / 2.5 (FIT). Combos + Packages CRUD scheduled after 2.4.
+
+## Module 2.5: FIT meal builder — LOCKED SPEC
+Normalized 4-table schema: `fit_meal_templates`, `fit_meal_categories`, `fit_meal_options` (FK→categories), `fit_meal_template_categories` (linker), plus `fit_meal_orders` and `fit_subscription_waitlist`. Effort estimate ~12–14h. Full schema + admin/customer UI breakdown captured in conversation transcript dated 2026-05-05; will be applied verbatim when Module 2.5 ships. (`SCOPE_LOCKED.md` was referenced but doesn't yet exist in the repo — to be created when other locked specs accrete.)
+
+---
+
 # Phase 1A: Customer App Web Testing
 Started: 2026-05-05
 

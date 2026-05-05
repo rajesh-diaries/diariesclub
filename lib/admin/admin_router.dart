@@ -5,16 +5,22 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'audit/audit_log_screen.dart';
 import 'birthday_crm/birthday_crm_screen.dart';
+import 'catalog/catalog_index_screen.dart';
+import 'catalog/coffee_list_screen.dart';
+import 'catalog/combos_list_screen.dart';
+import 'catalog/fit_list_screen.dart';
 import 'config/config_screen.dart';
 import 'customers/customer_detail_screen.dart';
 import 'customers/customers_screen.dart';
 import 'live_ops/live_ops_screen.dart';
 import 'login_screen.dart';
+import 'packages/packages_list_screen.dart';
 import 'providers/admin_auth_provider.dart';
 import 'refunds/refunds_queue_screen.dart';
 import 'shell.dart';
 import 'stubs/coming_soon_screen.dart';
 import 'users/users_screen.dart';
+import 'workshops/workshops_list_screen.dart';
 
 /// Admin web router. Auth gate runs on every navigation:
 ///   - no Supabase session → /admin/login
@@ -84,31 +90,32 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             path: '/admin/audit',
             builder: (_, __) => const AuditLogScreen(),
           ),
-          // Stubs.
+          // Module 2.1 — view-only list screens (CRUD lands in 2.2 / 2.4 / 2.5).
           GoRoute(
             path: '/admin/workshops',
-            builder: (_, __) => const ComingSoonScreen(
-              title: 'Workshops',
-              description: 'Workshop scheduling',
-              icon: PhosphorIconsRegular.graduationCap,
-              rationale:
-                  'Schedule new workshops, view registrations, mark attended. '
-                  'Customer-facing workshops already render from the existing '
-                  'workshops table — full admin CRUD ships in the next session.',
-            ),
+            builder: (_, __) => const WorkshopsListScreen(),
           ),
           GoRoute(
             path: '/admin/catalog',
-            builder: (_, __) => const ComingSoonScreen(
-              title: 'Catalog',
-              description: 'Menu items / combos / birthday packages',
-              icon: PhosphorIconsRegular.storefront,
-              rationale:
-                  'Full CRUD for the menu, combos, and birthday package '
-                  'tiers. Today the seed data is good — admin edits will '
-                  'arrive with image upload.',
-            ),
+            builder: (_, __) => const CatalogIndexScreen(),
           ),
+          GoRoute(
+            path: '/admin/catalog/coffee',
+            builder: (_, __) => const CoffeeListScreen(),
+          ),
+          GoRoute(
+            path: '/admin/catalog/fit',
+            builder: (_, __) => const FitListScreen(),
+          ),
+          GoRoute(
+            path: '/admin/catalog/combos',
+            builder: (_, __) => const CombosListScreen(),
+          ),
+          GoRoute(
+            path: '/admin/packages',
+            builder: (_, __) => const PackagesListScreen(),
+          ),
+          // Stubs.
           GoRoute(
             path: '/admin/content',
             builder: (_, __) => const ComingSoonScreen(
