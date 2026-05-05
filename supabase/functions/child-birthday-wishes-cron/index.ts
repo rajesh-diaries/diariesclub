@@ -26,6 +26,15 @@
 //    - families.notification_preferences->>'birthday_wish_enabled' != 'false'
 //    - venue_config.child_birthday_wish_enabled = TRUE for the child's venue
 //
+//  Interaction with FEATURE-002 (birthday_interest_state):
+//    The wish is a UNIVERSAL brand commitment and is NOT gated by
+//    birthday_interest_state. A customer who opts out for the year via
+//    the discovery-page card silences the journey + sales reminders only;
+//    the wish on the actual DOB still fires (preserves the delightful
+//    surprise). The only opt-out path for the wish itself is the
+//    per-family notification_preferences.birthday_wish_enabled = false
+//    toggle in Profile → Notifications.
+//
 //  Channel: v1 sends push only (via the notify_push_dispatch trigger that
 //  fires on notifications INSERT). SMS is deferred to v1.1 — requires
 //  MSG91 DLT-approved template registration per venue.

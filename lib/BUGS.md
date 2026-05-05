@@ -23,8 +23,31 @@ For each bug, use this format:
 
 ## Features (planned, build in fix-batch)
 
+### FEATURE-001 + FEATURE-002 interaction (CLARIFIED 2026-05-05)
+
+The birthday wish on DOB is a UNIVERSAL brand commitment and is NOT gated by FEATURE-002's `birthday_interest_state`. The two features serve different concerns:
+
+- **'Not this year'** (FEATURE-002) → commercial interest in booking a party. Silences the funnel (journey-cron, sales reminders).
+- **Birthday wish** (FEATURE-001) → brand love. Universal — fires for every active child on their DOB regardless of interest state.
+
+| State | Journey nudges | Sales reminders | Wish on DOB |
+|---|---|---|---|
+| `birthday_interest_state='interested'` | ✓ | ✓ | ✓ |
+| `birthday_interest_state='not_this_year'` | ✗ | ✗ | **✓** |
+| `notification_preferences.birthday_wish_enabled=false` | (per FEATURE-002 state above) | (per FEATURE-002 state above) | ✗ |
+
+The only opt-out path for the wish itself is the per-family toggle in Profile → Notifications.
+
+The warm decline modal on the discovery page deliberately does NOT mention the wish — the wish is a delightful surprise on the day, and foreshadowing it would defeat the purpose. Customers who explicitly want to opt out can do so from the existing settings toggle.
+
+The `child-birthday-wishes-cron` Edge Function does NOT filter on `birthday_interest_state` — only on `notification_preferences.birthday_wish_enabled`. A header comment in the function documents this.
+
+---
+
+
 ## FEATURE-001: Universal child birthday wishes (SHIPPED — Phase 3c)
 - Status: customer-facing UI shipped. Schema (0020) + cron (Phase 2) live. Notifications settings screen now has "Birthday wishes for my children" toggle backed by `families.notification_preferences.birthday_wish_enabled`. Per-child toggle remains v1.1 deferral.
+- Universal-by-design: NOT gated by FEATURE-002's `birthday_interest_state`. See "FEATURE-001 + FEATURE-002 interaction" section above for the full matrix. The only opt-out is the family-level toggle in Profile → Notifications.
 - Discovered: 2026-05-05 Phase 1A founder request
 - Severity: 🟢 BRAND FEATURE (high-impact differentiator)
 - App: Customer notification system + new cron
@@ -71,7 +94,8 @@ For each bug, use this format:
 ---
 
 ## FEATURE-002: Birthday interest opt-out (SHIPPED — Phase 3b)
-- Status: customer-facing UI shipped. Schema (0021), RPC (`family_set_birthday_interest`), cron filter (birthday-journey-cron skips 'not_this_year') all live. Discovery page renders the radio card; "Not this year" triggers the warm decline modal with the verbatim copy from spec.
+- Status: customer-facing UI shipped. Schema (0021), RPC (`family_set_birthday_interest`), cron filter (birthday-journey-cron skips 'not_this_year') all live. Discovery page renders the radio card; "Not this year" triggers the warm decline modal.
+- Decline-modal copy revised 2026-05-05: deliberately silent on the universal birthday wish (FEATURE-001) so it remains a surprise. The wish-mention lines were removed; only the warm acknowledgement and the two CTAs remain. See the "FEATURE-001 + FEATURE-002 interaction" clarification above for the full design rationale.
 - Discovered: 2026-05-05 Phase 1A founder request
 - Severity: 🟢 PRODUCT FEATURE (UX clarity + brand respect)
 - App: Customer Web + Mobile + birthday cron systems

@@ -345,6 +345,10 @@ class _BirthdayInterestCardState extends ConsumerState<_BirthdayInterestCard> {
   }
 }
 
+/// Warm acknowledgement when a customer opts out for the year. Deliberately
+/// silent on the universal birthday wish (FEATURE-001) — the wish is a
+/// surprise brand moment and shouldn't be foreshadowed here. Per-family
+/// opt-out for the wish itself lives in Profile → Notifications.
 Future<void> _showDeclineModal(BuildContext context, String childName) async {
   await showModalBottomSheet<void>(
     context: context,
@@ -365,19 +369,6 @@ Future<void> _showDeclineModal(BuildContext context, String childName) async {
               'Whatever you celebrate with this year, $childName is still '
               'part of our Play Diaries family.',
               style: AppTextStyles.body(sheetCtx),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              "We'll just send a happy birthday wish on the day 🎂",
-              style: AppTextStyles.body(sheetCtx),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '(you can turn that off in Settings too if you’d like)',
-              style: AppTextStyles.caption(
-                sheetCtx,
-                color: AppColors.lightTextSecondary,
-              ),
             ),
             const SizedBox(height: 24),
             Row(
