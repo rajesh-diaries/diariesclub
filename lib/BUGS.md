@@ -149,6 +149,24 @@ When customer taps "Not this year":
 
 ---
 
+## BUG-018: Smart birthday card on home + simpler decline modal (FIXED)
+- Discovered: 2026-05-05 Phase 1A web testing (FEATURE-002 follow-up)
+- Severity: 🟡 IMPORTANT (UX consistency with the new opt-out model)
+- App: Customer Web + Mobile
+- Location: lib/features/home/widgets/birthday_card.dart, lib/features/birthday/birthday_discovery_screen.dart, supabase/migrations/0029_birthday_home_card_threshold.sql
+- Two changes shipped together:
+  1. **Home birthday card** — collapsed the prior multi-prompting-card behavior into ONE residual card representing the family's no-reservation state. Per-child reservation cards (interested / admin_contacted / confirmed / album) preserved unchanged.
+
+     **Render rules:**
+     - **Rich variant**: child opted-in (`birthday_interest_state='interested'`), birthday within threshold (`days_until <= venue_config.birthday_home_card_threshold_days`, default 30), AND no active reservation. Closest-upcoming such child wins. Gradient styling + "Plan the party →".
+     - **Discovery variant**: no eligible "rich" child AND not all kids have active reservations. Lighter outlined card with "Explore birthday packages →". Covers: no children at all, all children opted out, all eligible birthdays past threshold.
+     - **No residual card**: every child has an active reservation (their status cards cover the state — a discovery prompt would be redundant).
+  2. **Decline modal** — single full-width Done button that routes to /home (replaces the previous two-button [Done] / [Browse other things to do] layout). Customer chose to opt out — give them one clear exit, don't push further engagement.
+- Schema: migration 0029 adds `venue_config.birthday_home_card_threshold_days INT DEFAULT 30 CHECK BETWEEN 1 AND 365`. Default replaces the previous hardcoded 90-day prompting window.
+- Status: FIXED 2026-05-05
+
+---
+
 ## BUG-017: +30 min session extension fails, +60 min works (FIXED)
 - Discovered: 2026-05-05 Phase 1A web testing
 - Severity: 🟡 IMPORTANT (revenue path — every short-extend attempt failed)

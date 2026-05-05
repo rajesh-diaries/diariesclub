@@ -349,6 +349,10 @@ class _BirthdayInterestCardState extends ConsumerState<_BirthdayInterestCard> {
 /// silent on the universal birthday wish (FEATURE-001) — the wish is a
 /// surprise brand moment and shouldn't be foreshadowed here. Per-family
 /// opt-out for the wish itself lives in Profile → Notifications.
+///
+/// Single Done CTA that routes to /home (replace stack). The customer
+/// chose "Not this year" — give them one clear exit, don't push further
+/// engagement on the way out.
 Future<void> _showDeclineModal(BuildContext context, String childName) async {
   await showModalBottomSheet<void>(
     context: context,
@@ -371,25 +375,15 @@ Future<void> _showDeclineModal(BuildContext context, String childName) async {
               style: AppTextStyles.body(sheetCtx),
             ),
             const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(sheetCtx).pop(),
-                    child: const Text('Done'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: PrimaryButton(
-                    label: 'Browse other things to do',
-                    onPressed: () {
-                      Navigator.of(sheetCtx).pop();
-                      sheetCtx.go('/home');
-                    },
-                  ),
-                ),
-              ],
+            SizedBox(
+              width: double.infinity,
+              child: PrimaryButton(
+                label: 'Done',
+                onPressed: () {
+                  Navigator.of(sheetCtx).pop();
+                  sheetCtx.go('/home');
+                },
+              ),
             ),
           ],
         ),
