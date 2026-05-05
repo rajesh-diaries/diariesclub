@@ -11,7 +11,16 @@
 //  notification. If the function dies mid-run on retry it'll skip
 //  already-marked rows.
 //
-//  Auth: service-role bearer (cron caller).
+//  Cadence (post-BUG-009): [28, 14, 7, 3]. Day-0 ("Happy birthday") is
+//  owned by FEATURE-001's universal-wishes cron; this cron stops at day-3.
+//  The new 28-day touch reuses the 'birthday_d_minus_30' notification
+//  type and the d_minus_30_sent dedup column from birthday_journey_state
+//  — close enough semantically; the 90/60/1/0 columns become unused.
+//
+//  Interest opt-out (FEATURE-002): children with
+//  birthday_interest_state='not_this_year' are skipped entirely.
+//
+//  Auth: service-role bearer (cron caller). verify_jwt=true.
 // ===========================================================================
 
 import { admin } from "./_shared/admin.ts";
@@ -31,15 +40,13 @@ interface Touchpoint {
   title: string;
 }
 
+// Cadence reduced to 4 touches (BUG-009). Day-0 owned by FEATURE-001.
+// 28-day touch reuses the 'birthday_d_minus_30' type/dedup column.
 const TOUCHPOINTS: Touchpoint[] = [
-  { days: 90, type: "birthday_d_minus_90", sentField: "d_minus_90_sent", title: "90 days to go!" },
-  { days: 60, type: "birthday_d_minus_60", sentField: "d_minus_60_sent", title: "60 days to go!" },
-  { days: 30, type: "birthday_d_minus_30", sentField: "d_minus_30_sent", title: "30 days to go!" },
-  { days: 14, type: "birthday_d_minus_14", sentField: "d_minus_14_sent", title: "Two weeks!" },
-  { days: 7,  type: "birthday_d_minus_7",  sentField: "d_minus_7_sent",  title: "One week!" },
+  { days: 28, type: "birthday_d_minus_30", sentField: "d_minus_30_sent", title: "4 weeks to go!" },
+  { days: 14, type: "birthday_d_minus_14", sentField: "d_minus_14_sent", title: "2 weeks!" },
+  { days: 7,  type: "birthday_d_minus_7",  sentField: "d_minus_7_sent",  title: "1 week!" },
   { days: 3,  type: "birthday_d_minus_3",  sentField: "d_minus_3_sent",  title: "3 days!" },
-  { days: 1,  type: "birthday_d_minus_1",  sentField: "d_minus_1_sent",  title: "Tomorrow!" },
-  { days: 0,  type: "birthday_d_zero",     sentField: "d_zero_sent",     title: "Happy birthday!" },
 ];
 
 interface BirthdayJourneyRow {
@@ -105,12 +112,15 @@ Deno.serve(async (req) => {
 
     // Pull all active children + their journey state. The bulk row count
     // is small (hundreds at v1 scale); filter in-memory.
+    // FEATURE-002: skip kids who opted out for this year via interest_state.
     const { data: children, error: cErr } = await admin
       .from("children")
       .select(
-        "id, name, family_id, date_of_birth, family:families(is_walk_in, deleted_at, is_anonymised)",
+        "id, name, family_id, date_of_birth, birthday_interest_state, " +
+          "family:families(is_walk_in, deleted_at, is_anonymised)",
       )
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .neq("birthday_interest_state", "not_this_year");
     if (cErr) throw cErr;
 
     const eligibleChildren: ChildRow[] = [];
@@ -211,19 +221,15 @@ Deno.serve(async (req) => {
 
 function bodyFor(days: number, name: string, hasReservation: boolean): string {
   if (hasReservation) {
-    if (days === 0) return `It's ${name}'s birthday! 🎉 See you at Diaries.`;
-    if (days === 1) return `Tomorrow's the big day! See you at Diaries.`;
-    if (days === 3) return `${name}'s party is in 3 days. Anything we should know?`;
-    if (days === 7) return `${name}'s party is one week away — exciting!`;
+    if (days === 3)  return `${name}'s party is in 3 days. Anything we should know?`;
+    if (days === 7)  return `${name}'s party is one week away — exciting!`;
+    if (days === 14) return `${name}'s party is 2 weeks out. Final headcount soon!`;
+    if (days === 28) return `${name}'s party is 4 weeks away. All systems go!`;
     return `Your party plans are coming together. Track status in the app.`;
   }
-  if (days === 90) return `${name}'s birthday is in 90 days. Plan it with us?`;
-  if (days === 60) return `60 days to ${name}'s birthday. Browse packages.`;
-  if (days === 30) return `One month until ${name}'s big day. Reserve a slot?`;
-  if (days === 14) return `${name}'s birthday is in 2 weeks!`;
-  if (days === 7)  return `7 days. Want a memorable celebration?`;
+  if (days === 28) return `${name}'s birthday is 4 weeks away. Plan it with us?`;
+  if (days === 14) return `${name}'s birthday is 2 weeks away — reserve a slot?`;
+  if (days === 7)  return `One week to ${name}'s birthday. Want a memorable one?`;
   if (days === 3)  return `Last call for ${name}'s birthday — 3 days away.`;
-  if (days === 1)  return `${name}'s birthday is tomorrow.`;
-  if (days === 0)  return `Happy birthday, ${name}! 🎂`;
   return `${name}'s birthday approaches. Let's plan!`;
 }
