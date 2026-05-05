@@ -32,6 +32,15 @@ class ReservationStatusScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Your reservation'),
+        // BUG-011: explicit back arrow with web-safe fallback. The default
+        // auto-leading uses Navigator.pop, which no-ops on web hash-routes
+        // when this page is the entry point (refresh or push notification
+        // deep link).
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/birthday'),
+        ),
         actions: [
           PopupMenuButton<String>(
             onSelected: (v) async {

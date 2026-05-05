@@ -139,7 +139,8 @@ When customer taps "Not this year":
 
 ---
 
-## BUG-014: Back button on Birthday discovery page doesn't navigate to home (OPEN)
+## BUG-014: Back button on Birthday discovery page doesn't navigate to home (FIXED)
+- Fix applied: lib/features/birthday/birthday_discovery_screen.dart back-arrow now uses `context.canPop() ? context.pop() : context.go('/home')` so direct-entry / refresh users on web aren't trapped.
 - Discovered: 2026-05-05 Phase 1A web testing
 - Severity: 🟡 IMPORTANT (UX trap — customer feels stuck)
 - App: Customer Web + Mobile
@@ -180,7 +181,8 @@ When customer taps "Not this year":
 
 ---
 
-## BUG-011: No back navigation on Reservation status screen (OPEN)
+## BUG-011: No back navigation on Reservation status screen (FIXED)
+- Fix applied: lib/features/birthday/reservation_status_screen.dart AppBar now has explicit `leading: IconButton` with web-safe fallback `context.canPop() ? context.pop() : context.go('/birthday')`.
 - Discovered: 2026-05-05 Phase 1A web testing
 - Severity: 🟡 IMPORTANT (UX trap — customer cannot navigate back from reservation status)
 - App: Customer Web + Mobile
@@ -244,7 +246,8 @@ Status: v1 fix DECIDED, applies in fix-batch. v1.1 deferred.
 
 ---
 
-## BUG-008: PrimaryButton Row overflows by 17px on ChildDetailsScreen (OPEN)
+## BUG-008: PrimaryButton Row overflows by 17px on ChildDetailsScreen (FIXED)
+- Fix applied: lib/core/widgets/primary_button.dart wraps the label `Text` in `Flexible` with `overflow: TextOverflow.ellipsis`. Long labels truncate with ellipsis instead of overflowing; short labels behave as before.
 - Discovered: 2026-05-05 Phase 1A web testing
 - Severity: 🟢 POLISH
 - App: Customer Web (likely also affects mobile narrow screens)
@@ -261,7 +264,8 @@ Status: v1 fix DECIDED, applies in fix-batch. v1.1 deferred.
 
 ---
 
-## BUG-007: "Form submission canceled because form is not connected" warning (OPEN)
+## BUG-007: "Form submission canceled because form is not connected" warning (FIXED)
+- Fix applied: lib/features/auth/otp_verify_screen.dart `_verify()` now early-returns `if (_isVerifying) return;`. Root cause was paste handler + per-box completion both calling `_verify` in the same frame; the second HTTP submit was being aborted, which is what triggers the browser warning.
 - Discovered: 2026-05-05 Phase 1A web testing
 - Severity: 🟢 POLISH (not visible to user, but indicates lifecycle bug)
 - App: Customer Web

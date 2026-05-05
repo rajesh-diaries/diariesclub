@@ -58,7 +58,11 @@ class BirthdayDiscoveryScreen extends ConsumerWidget {
         title: const Text('Birthday'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          // BUG-014: pop() no-ops on web hash-routes when this page was the
+          // entry point (refresh or deep-link). Fall back to /home so the
+          // user is never trapped.
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/home'),
         ),
       ),
       body: SafeArea(

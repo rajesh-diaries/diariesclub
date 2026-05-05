@@ -94,6 +94,12 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
   }
 
   Future<void> _verify() async {
+    // BUG-007 guard: paste handler + per-box completion can both call us in
+    // the same frame. Without this gate, two HTTP submits race; the second
+    // gets aborted and the browser logs "Form submission canceled because
+    // form is not connected".
+    if (_isVerifying) return;
+
     final code = _controllers.map((c) => c.text).join();
     if (code.length != _otpLength || _phone == null) return;
 
