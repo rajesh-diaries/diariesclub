@@ -15,8 +15,8 @@ Marketing content uses **public** buckets; user-uploaded sensitive content stays
 | `workshop-photos` | **public** (0035) | Promotional. UUID filenames. Linkable from push deep-links, WhatsApp shares. |
 | `menu-photos` | **public** (0035) | Same as above. |
 | `package-photos` | **public** (0035) | Same. Created in 0035. |
-| `hero-recaps` | **public** (pre-existing) | Rendered session-recap PNGs (no faces — child name + duration + XP). Social-shareable. |
-| `hero-cards` | **public** (pre-existing) | Rendered hero-card art including kid photo. **Worth a privacy review** — UUID filenames are unguessable but the bucket is publicly listable. Decision pending. |
+| `hero-recaps` | **public** (pre-existing) | Rendered session-recap PNGs (no faces — child name + duration + XP only). Social-shareable. Confirmed safe. |
+| `hero-cards` | **public** (pre-existing) | Brand illustrations (24 hero card templates for Rafi / Ellie / Gerry / Zena). Static admin-curated artwork referenced by `hero_card_definitions.image_url`. **No kid photos** — kid faces appear only as client-side composites at render time, never stored. No client writes allowed (`0001:1330-1331`). Public classification correct per the marketing-content rule. (Earlier privacy-review flag raised in error — superseded.) |
 | `birthday-photos` | private | Customer-uploaded kid photos. Signed URLs via `signed_birthday_photo_url_provider`. |
 | `child-photos` | private | Per-child profile photos. Signed URLs. |
 | `invoices` | private | Financial documents. Service-role only. |
