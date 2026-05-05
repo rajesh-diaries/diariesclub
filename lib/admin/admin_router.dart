@@ -20,6 +20,7 @@ import 'refunds/refunds_queue_screen.dart';
 import 'shell.dart';
 import 'stubs/coming_soon_screen.dart';
 import 'users/users_screen.dart';
+import 'workshops/workshop_edit_screen.dart';
 import 'workshops/workshops_list_screen.dart';
 
 /// Admin web router. Auth gate runs on every navigation:
@@ -94,6 +95,15 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/workshops',
             builder: (_, __) => const WorkshopsListScreen(),
+          ),
+          GoRoute(
+            path: '/admin/workshops/new',
+            builder: (_, __) => const WorkshopEditScreen(),
+          ),
+          GoRoute(
+            path: '/admin/workshops/:id/edit',
+            builder: (_, state) =>
+                WorkshopEditScreen(workshopId: state.pathParameters['id']),
           ),
           GoRoute(
             path: '/admin/catalog',

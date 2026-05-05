@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,19 +9,30 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency.dart';
 import '../widgets/admin_list_scaffold.dart';
 
-/// View-only stub for /admin/workshops — Module 2.1. Full CRUD lands in
-/// Module 2.2 (workshop create/edit/delete + photo upload + push).
+/// Workshops list with full CRUD (Module 2.2). + New button creates a
+/// new workshop; row actions edit or unpublish. Soft-delete via
+/// admin_workshop_delete sets is_published=FALSE; the list shows
+/// unpublished rows greyed out so admin can re-publish.
 class WorkshopsListScreen extends ConsumerWidget {
   const WorkshopsListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(_workshopsListProvider);
+    final async = ref.watch(workshopsListProvider);
     return AdminListScaffold(
       title: 'Workshops',
-      subtitle: 'Read-only — schedule, ages, capacity, registrations',
-      placeholderBanner:
-          'Create / Edit coming soon — full CRUD ships in Module 2.2.',
+      subtitle:
+          'Schedule, ages, capacity, registrations. Publish-toggle fans out push to opted-in families.',
+      actions: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: FilledButton.icon(
+            icon: const Icon(PhosphorIconsRegular.plus, size: 16),
+            label: const Text('New workshop'),
+            onPressed: () => context.go('/admin/workshops/new'),
+          ),
+        ),
+      ],
       isEmpty: async.maybeWhen(
         data: (rows) => rows.isEmpty,
         orElse: () => false,
@@ -28,12 +40,12 @@ class WorkshopsListScreen extends ConsumerWidget {
       emptyState: const AdminListEmptyState(
         icon: PhosphorIconsRegular.graduationCap,
         message: 'No workshops yet.',
-        subtitle: 'Create the first one once Module 2.2 ships.',
+        subtitle: "Tap 'New workshop' to create the first one.",
       ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (rows) => _Table(rows: rows),
+        data: (rows) => _Table(rows: rows, ref: ref),
       ),
     );
   }
@@ -41,7 +53,49 @@ class WorkshopsListScreen extends ConsumerWidget {
 
 class _Table extends StatelessWidget {
   final List<Map<String, dynamic>> rows;
-  const _Table({required this.rows});
+  final WidgetRef ref;
+  const _Table({required this.rows, required this.ref});
+
+  Future<void> _confirmUnpublish(BuildContext context, String id, String title) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Unpublish workshop?'),
+        content: Text(
+          'Hides "$title" from customers. Existing registrations are kept; '
+          're-publishing later does not re-fan-out push.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.adminRed),
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Unpublish'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'admin_workshop_delete',
+        params: {'p_workshop_id': id},
+      );
+      if (!context.mounted) return;
+      ref.invalidate(workshopsListProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Workshop unpublished')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not unpublish: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,19 +118,57 @@ class _Table extends StatelessWidget {
               DataColumn(label: Text('Spots left'), numeric: true),
               DataColumn(label: Text('Price'), numeric: true),
               DataColumn(label: Text('Status')),
+              DataColumn(label: Text('')),
             ],
             rows: [
               for (final r in rows)
                 DataRow(cells: [
                   DataCell(Text(_formatDate(r['scheduled_at'] as String?))),
-                  DataCell(Text((r['title'] as String?) ?? '—')),
+                  DataCell(Text(
+                    (r['title'] as String?) ?? '—',
+                    style: TextStyle(
+                      color: (r['is_published'] as bool? ?? true)
+                          ? null
+                          : AppColors.lightTextSecondary,
+                      decoration: (r['is_published'] as bool? ?? true)
+                          ? null
+                          : TextDecoration.lineThrough,
+                    ),
+                  )),
                   DataCell(Text(_ageRange(r))),
                   DataCell(Text('${r['capacity'] ?? 0}')),
                   DataCell(_spotsCell(context, r)),
                   DataCell(Text(
                     Money.fromPaise((r['price_paise'] as int?) ?? 0),
                   )),
-                  DataCell(_StatusBadge(status: r['status'] as String?)),
+                  DataCell(_StatusBadge(
+                    status: r['status'] as String?,
+                    isPublished: (r['is_published'] as bool?) ?? true,
+                  )),
+                  DataCell(Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Edit',
+                        icon: const Icon(PhosphorIconsRegular.pencilSimple,
+                            size: 18),
+                        onPressed: () => context.go(
+                          '/admin/workshops/${r['id']}/edit',
+                        ),
+                      ),
+                      if (r['is_published'] as bool? ?? true)
+                        IconButton(
+                          tooltip: 'Unpublish',
+                          icon: const Icon(PhosphorIconsRegular.eyeSlash,
+                              size: 18, color: AppColors.adminRed),
+                          onPressed: () => _confirmUnpublish(
+                            context,
+                            r['id'] as String,
+                            (r['title'] as String?) ?? 'this workshop',
+                          ),
+                        ),
+                    ],
+                  )),
                 ]),
             ],
           ),
@@ -119,36 +211,43 @@ class _Table extends StatelessWidget {
 
 class _StatusBadge extends StatelessWidget {
   final String? status;
-  const _StatusBadge({required this.status});
+  final bool isPublished;
+  const _StatusBadge({required this.status, required this.isPublished});
   @override
   Widget build(BuildContext context) {
-    final color = switch (status) {
-      'upcoming' => AppColors.activeGreen,
-      'completed' => AppColors.lightTextSecondary,
-      'cancelled' => AppColors.adminRed,
-      _ => AppColors.lightTextSecondary,
+    if (!isPublished) {
+      return _badge('Unpublished', AppColors.lightTextSecondary);
+    }
+    return switch (status) {
+      'upcoming' => _badge('Upcoming', AppColors.activeGreen),
+      'completed' => _badge('Completed', AppColors.lightTextSecondary),
+      'cancelled' => _badge('Cancelled', AppColors.adminRed),
+      _ => _badge(status ?? '—', AppColors.lightTextSecondary),
     };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        status ?? '—',
-        style: TextStyle(color: color, fontWeight: FontWeight.w700),
-      ),
-    );
   }
+
+  Widget _badge(String label, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(color: color, fontWeight: FontWeight.w700),
+        ),
+      );
 }
 
-final _workshopsListProvider =
+final workshopsListProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  // Admin sees published + unpublished. Customer-side query (in /club) only
+  // reads is_published=TRUE.
   final rows = await Supabase.instance.client
       .from('workshops')
       .select(
         'id, title, scheduled_at, age_group_min, age_group_max, '
-        'capacity, spots_remaining, price_paise, status',
+        'capacity, spots_remaining, price_paise, status, is_published',
       )
       .order('scheduled_at', ascending: true);
   return List<Map<String, dynamic>>.from(rows);

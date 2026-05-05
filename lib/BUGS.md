@@ -22,6 +22,16 @@ Sidebar updates: stub dots removed from Workshops + Catalog; new Packages entry 
 
 CRUD ships per-domain in Modules 2.2 (workshops) / 2.4 (Coffee) / 2.5 (FIT). Combos + Packages CRUD scheduled after 2.4.
 
+## Module 2.2: Workshops full CRUD (SHIPPED 2026-05-05)
+Replaces Module 2.1's view-only `/admin/workshops` with full create / edit / unpublish.
+
+- Migration 0030 — `workshops.is_published BOOLEAN DEFAULT TRUE` + `workshop-photos` private storage bucket with auth-read / service-write RLS.
+- Migration 0031 — three SECURITY DEFINER RPCs (`admin_workshop_create`, `admin_workshop_update`, `admin_workshop_delete`) gated on the new `_assert_active_admin()` helper. Soft-delete via `is_published=false`.
+- **Push fan-out**: when `is_published` flips FALSE→TRUE, the RPC inserts one `notifications` row per opted-in family (`notification_preferences.workshop_reminders=true`, walk-in/anonymised excluded). The existing `notify_push_dispatch` trigger picks them up and fires send-push via FCM. No new Edge Function — same pattern as FEATURE-001 wishes; one less moving part.
+- Capacity-resize guard: `admin_workshop_update` refuses to drop capacity below already-registered count (`spots_remaining` recomputed accordingly).
+- Admin UI: list shows is_published in status column (greyed strikethrough when unpublished); + New / Edit / Unpublish actions; new `WorkshopEditScreen` form with photo upload (XFile.readAsBytes → workshop-photos bucket via the admin's authenticated session).
+- Routes added: `/admin/workshops/new`, `/admin/workshops/:id/edit`.
+
 ## Module 2.5: FIT meal builder — LOCKED SPEC
 Normalized 4-table schema: `fit_meal_templates`, `fit_meal_categories`, `fit_meal_options` (FK→categories), `fit_meal_template_categories` (linker), plus `fit_meal_orders` and `fit_subscription_waitlist`. Effort estimate ~12–14h. Full schema + admin/customer UI breakdown captured in conversation transcript dated 2026-05-05; will be applied verbatim when Module 2.5 ships. (`SCOPE_LOCKED.md` was referenced but doesn't yet exist in the repo — to be created when other locked specs accrete.)
 
