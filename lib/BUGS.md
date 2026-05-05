@@ -21,6 +21,186 @@ For each bug, use this format:
 - Notes: <web-specific quirks or context>
 ```
 
+## Features (planned, build in fix-batch)
+
+## FEATURE-001: Universal child birthday wishes (DECIDED — build in fix-batch)
+- Discovered: 2026-05-05 Phase 1A founder request
+- Severity: 🟢 BRAND FEATURE (high-impact differentiator)
+- App: Customer notification system + new cron
+- Concept: Wish every active child in DB on their actual DOB, regardless of whether family booked a party with us. Reinforces brand love + family-feel.
+
+### Two flavors based on context
+- Celebrating with us today (confirmed/completed birthday_reservation): "Happy birthday [Child]! 🎂 Thank you for celebrating with your Play Diaries family today. May your day be filled with joy ✨"
+- Not celebrating with us: "Happy birthday [Child]! 🎂 Wishing you joy and lots of laughter today, from your Play Diaries family ✨"
+
+### Schema
+- venue_config.child_birthday_wish_enabled BOOLEAN DEFAULT TRUE
+- venue_config.child_birthday_wish_time TIME DEFAULT '00:30 UTC' (06:00 IST)
+- venue_config.child_birthday_wish_copy_celebrating TEXT (configurable)
+- venue_config.child_birthday_wish_copy_default TEXT (configurable)
+- notification_preferences.birthday_wish_enabled BOOLEAN DEFAULT TRUE (per family)
+- New table child_birthday_wishes_sent (idempotency + audit):
+  - id UUID PRIMARY KEY
+  - child_id UUID REFERENCES children(id)
+  - year INTEGER
+  - sent_at TIMESTAMPTZ
+  - was_celebrating BOOLEAN
+  - channel TEXT
+  - UNIQUE(child_id, year)
+
+### Edge Function: child-birthday-wishes
+- Scheduled daily 00:30 UTC via pg_cron
+- Selects active children where MONTH(dob)=MONTH(today) AND DAY(dob)=DAY(today)
+- Filters: family.is_walk_in=FALSE, prefs.birthday_wish_enabled=TRUE
+- Filters: family inactive >6 months → skip; child created <30 days ago → skip
+- Idempotency: skip if child_birthday_wishes_sent row exists for this child + year
+- Branches: if confirmed/completed birthday_reservation today → celebrating copy; else default copy
+- Sends both push (FCM) and SMS (MSG91)
+- Inserts row into child_birthday_wishes_sent
+- Audit logs each wish
+
+### Customer settings
+- Profile → Notifications: per-family "Birthday wishes for my children" toggle
+- (per-child toggle deferred to v1.1)
+
+### Estimated: 2.5 hours
+### Status: DECIDED, applies in fix-batch phase
+### Priority: HIGH (brand differentiator at launch)
+
+---
+
+## FEATURE-002: Birthday interest opt-out (DECIDED — build in fix-batch)
+- Discovered: 2026-05-05 Phase 1A founder request
+- Severity: 🟢 PRODUCT FEATURE (UX clarity + brand respect)
+- App: Customer Web + Mobile + birthday cron systems
+- Concept: Let customer self-declare interest level so we don't push birthday content to disengaged families.
+
+### Two states (per child)
+- 'interested' (default) — full notification cadence applies
+- 'not_this_year' — silence ALL birthday content (no journey, no sales reminders)
+  - EXCEPT: birthday wish on actual DOB still fires (FEATURE-001) unless separately disabled
+
+### UI on birthday discovery page
+Card at top of page:
+
+  "Tell us about [Child]'s birthday"
+
+  ◉ Yes, we'd love to celebrate here  (default)
+  ○ Not this year, thanks
+
+When customer taps "Not this year":
+- Save state: birthday_interest_state = 'not_this_year'
+- Show warm confirmation modal:
+
+  "Got it. Whatever you celebrate with this year, [Child] is still part of our Play Diaries family.
+
+  We'll just send a happy birthday wish on the day 🎂
+  (you can turn that off in Settings too if you'd like)
+
+  [Done]   [Browse other things to do]"
+
+"Browse other things to do" CTA routes to home or cafe.
+
+### Schema
+- ALTER TABLE children ADD COLUMN birthday_interest_state TEXT
+  CHECK (birthday_interest_state IN ('interested', 'not_this_year'))
+  DEFAULT 'interested'
+- ALTER TABLE children ADD COLUMN birthday_interest_updated_at TIMESTAMPTZ
+
+### RPC
+- family_set_birthday_interest(p_child_id, p_interest_state)
+
+### Cron filter updates
+- birthday-journey-cron: skip kids with 'not_this_year'
+- child-birthday-wishes-cron: STILL fires for 'not_this_year' (separate per-child wish toggle handles that)
+
+### Settings UI (Profile → Notifications)
+- Per-child toggle: "Birthday content for [Child]"
+- Per-child toggle: "Birthday wish for [Child]" (separate, defaults ON)
+
+### Estimated: 1 hour
+### Status: DECIDED, applies in fix-batch phase
+
+---
+
+## BUG-015: Journey timeline shows on /birthday discovery without active reservation (OPEN)
+- Discovered: 2026-05-05 Phase 1A web testing
+- Severity: 🟡 IMPORTANT (UX confusion + product clarity)
+- App: Customer Web + Mobile
+- Location: BirthdayDiscoveryScreen
+- Symptom: Journey timeline (D-N progress dots) renders even when customer has NOT booked a party
+- Current behavior: Shows progress based on child.dob countdown
+- Expected: Journey timeline should ONLY show after status='confirmed' (paid reservation)
+- Why this is wrong:
+  - Customer hasn't engaged with birthday product yet
+  - Showing "21 days to go" with progress dots implies they have a reservation
+  - Confusing for customers who chose "Not interested" or didn't book
+- Fix: Only render timeline if customer has an active reservation for this child. Otherwise just show "ssfdfo's birthday — 21 days to go" header without timeline OR a different "Plan ahead" CTA.
+
+---
+
+## BUG-014: Back button on Birthday discovery page doesn't navigate to home (OPEN)
+- Discovered: 2026-05-05 Phase 1A web testing
+- Severity: 🟡 IMPORTANT (UX trap — customer feels stuck)
+- App: Customer Web + Mobile
+- Location: BirthdayDiscoveryScreen at /birthday
+- Steps to reproduce:
+  1. From home, tap birthday card
+  2. Land on /birthday discovery page
+  3. Tap back arrow (top-left)
+  4. Nothing happens OR navigates to wrong place (verify which)
+- Expected: Back to home (/)
+- Actual: TBD — need to verify exact behavior (no nav OR wrong route)
+- Likely cause: GoRouter pop logic — if /birthday was opened directly (not via push from /home), there's nothing to pop to. Need to check if AppBar uses Navigator.pop OR context.go('/')
+- Fix: Use context.go('/') for back button instead of context.pop() OR ensure home is always in the route stack
+
+---
+
+## BUG-013: Customer cancellation flow on Reservation status screen (OPEN — fix-batch)
+- Discovered: 2026-05-05 Phase 1A web testing
+- Severity: 🟡 IMPORTANT (customer needs self-serve cancellation pre-confirm)
+- App: Customer Web + Mobile
+- Location: lib/features/birthday/reservation_status_screen.dart — kebab menu (⋯) in AppBar
+- Spec:
+  - Kebab menu shows "Cancel reservation" ONLY if status IN ('interested', 'contacted')
+  - For status='confirmed' or 'completed': HIDE cancel option (admin-only refund flow handles cancellations post-payment)
+  - Tap "Cancel reservation" → bottom sheet:
+    - Title: "Cancel this reservation?"
+    - Body: "You can submit again anytime."
+    - Buttons: "Keep it" (left, secondary) / "Yes, cancel" (right, primary destructive)
+  - "Yes, cancel" calls birthday_reservation_cancel RPC
+    - If RPC doesn't exist: write it. SECURITY DEFINER, idempotent, audit-logged.
+    - Sets status='cancelled_by_customer', cancelled_at=now(), cancelled_reason='customer_initiated'
+    - Returns updated reservation row
+  - Customer app shows snackbar: "Reservation cancelled"
+  - Routes back to /birthday discovery (replace stack, not push)
+  - v1 omits "why are you cancelling?" survey — defer to v1.1
+  - v1 omits cancellation-window restrictions — admin handles edge cases manually
+- Status: OPEN — applies in fix-batch
+
+---
+
+## BUG-011: No back navigation on Reservation status screen (OPEN)
+- Discovered: 2026-05-05 Phase 1A web testing
+- Severity: 🟡 IMPORTANT (UX trap — customer cannot navigate back from reservation status)
+- App: Customer Web + Mobile
+- Location: BirthdayReservationStatusScreen at /birthday/reservations/[id]
+- Symptom: AppBar shows "Your reservation" title + kebab menu (⋯) on right but NO back arrow on left
+- Steps to reproduce:
+  1. Submit a birthday reservation successfully
+  2. Land on the status screen
+  3. Try to navigate away — no back button visible
+  4. Forced to use browser back button (web) or system back (mobile)
+- Expected: Standard back arrow on left of AppBar that pops to /birthday or /home
+- Actual: No back navigation; user is stuck
+- Notes:
+  - Likely AppBar has automaticallyImplyLeading: false OR was pushed via a route that loses back stack
+  - Could be intentional but is bad UX
+- Fix: ensure AppBar has back arrow that routes to /birthday discovery OR home
+- Status: OPEN
+
+---
+
 ## BUG-010: Birthday reservation submit fails — CHECK constraint rejects 'manual' (FIXED)
 - Discovered: 2026-05-05 Phase 1A web testing
 - Severity: 🔴 BLOCKER (revenue-critical — birthday is biggest lever)
@@ -43,19 +223,22 @@ For each bug, use this format:
 - Location: Birthday reservation status screen — JOURNEY timeline; birthday-journey-cron Edge Function
 
 ### v1 fix (apply in fix-batch — 30 min)
-- Change default D-N list from [90, 60, 30, 14, 7, 3, 1, 0] to [28, 14, 7, 3, 1, 0]
+- Change default D-N list from [90, 60, 30, 14, 7, 3, 1, 0] to [28, 14, 7, 3, 0]
 - Update timeline widget labels:
   - 28 → "4 weeks"
   - 14 → "2 weeks"
   - 7 → "1 week"
   - 3 → "3 days"
-  - 1 → "Tomorrow"
   - 0 → "Today!"
 - Update birthday-journey-cron to use new day list
 - Update notification copy templates accordingly
 
 ### v1.1 followup (post-launch — 4-5 hours)
 Make milestones admin-configurable via venue_config.birthday_journey_milestones JSONB.
+
+### Verification notes (2026-05-05 retest)
+- Timeline labels still show old "D-90 / D-60 / D-30 / D-14 / D-7 / Day 0" — expected per deferred status. Will be replaced in fix-batch with new [28, 14, 7, 3, 0] cadence.
+- Timeline only renders 6 of the 8 hardcoded milestones. Could be deliberate UI cap or a rendering bug — verify when applying the fix-batch cadence change.
 
 Status: v1 fix DECIDED, applies in fix-batch. v1.1 deferred.
 
