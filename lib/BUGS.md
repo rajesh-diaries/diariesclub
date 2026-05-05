@@ -85,6 +85,26 @@ Replaces Module 2.1's view-only `/admin/catalog/coffee` with full create / edit 
 
 ---
 
+## Module 2.7: Birthday packages rich CRUD + PDF (SHIPPED 2026-05-05)
+Replaces Module 2.1's view-only `/admin/packages` with full CRUD + JSONB-driven menu options + PDF generation.
+
+- **Migration 0040** — adds 4 JSONB columns to `birthday_packages`: `menu_options`, `non_food_offerings`, `available_days`, plus a `pdf_url` slot. Creates `package-pdfs` public bucket (per ARCHITECTURE-001 — promotional content).
+- **Migration 0041** — four SECURITY DEFINER RPCs gated on `_assert_active_admin()`:
+  - `admin_package_create` (16 args) and `admin_package_update` (17 args, all COALESCE-able). Update sets `pdf_url=NULL` to invalidate the cached PDF.
+  - `admin_package_delete` — soft via `is_active=false`.
+  - `admin_package_regenerate_pdf` — fires `generate-package-menu-pdf` Edge Function via `pg_net` using the vault service-role key (same pattern as `notify_push_dispatch`).
+- **Edge Function `generate-package-menu-pdf`** — composes a single-page A4 PDF using `pdf-lib`. Sections: header, title + tier, description, capacity line, "What's included", menu options (categories with options + upcharge labels), "Also included" (non-food offerings), pricing footer, contact line. Uploads to `package-pdfs` bucket and writes URL back to `birthday_packages.pdf_url`. `verify_jwt=true` + service-role bearer.
+- **Admin UI**:
+  - `PackagesListScreen` rewritten — card grid (320px wide, 16:9 cover aspect). Per-card: Active badge, PDF-cached chip (green ✓ if cached, grey "PDF stale" otherwise), Edit + PDF actions. PDF button calls `admin_package_regenerate_pdf` and refreshes after 3s.
+  - `PackageEditScreen` (new) — single form for create+edit. Scalar fields (name, tier, hero_theme, price, deposit, duration, capacity, sort) + photo upload to `package-photos`. JSONB fields (`inclusions`, `menu_options`, `non_food_offerings`, `available_days`) edited as JSON-text textareas with **placeholder defaults** so admin edits structured data instead of starting blank. Gallery URLs as one-per-line text. On save, RPC fires; PDF regen auto-triggered after success (best-effort, doesn't block save).
+- **Customer UI**: minimal touch-up to `package_detail_screen.dart` — adds "Download menu PDF" outlined button (links to `pdf_url`) between "Not included" and "How booking works" sections, only when `pdf_url` is non-empty. Falls back gracefully when admin hasn't generated yet.
+- Routes added: `/admin/packages/new`, `/admin/packages/:id/edit`.
+- **Deferred to v1.1**: full menu-selector flow during reservation (customer picks specific menu options). The data is captured in `menu_options` JSONB; reservation UI integration is a follow-up.
+
+flutter analyze (whole project): clean.
+
+---
+
 ## Cart unification (Module 2.5/2.6 follow-up — SHIPPED 2026-05-05)
 
 Resolves the split-cart problem from Module 2.5 (FIT meals previously bypassed the cart) + the combo XOR limitation in Module 2.6.

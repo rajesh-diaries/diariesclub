@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/providers/auth_provider.dart';
@@ -259,6 +260,18 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
             const SizedBox(height: 16),
             const _SectionHeader(text: 'Not included'),
             const _NotIncluded(),
+            const SizedBox(height: 16),
+            // Module 2.7: customer can download admin-generated PDF if cached.
+            if ((package['pdf_url'] as String?)?.isNotEmpty ?? false)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: OutlinedButton.icon(
+                  icon: const Icon(PhosphorIconsRegular.filePdf),
+                  label: const Text('Download menu PDF'),
+                  onPressed: () =>
+                      launchUrl(Uri.parse(package['pdf_url'] as String)),
+                ),
+              ),
             const SizedBox(height: 16),
             const _SectionHeader(text: 'How booking works'),
             const _HowItWorks(),

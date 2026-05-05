@@ -21,6 +21,7 @@ import 'customers/customer_detail_screen.dart';
 import 'customers/customers_screen.dart';
 import 'live_ops/live_ops_screen.dart';
 import 'login_screen.dart';
+import 'packages/package_edit_screen.dart';
 import 'packages/packages_list_screen.dart';
 import 'providers/admin_auth_provider.dart';
 import 'refunds/refunds_queue_screen.dart';
@@ -168,6 +169,15 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/packages',
             builder: (_, __) => const PackagesListScreen(),
+          ),
+          GoRoute(
+            path: '/admin/packages/new',
+            builder: (_, __) => const PackageEditScreen(),
+          ),
+          GoRoute(
+            path: '/admin/packages/:id/edit',
+            builder: (_, state) =>
+                PackageEditScreen(packageId: state.pathParameters['id']),
           ),
           GoRoute(
             path: '/admin/announcements',
