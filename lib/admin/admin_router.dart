@@ -9,6 +9,7 @@ import 'audit/audit_log_screen.dart';
 import 'birthday_crm/birthday_crm_screen.dart';
 import 'catalog/catalog_index_screen.dart';
 import 'catalog/coffee_list_screen.dart';
+import 'catalog/combo_edit_screen.dart';
 import 'catalog/combos_list_screen.dart';
 import 'catalog/fit_categories_screen.dart';
 import 'catalog/fit_list_screen.dart';
@@ -154,6 +155,15 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/catalog/combos',
             builder: (_, __) => const CombosListScreen(),
+          ),
+          GoRoute(
+            path: '/admin/catalog/combos/new',
+            builder: (_, __) => const ComboEditScreen(),
+          ),
+          GoRoute(
+            path: '/admin/catalog/combos/:id/edit',
+            builder: (_, state) =>
+                ComboEditScreen(comboId: state.pathParameters['id']),
           ),
           GoRoute(
             path: '/admin/packages',

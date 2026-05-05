@@ -85,6 +85,17 @@ Replaces Module 2.1's view-only `/admin/catalog/coffee` with full create / edit 
 
 ---
 
+## Module 2.6: Combos CRUD (SHIPPED 2026-05-05)
+Replaces Module 2.1's view-only `/admin/catalog/combos` with full CRUD.
+
+- Migration 0038 — three SECURITY DEFINER RPCs (`admin_combo_create`, `admin_combo_update`, `admin_combo_delete`). No schema change needed; existing `combos` table already has all columns. Soft-delete via `is_active=false`.
+- Combo items stored in `inclusions` JSONB. New shape: `{"menu_items":[{"id":"<uuid>","quantity":N},...]}`. Backward-compatible read accepts legacy `{"menu_item_ids":[...]}` flat array.
+- `CombosListScreen` rewritten — DataTable with thumbnail, name (strikethrough when hidden), description excerpt, item count, price, status badge. + New / Edit / Deactivate actions.
+- `ComboEditScreen` (new) — single form for create+edit. Photo picker → `menu-photos` (public). Multi-item picker grouped by brand (Coffee / FIT) with per-row checkbox + quantity stepper. **Live savings indicator** computes (Σ item × qty) − combo price; shows "Saves ₹X" / "Combo costs MORE" / "Same as à-la-carte" with appropriate colour.
+- Routes added: `/admin/catalog/combos/new`, `/admin/catalog/combos/:id/edit`.
+
+---
+
 ## Module 2.5: FIT meal builder (SHIPPED 2026-05-05)
 Normalized 4-table builder + orders + waitlist. Pricing server-authoritative. Two commits: schema/RPCs (A) and admin+customer UI bundled (B).
 
