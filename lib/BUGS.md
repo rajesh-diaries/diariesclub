@@ -66,6 +66,12 @@ Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone,
   - `staff_home_screen.dart` — already instrumented in v1; switched to debugPrint with `[BUG-023-V2]` tag
   - Orange box copy bumped to "BUG-023 V2" — visual confirmation of fresh build
 - **What we'll know after Round 2:** if user sees `[BUG-023-V2]` in logs at all → fresh build is loaded; if the `/staff/home` route builder fires but `StaffHomeScreen.build()` doesn't, that's a Flutter bug (impossible under normal semantics). If neither fires but redirect logs show `→ /staff/home`, navigation completed but the screen isn't building — extreme rarity.
+- **Round 2 result (2026-05-06):** EVERY builder fires (StaffApp.build, MaterialApp.builder, redirect, /staff/home builder, StaffHomeScreen.build, _StatsBar, _ActionsGrid, _EndShiftCta — all logged). But the orange "BUG-023 V2" box still doesn't paint on the device. Widgets are building; pixels aren't.
+- **Round 2 narrows to: rendering/paint failure, not widget tree failure.** Strongest hypothesis is Impeller-on-Vivo-Funtouch-Android-15. Logs show `Using the Impeller rendering backend (Vulkan)`. Vivo I2306 (Funtouch OS, Android 15) has a known Flutter Impeller defect on certain widget shapes — widgets layout cleanly but never paint. Customer app on Chrome (Skia / browser canvas) renders fine; staff app uses Impeller on the phone.
+- **Round 3 instrumentation (commit pending):** kill-switch test — replace the entire `StaffHomeScreen` body with `ColoredBox(Colors.red, child: Center(Text('BUG-023 V3 KILL SWITCH', white)))`. Decisive: if red box paints, the body slot CAN render and the issue is something specific to the original widget tree. If red box ALSO doesn't paint, the body slot itself is broken — Impeller fingerprint on this device.
+- **Round 3 user test plan:**
+  1. Uninstall + reinstall + launch normally → does the red box show?
+  2. If still blank: re-launch with `flutter run --no-enable-impeller` → does the red box show now? If yes → confirmed Impeller bug, document workaround in `AndroidManifest.xml` via `io.flutter.embedding.android.EnableImpeller=false` meta-data.
 
 ---
 

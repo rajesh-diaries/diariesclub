@@ -1,3 +1,8 @@
+// BUG-023 V3 kill-switch state: original body widgets (_StatsBar, _ActionsGrid,
+// _EndShiftCta) are kept in this file but temporarily unreferenced while we
+// diagnose. Restore wiring once root cause is found.
+// ignore_for_file: unused_element
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,43 +23,31 @@ class StaffHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[BUG-023-V2] StaffHomeScreen.build()');
-    return Scaffold(
-      appBar: const StaffAppBar(),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // BUG-023 diagnostic. If you see this orange box on the
-              // device, the body IS rendering — issue is occlusion above.
-              // If you don't, body never built — issue is higher in the
-              // tree. Remove once root cause is found.
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.20),
-                  border: Border.all(color: Colors.deepOrange, width: 2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'DEBUG: StaffHomeScreen body built — BUG-023 V2',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: Colors.deepOrange,
-                  ),
-                ),
+    debugPrint('[BUG-023-V3] StaffHomeScreen.build()');
+    // BUG-023 V3 — KILL SWITCH TEST. The actual body has been replaced
+    // with the simplest possible ColoredBox + Text. If even THIS doesn't
+    // paint, the body slot itself can't render (Impeller / GPU / Scaffold
+    // body clip). If it DOES paint, something specific to the real body
+    // widget tree is failing. Restore the original body once we know.
+    return const Scaffold(
+      appBar: StaffAppBar(),
+      body: ColoredBox(
+        color: Colors.red,
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'BUG-023 V3 KILL SWITCH\n'
+              'If you see this red box, body slot paints.\n'
+              'If blank: Impeller / GPU / Scaffold issue.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                height: 1.4,
               ),
-              const SizedBox(height: 12),
-              const _StatsBar(),
-              const SizedBox(height: 24),
-              const _ActionsGrid(),
-              const SizedBox(height: 24),
-              const _EndShiftCta(),
-              const SizedBox(height: 16),
-            ],
+            ),
           ),
         ),
       ),
