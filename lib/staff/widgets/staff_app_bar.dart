@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
-import '../providers/staff_auth_provider.dart';
-
-/// Shared staff-app top bar. Shows the venue label on the left, a sign-out
-/// affordance on the right.
-class StaffAppBar extends ConsumerWidget implements PreferredSizeWidget {
+/// BUG-031 minimal-StaffAppBar bisect. Reduced to a plain StatelessWidget
+/// returning AppBar(title: Text('Diaries Staff')) — no ConsumerWidget,
+/// no ref.watch, no Row, no Icon, no AppTextStyles, no actions array,
+/// no IconButton, no tooltip, no showDialog. If body taps fire with
+/// THIS, we build back layers and find the absorber.
+class StaffAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String? title;
   final List<Widget>? extraActions;
   const StaffAppBar({super.key, this.title, this.extraActions});
@@ -17,56 +14,10 @@ class StaffAppBar extends ConsumerWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final device = ref.watch(currentTabletDeviceProvider).valueOrNull;
-    final label = (device?['device_label'] as String?) ?? 'Diaries Staff';
-
+  Widget build(BuildContext context) {
     return AppBar(
       automaticallyImplyLeading: false,
-      title: Row(
-        children: [
-          const Icon(Icons.phone_iphone, color: AppColors.navy, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            title ?? label,
-            style: AppTextStyles.h3(context),
-          ),
-        ],
-      ),
-      actions: [
-        ...?extraActions,
-        IconButton(
-          tooltip: 'Sign out',
-          icon: const Icon(Icons.logout),
-          onPressed: () async {
-            final confirm = await showDialog<bool>(
-              context: context,
-              builder: (c) => AlertDialog(
-                title: const Text('Sign out?'),
-                content: const Text(
-                  'Signing out will require this phone to be re-registered before any staff can use it.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(c).pop(false),
-                    child: const Text('Cancel'),
-                  ),
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.adminRed,
-                    ),
-                    onPressed: () => Navigator.of(c).pop(true),
-                    child: const Text('Sign out'),
-                  ),
-                ],
-              ),
-            );
-            if (confirm == true) {
-              await Supabase.instance.client.auth.signOut();
-            }
-          },
-        ),
-      ],
+      title: Text(title ?? 'Diaries Staff'),
     );
   }
 }

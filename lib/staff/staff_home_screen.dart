@@ -24,12 +24,14 @@ class StaffHomeScreen extends ConsumerWidget {
     // so the original blank-body symptom on phone (BUG-023) should
     // resolve. If a null-check crash persists post-0043, it's a real
     // BUG-023 separate from BUG-026 and we'll re-bisect.
-    // BUG-031 parent bisect step 2: replaced StaffAppBar with a plain
-    // AppBar. If THIS taps, StaffAppBar is absorbing pointer events.
-    // If still nothing, the issue is higher (MaterialApp.builder
-    // MediaQuery wrapper, or app shell).
+    // BUG-031 bisect step 3: StaffAppBar restored, but the StaffAppBar
+    // widget itself has been simplified to a bare StatelessWidget
+    // returning AppBar(title: Text(...)). No ConsumerWidget, no
+    // ref.watch, no actions, no IconButton. If body taps fire now,
+    // we know the simplified StaffAppBar shape is OK — then build
+    // back complexity in staff_app_bar.dart to find the absorber.
     return Scaffold(
-      appBar: AppBar(title: const Text('test')),
+      appBar: const StaffAppBar(),
       body: GestureDetector(
         onTap: () {
           // ignore: avoid_print
