@@ -181,27 +181,49 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // BUG-030 fix: bumped border + soft shadow + accent top stripe so the
+    // tiles are visibly distinct from the page background (lightSurface
+    // on lightBackground was ~20 RGB points of contrast — easy to miss
+    // on a glossy phone screen, especially with all-zero values for a
+    // fresh dev account).
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
         color: AppColors.lightSurface,
-        border: Border.all(color: AppColors.lightBorder),
+        border: Border.all(
+          color: AppColors.lightTextSecondary.withValues(alpha: 0.20),
+        ),
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          Text(
-            value,
-            style: AppTextStyles.h2(context, color: color),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: AppTextStyles.caption(
-              context,
-              color: AppColors.lightTextSecondary,
+          Container(height: 3, color: color),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+            child: Column(
+              children: [
+                Text(
+                  value,
+                  style: AppTextStyles.h2(context, color: color),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.lightTextSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
