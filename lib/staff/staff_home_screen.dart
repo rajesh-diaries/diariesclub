@@ -231,104 +231,78 @@ class _StatTile extends StatelessWidget {
 class _ActionsGrid extends StatelessWidget {
   const _ActionsGrid();
 
-  static const double _cellHeight = 112;
-  static const double _gap = 16;
-
   @override
   Widget build(BuildContext context) {
-    // BUG-023 fix candidate B: replaced GridView.count(shrinkWrap, NeverScroll)
-    // with a manual Column of three Rows. GridView's sliver/viewport internals
-    // collapsed to zero content on Vivo Funtouch Android 15 inside a ListView
-    // (and previously inside a SingleChildScrollView). Pure RenderBox layout
-    // (Column + Row + Expanded + SizedBox) is deterministic and avoids the
-    // sliver path entirely.
-    final cards = <_ActionCard>[
-      _ActionCard(
-        icon: PhosphorIconsFill.qrCode,
-        label: 'Scan QR',
-        onTap: () => _withPin(
-          context,
-          actionLabel: 'Scan session QR',
-          route: '/staff/qr',
-        ),
-      ),
-      _ActionCard(
-        icon: PhosphorIconsFill.phoneCall,
-        label: 'Manual session',
-        onTap: () => _withPin(
-          context,
-          actionLabel: 'Create manual session',
-          route: '/staff/manual',
-        ),
-      ),
-      _ActionCard(
-        icon: PhosphorIconsFill.clock,
-        label: 'Active sessions',
-        onTap: () => context.push('/staff/sessions'),
-      ),
-      _ActionCard(
-        icon: PhosphorIconsFill.cookingPot,
-        label: 'Kitchen (KDS)',
-        onTap: () => context.push('/staff/kds'),
-      ),
-      _ActionCard(
-        icon: PhosphorIconsFill.carrot,
-        label: 'Healthy Bite',
-        onTap: () => context.push('/staff/healthy-bite'),
-      ),
-      _ActionCard(
-        icon: PhosphorIconsFill.arrowUUpLeft,
-        label: 'Refund',
-        onTap: () => _withPin(
-          context,
-          actionLabel: 'Issue refund',
-          route: '/staff/refund',
-        ),
-      ),
-      _ActionCard(
-        icon: PhosphorIconsFill.cashRegister,
-        label: 'Walk-in POS',
-        onTap: () => _withPin(
-          context,
-          actionLabel: 'Walk-in cash checkout',
-          route: '/staff/walkin',
-        ),
-      ),
-      _ActionCard(
-        icon: PhosphorIconsFill.toggleRight,
-        label: 'Menu availability',
-        onTap: () => context.push('/staff/menu'),
-      ),
-      _ActionCard(
-        icon: PhosphorIconsFill.fileText,
-        label: 'Audit log',
-        onTap: () => context.push('/staff/audit'),
-      ),
-    ];
-
-    Widget rowOf3(int start) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: _gap),
-        child: SizedBox(
-          height: _cellHeight,
-          child: Row(
-            children: [
-              Expanded(child: cards[start]),
-              const SizedBox(width: _gap),
-              Expanded(child: cards[start + 1]),
-              const SizedBox(width: _gap),
-              Expanded(child: cards[start + 2]),
-            ],
-          ),
-        ),
-      );
-    }
-
+    // BUG-031 v1 fallback: 3×3 card grid with custom InkWell/GestureDetector
+    // shapes consistently triggered tap-absorbing hit-test issues on Flutter
+    // web. After 10 fix attempts, BUG-031 was deferred to v1.1; the polished
+    // card grid lands then. For v1 staff app to be functional, this falls
+    // back to a Column of plain Material ListTile rows — the most-tested
+    // tappable widget in Flutter, very unlikely to hit the same hit-test
+    // pathology. Same 9 actions, same routes, same PIN gating.
     return Column(
       children: [
-        rowOf3(0),
-        rowOf3(3),
-        rowOf3(6),
+        _ActionTile(
+          icon: PhosphorIconsRegular.qrCode,
+          label: 'Scan QR',
+          onTap: () => _withPin(
+            context,
+            actionLabel: 'Scan session QR',
+            route: '/staff/qr',
+          ),
+        ),
+        _ActionTile(
+          icon: PhosphorIconsRegular.phoneCall,
+          label: 'Manual session',
+          onTap: () => _withPin(
+            context,
+            actionLabel: 'Create manual session',
+            route: '/staff/manual',
+          ),
+        ),
+        _ActionTile(
+          icon: PhosphorIconsRegular.clock,
+          label: 'Active sessions',
+          onTap: () => context.push('/staff/sessions'),
+        ),
+        _ActionTile(
+          icon: PhosphorIconsRegular.cookingPot,
+          label: 'Kitchen (KDS)',
+          onTap: () => context.push('/staff/kds'),
+        ),
+        _ActionTile(
+          icon: PhosphorIconsRegular.carrot,
+          label: 'Healthy Bite',
+          onTap: () => context.push('/staff/healthy-bite'),
+        ),
+        _ActionTile(
+          icon: PhosphorIconsRegular.arrowUUpLeft,
+          label: 'Refund',
+          onTap: () => _withPin(
+            context,
+            actionLabel: 'Issue refund',
+            route: '/staff/refund',
+          ),
+        ),
+        _ActionTile(
+          icon: PhosphorIconsRegular.cashRegister,
+          label: 'Walk-in POS',
+          onTap: () => _withPin(
+            context,
+            actionLabel: 'Walk-in cash checkout',
+            route: '/staff/walkin',
+          ),
+        ),
+        _ActionTile(
+          icon: PhosphorIconsRegular.toggleRight,
+          label: 'Menu availability',
+          onTap: () => context.push('/staff/menu'),
+        ),
+        _ActionTile(
+          icon: PhosphorIconsRegular.fileText,
+          label: 'Audit log',
+          onTap: () => context.push('/staff/audit'),
+        ),
       ],
     );
   }
@@ -345,11 +319,13 @@ class _ActionsGrid extends StatelessWidget {
   }
 }
 
-class _ActionCard extends StatelessWidget {
+/// BUG-031 fallback row. Plain Material ListTile — most-tested tappable
+/// pattern in Flutter. Polished _ActionCard returns in v1.1.
+class _ActionTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _ActionCard({
+  const _ActionTile({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -357,43 +333,28 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // BUG-031 final shape: Material(color, shape) > InkWell(onTap,
-    // borderRadius) > Padding > Column. No clipBehavior (that was the
-    // tap-swallower in 99da1fa). Material provides the visible surface;
-    // InkWell paints ripples on it; hit-test region == paint region.
-    // BUG-029 fit kept: icon 28, gap 8, padding 12, body font, 2-line ellipsis.
     return Material(
       color: AppColors.lightSurface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.lightBorder),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 28, color: AppColors.navy),
-              const SizedBox(height: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  style: AppTextStyles.body(context),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
+      child: ListTile(
+        leading: Icon(icon, color: AppColors.navy),
+        title: Text(label, style: AppTextStyles.bodyLarge(context)),
+        trailing: const Icon(
+          Icons.chevron_right,
+          color: AppColors.lightTextSecondary,
         ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.lightBorder),
+        ),
+        onTap: onTap,
       ),
     );
   }
 }
+
+// _ActionCard (3×3 grid card variant) removed pending BUG-031 v1.1
+// resolution. Restore from git history (commit 59c8e50) when the
+// underlying Flutter web hit-test issue is understood.
 
 class _EndShiftCta extends StatelessWidget {
   const _EndShiftCta();

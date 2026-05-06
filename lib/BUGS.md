@@ -107,7 +107,38 @@ Discovered while investigating BUG-023. Adjacent but separate bug — significan
 
 ---
 
-## BUG-023: Staff app blank /staff/home body (FIXED 2026-05-06)
+## BUG-031: Staff home action cards non-tappable on Flutter web (DEFERRED to v1.1, 2026-05-06)
+
+After 10 fix attempts (Material+InkWell variants, Card+InkWell, GestureDetector, removing SafeArea, Padding+Column, etc.) action cards on `/staff/home` consistently absorb taps on Chrome web with `mouse_tracker.dart:199` / `box.dart:251` assertions firing every frame. Bisect identified the cause as the original `StaffAppBar`'s `ConsumerWidget extends + ref.watch` rebuild loop bleeding hit-test paths into the body region — but even after decoupling StaffAppBar from Riverpod (commit `59c8e50`), the polished card grid still fails. Root cause is a deep Flutter web rendering / hit-test interaction that needs dedicated investigation, not more incremental patches.
+
+- **Severity:** 🔴 BLOCKER for the polished home → DEFERRED v1.1
+- **v1 fallback shipped (this commit):** `_ActionsGrid` now renders as a `Column` of plain Material `ListTile` rows (icon + label + chevron, onTap → same routes, same PIN gating). ListTile is the most-tested tappable widget in Flutter; very unlikely to hit the same hit-test pathology.
+- **What lands in v1.1:** restore the polished 3×3 card grid (last working shape lives at commit `59c8e50` — `Material > InkWell > Padding > Column`). Need to figure out the actual Flutter-web interaction first.
+- **Investigation pointers for v1.1 pickup:** customer app's `CardGridItem` (`lib/features/adventure/widgets/card_grid_item.dart`) uses the same InkWell+Container shape and works fine on web. Difference is somewhere in the staff shell — the previous bisect ruled out StaffAppBar after the Riverpod decoupling, so the next layer to test is `app_staff.dart`'s `MaterialApp.router > builder` MediaQuery wrapper, the StaffApp ProviderScope topology, or a Riverpod stream that's emitting at framerate.
+
+---
+
+## BUG-030: Stat tiles invisible on phone home (OPEN 2026-05-06)
+
+Stat tiles render but with very low contrast (white surface on near-white background) plus all-zero values for a fresh dev account. Commit `f6ad986` added a 3px coloured top stripe + visible border + soft shadow to make tiles distinct, but the user has not yet confirmed visibility on the I2306 phone. Ship as v1; revisit if user reports tiles still hard to see.
+
+- **Severity:** 🟡 IMPORTANT (cosmetic; doesn't block function)
+- **Status:** OPEN, awaiting on-device confirmation that the BUG-030 contrast fix landed.
+
+---
+
+## BUG-029: Action card content overflows on phone portrait (OPEN — partially mitigated 2026-05-06)
+
+Was applied to `_ActionCard` (icon 28, gap 8, padding 12, body font, 2-line ellipsis) — but the card grid itself is now deferred behind BUG-031, so the v1 staff home uses a `ListTile`-based fallback that doesn't have this overflow problem. The fix and the bug both come back when BUG-031 lands and the polished grid returns in v1.1.
+
+- **Severity:** 🟡 IMPORTANT
+- **Status:** OPEN — moot in v1 (fallback doesn't have the overflow); reactivates when card grid is restored in v1.1.
+
+---
+
+## BUG-023: Staff app blank /staff/home body (PARTIALLY CLOSED 2026-05-06)
+
+Render fixed (Padding > Column body shape) — staff home renders on web AND phone. Tap functionality on the action cards is BUG-031 (DEFERRED to v1.1). v1 ships with the ListTile fallback for navigation.
 
 **Final root cause via 3-step bisect on web:**
 - Bisect 1 (`eb8ca7d`): `_ActionsGrid` + `_EndShiftCta` only → still blank.

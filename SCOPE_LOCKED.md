@@ -33,14 +33,22 @@ Plus follow-ups:
 
 ### Phase 3 — Pre-launch (PENDING)
 - Account deletion feature (~2-3h, MANDATORY for App Store + Play Store)
-- Staff app phone-only refactor (DECISION-001, +1-2 days)
+- Staff app phone-only refactor (DECISION-001, +1-2 days) — see launch-scope note below
 - Pre-launch testing pass
 - App store metadata (descriptions, screenshots, keywords)
 - Production builds (iOS + Android)
 - Submit to stores
 - Store review (3-7 days each)
 
+### Launch scope (DECIDED 2026-05-06 after BUG-031 deferral)
+- **Customer app:** full launch.
+- **Admin web:** full launch.
+- **Staff app:** functional launch. Sign-in works. Home navigation uses a Material `ListTile` fallback list (icon + label + chevron rows) instead of the polished 3×3 card grid. All routes accessible; gated routes still require staff PIN. The polished card grid (`_ActionCard` with Material+InkWell shape) lands in v1.1 once BUG-031 is properly investigated.
+- Customer + admin are the launch blockers; staff app polish is not.
+
 ### Deferred to v1.1
+- BUG-031 — staff home polished 3×3 action card grid (10 fix attempts on 2026-05-06, all failed; deep Flutter web hit-test issue, needs dedicated investigation; fallback ListTile shipped for v1)
+- BUG-029 — staff card overflow on phone portrait (moot in v1 fallback; reactivates with v1.1 grid)
 - Notification copy templates UI
 - Reactivation campaign defaults
 - Per-child birthday wish toggle
