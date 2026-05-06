@@ -368,35 +368,49 @@ class _ActionCard extends StatelessWidget {
     // to swallow tap events on this Flutter+web build, leaving cards visually
     // present but unresponsive. Reverted to the original InkWell > Container
     // pattern that was known to be tappable.
-    // BUG-029 fix: cell height 112 was tablet-tuned; on phone portrait
-    // 3-col layout the inside (icon+gap+2-line label+padding) overflowed
-    // by 12-46px. Tightened icon, gap, padding, and font so 2-line labels
-    // fit comfortably in the same cell height.
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.lightSurface,
-          border: Border.all(color: AppColors.lightBorder),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 28, color: AppColors.navy),
-            const SizedBox(height: 8),
-            Flexible(
-              child: Text(
-                label,
-                style: AppTextStyles.body(context),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+    // BUG-031 fix (v2): canonical Card + InkWell pattern.
+    //   - 99da1fa used Material(clipBehavior: antiAlias) → cards rendered
+    //     but onTap never fired (clip swallowed taps).
+    //   - 7490a4a reverted to InkWell > Container(decoration) → cards
+    //     tappable but mouse_tracker.dart:199 assertion fired again
+    //     because the Container's painted region didn't match InkWell's
+    //     hit-test region.
+    // Card widget defaults to clipBehavior: none; it provides the visible
+    // surface (color + shape + border via RoundedRectangleBorder.side) so
+    // hit-test region == paint region == InkWell ripple region. No
+    // mismatch, no assertion, taps work.
+    //
+    // BUG-029 fit: icon 28, gap 8, padding 12, body font, 2-line ellipsis
+    // — comfortably inside the 112px cell on phone portrait.
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: AppColors.lightSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.lightBorder),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 28, color: AppColors.navy),
+              const SizedBox(height: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  style: AppTextStyles.body(context),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
