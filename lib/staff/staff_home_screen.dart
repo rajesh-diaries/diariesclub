@@ -1,3 +1,9 @@
+// BUG-023 candidate D state: body is intentionally a minimum-viable
+// Center>Column>Text. Original widgets (_StatsBar, _ActionsGrid,
+// _EndShiftCta) are kept in this file but temporarily unreferenced so
+// we can rewire fast once we know which one throws.
+// ignore_for_file: unused_element
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,25 +24,32 @@ class StaffHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // BUG-023 fix candidate C — drop SafeArea entirely. The V3 kill
-    // switch worked WITHOUT SafeArea; candidates A and B both kept it
-    // and stayed blank. Scaffold already accounts for the AppBar +
-    // bottom system inset (resizeToAvoidBottomInset=true by default),
-    // so SafeArea was redundant; on Vivo Funtouch Android 15 it appears
-    // to compute padding that collapses content. Body now uses plain
-    // Padding for layout chrome and ListView for scrolling.
-    return Scaffold(
-      appBar: const StaffAppBar(),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: const [
-          _StatsBar(),
-          SizedBox(height: 24),
-          _ActionsGrid(),
-          SizedBox(height: 24),
-          _EndShiftCta(),
-          SizedBox(height: 16),
-        ],
+    // BUG-023 fix candidate D — minimum viable body. Logs from candidate C
+    // showed `Null check operator used on a null value` thrown repeatedly
+    // from rendering/box.dart + rendering/sliver_mul (ListView's sliver
+    // pipeline). That's a build-time crash, not a layout pathology — one
+    // of the body subwidgets (_StatsBar / _ActionsGrid / _EndShiftCta) is
+    // throwing during build, which Flutter swallows and renders nothing.
+    // Body replaced with three plain Text widgets to test the hypothesis.
+    // If THIS renders, the bug is in one of the three custom widgets and
+    // we bisect tomorrow. If this is also blank, the failure is higher in
+    // the tree (StaffApp shell, MediaQuery wrapper, theme).
+    return const Scaffold(
+      appBar: StaffAppBar(),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'CANDIDATE D',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+            ),
+            SizedBox(height: 12),
+            Text('If you see this, body renders fine.'),
+            SizedBox(height: 8),
+            Text('Bug is in _StatsBar / _ActionsGrid / _EndShiftCta.'),
+          ],
+        ),
       ),
     );
   }

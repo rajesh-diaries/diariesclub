@@ -97,7 +97,7 @@ Discovered while investigating BUG-023. Adjacent but separate bug — significan
 
 ---
 
-## BUG-023: Staff app blank /staff/home body (FIX-CANDIDATE-C 2026-05-06)
+## BUG-023: Staff app blank /staff/home body (FIX-CANDIDATE-D 2026-05-06)
 
 Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone, but the body still paints blank with a non-tappable logout. Loop and blank-body were two stacked bugs, not one.
 
@@ -155,6 +155,12 @@ Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone,
 - **Fix candidate C (commit pending):** drop `SafeArea` entirely. Scaffold already accounts for the AppBar + bottom system insets via `resizeToAvoidBottomInset=true` (default). SafeArea atop that was redundant; on Vivo Funtouch Android 15 it appears to compute padding that collapses the body. Body is now `ListView(padding: 20) > [_StatsBar, gap, _ActionsGrid, gap, _EndShiftCta]` — no SafeArea wrapper.
 - **What to test:** uninstall + reinstall + sign in. Body should finally show 4 stat tiles + action grid + end shift bar.
 - **If candidate C also blank:** the failure pattern is something inside the StaffApp shell itself, not the screen. Next moves: drop the MediaQuery textScaler-clamp wrapper in `app_staff.dart`, then try `Scaffold` without AppBar (move logout into a floating widget) to fully match V3's working shape.
+- **Candidate C result (2026-05-06):** still blank, but device screenshot revealed the smoking gun: log shows `Another exception was thrown: Null check operator used on a null value` repeated continuously, with stack trace pointing at `rendering/box.dart:2…` and `rendering/sliver_mul…`. **This is not a layout pathology — it's a build-time Dart `!`-on-null crash being swallowed by Flutter's error handling.** The body looks blank because every build attempt throws and Flutter renders nothing in its place.
+- **Reframing:** ListView's children include `_StatsBar`, `_ActionsGrid`, `_EndShiftCta`. One (or more) of those throws during build. Flutter catches → ErrorWidget → which apparently also paints nothing on this device. Repeated rebuild attempts re-trigger the throw. Stack frame `sliver_mul` confirms the path is through ListView's sliver child manager.
+- **Fix candidate D (commit pending):** body replaced with `Center > Column(mainAxisSize.min) > [Text, Text, Text]`. Strips out ListView + all three custom widgets. **Decisive test:**
+  - If D renders → the bug is in `_StatsBar` / `_ActionsGrid` / `_EndShiftCta`. Tomorrow: bisect by re-introducing one at a time.
+  - If D still blank → the failure is upstream (StaffApp MediaQuery wrapper, theme, or AppBar). Tomorrow: drop the MediaQuery wrapper and re-test.
+- **For tomorrow morning, the user should also scroll up in `flutter logs` and find the FIRST `Another exception` message — its stack trace will name the user-code line, not just the framework path.**
 
 ---
 
