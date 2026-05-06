@@ -1,44 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_text_styles.dart';
 import 'providers/staff_auth_provider.dart';
 import 'widgets/staff_app_bar.dart';
+import 'widgets/staff_pin_sheet.dart';
 
-/// Staff home — v1 fallback (BUG-031 deferred to v1.1).
+/// Staff home — BUG-031 v1.1 investigation move #1.
 ///
-/// Background: across 10+ fix attempts on 2026-05-06 (Material+InkWell
-/// variants, Card+InkWell, GestureDetector with HitTestBehavior.opaque,
-/// SafeArea drops, Padding+Column wraps, ListTile fallback, etc.) the
-/// staff home consistently absorbed taps on Flutter web with
-/// `mouse_tracker.dart:199` and `box.dart:251` assertions firing every
-/// frame on entry. Bisect proved every interactive widget shape failed,
-/// while bare Text bodies + plain AppBar worked. Root cause is a deep
-/// Flutter-web hit-test interaction with this app shell that needs
-/// dedicated investigation, not more incremental patches.
-///
-/// v1 ship policy: staff signs in successfully, lands here, sees a
-/// list of available routes + paths. Navigation is via URL bar /
-/// bookmarks until v1.1 lands the polished interactive home.
-///
-/// The original interactive widgets (`_StatsBar`, `_ActionsGrid`,
-/// `_ActionCard`, `_ActionTile`, `_EndShiftCta`) are kept in git
-/// history (last working render shape: commit `d37391d`); restore
-/// when BUG-031 is properly investigated.
+/// MaterialApp.router builder MediaQuery wrapper dropped in app_staff.dart
+/// (commit pending). Body restored to a Column of interactive Material
+/// ListTile rows. If taps fire on web now, we close BUG-031. If not, the
+/// builder wasn't the absorber and we move to move #2 (bisect _StatsBar
+/// stream subscriptions).
 class StaffHomeScreen extends ConsumerWidget {
   const StaffHomeScreen({super.key});
-
-  static const _routes = <(String, String)>[
-    ('Scan QR', '/staff/qr'),
-    ('Manual session', '/staff/manual'),
-    ('Active sessions', '/staff/sessions'),
-    ('Kitchen (KDS)', '/staff/kds'),
-    ('Healthy Bite', '/staff/healthy-bite'),
-    ('Refund', '/staff/refund'),
-    ('Walk-in POS', '/staff/walkin'),
-    ('Menu availability', '/staff/menu'),
-    ('Audit log', '/staff/audit'),
-  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -47,80 +26,116 @@ class StaffHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: StaffAppBar(deviceLabel: deviceLabel),
-      body: const Padding(
-        padding: EdgeInsets.all(24),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'v1 — manual navigation',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: AppColors.navy,
+            _ActionTile(
+              icon: PhosphorIconsRegular.qrCode,
+              label: 'Scan QR',
+              onTap: () => _withPin(
+                context,
+                actionLabel: 'Scan session QR',
+                route: '/staff/qr',
               ),
             ),
-            SizedBox(height: 8),
-            Text(
-              'The polished home is shipping in v1.1 (BUG-031 — Flutter web '
-              'hit-test issue under investigation). For v1, navigate to '
-              'each feature by typing the path in the URL bar or using '
-              'bookmarks.',
-              style: TextStyle(fontSize: 14, color: AppColors.lightTextSecondary),
-            ),
-            SizedBox(height: 24),
-            Text(
-              'Available routes',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: AppColors.lightTextPrimary,
+            _ActionTile(
+              icon: PhosphorIconsRegular.phoneCall,
+              label: 'Manual session',
+              onTap: () => _withPin(
+                context,
+                actionLabel: 'Create manual session',
+                route: '/staff/manual',
               ),
             ),
-            SizedBox(height: 8),
-            _RoutesList(),
+            _ActionTile(
+              icon: PhosphorIconsRegular.clock,
+              label: 'Active sessions',
+              onTap: () => context.push('/staff/sessions'),
+            ),
+            _ActionTile(
+              icon: PhosphorIconsRegular.cookingPot,
+              label: 'Kitchen (KDS)',
+              onTap: () => context.push('/staff/kds'),
+            ),
+            _ActionTile(
+              icon: PhosphorIconsRegular.carrot,
+              label: 'Healthy Bite',
+              onTap: () => context.push('/staff/healthy-bite'),
+            ),
+            _ActionTile(
+              icon: PhosphorIconsRegular.arrowUUpLeft,
+              label: 'Refund',
+              onTap: () => _withPin(
+                context,
+                actionLabel: 'Issue refund',
+                route: '/staff/refund',
+              ),
+            ),
+            _ActionTile(
+              icon: PhosphorIconsRegular.cashRegister,
+              label: 'Walk-in POS',
+              onTap: () => _withPin(
+                context,
+                actionLabel: 'Walk-in cash checkout',
+                route: '/staff/walkin',
+              ),
+            ),
+            _ActionTile(
+              icon: PhosphorIconsRegular.toggleRight,
+              label: 'Menu availability',
+              onTap: () => context.push('/staff/menu'),
+            ),
+            _ActionTile(
+              icon: PhosphorIconsRegular.fileText,
+              label: 'Audit log',
+              onTap: () => context.push('/staff/audit'),
+            ),
           ],
         ),
       ),
     );
   }
+
+  Future<void> _withPin(
+    BuildContext context, {
+    required String actionLabel,
+    required String route,
+  }) async {
+    final staff = await StaffPinSheet.show(context, actionLabel: actionLabel);
+    if (staff == null) return;
+    if (!context.mounted) return;
+    context.push(route, extra: {'staffId': staff.staffId});
+  }
 }
 
-class _RoutesList extends StatelessWidget {
-  const _RoutesList();
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final (label, path) in StaffHomeScreen._routes)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.lightTextPrimary,
-                    ),
-                  ),
-                ),
-                Text(
-                  path,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 13,
-                    color: AppColors.lightTextSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
+    return Material(
+      color: AppColors.lightSurface,
+      child: ListTile(
+        leading: Icon(icon, color: AppColors.navy),
+        title: Text(label, style: AppTextStyles.bodyLarge(context)),
+        trailing: const Icon(
+          Icons.chevron_right,
+          color: AppColors.lightTextSecondary,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.lightBorder),
+        ),
+        onTap: onTap,
+      ),
     );
   }
 }

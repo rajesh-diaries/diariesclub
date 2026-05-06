@@ -17,6 +17,13 @@ class StaffApp extends ConsumerWidget {
     final themeMode = ref.watch(appThemeModeProvider);
     final router = ref.watch(staffRouterProvider);
 
+    // BUG-031 v1.1 investigation move #1: dropped the MaterialApp.router
+    // builder MediaQuery wrapper. The wrapper rebuilds on every router
+    // child swap and re-wraps Navigator in a fresh MediaQuery, which
+    // can re-register MouseRegions whose hit-test paths invalidate
+    // continuously on web. If staff home action taps now fire, the
+    // textScaler clamp belongs in a different layer (per-screen, or
+    // applied via Theme); for now we live with system textScaler.
     return MaterialApp.router(
       title: 'Diaries Club Staff',
       debugShowCheckedModeBanner: false,
@@ -31,18 +38,6 @@ class StaffApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      // Tablets render at higher density; staff don't need the same Dynamic
-      // Type headroom parents do. 1.3× cap keeps KDS cards readable without
-      // breaking 4-up grids.
-      builder: (context, child) {
-        final mq = MediaQuery.of(context);
-        return MediaQuery(
-          data: mq.copyWith(
-            textScaler: mq.textScaler.clamp(maxScaleFactor: 1.3),
-          ),
-          child: child ?? const SizedBox.shrink(),
-        );
-      },
     );
   }
 }
