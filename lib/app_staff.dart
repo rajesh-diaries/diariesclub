@@ -14,7 +14,7 @@ class StaffApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[BUG-023-V2] StaffApp.build()');
+    debugPrint('[BUG-023-V4] StaffApp.build()');
     final themeMode = ref.watch(appThemeModeProvider);
     final router = ref.watch(staffRouterProvider);
 
@@ -37,7 +37,7 @@ class StaffApp extends ConsumerWidget {
       // breaking 4-up grids.
       builder: (context, child) {
         debugPrint(
-          '[BUG-023-V2] StaffApp.builder(child=${child?.runtimeType})',
+          '[BUG-023-V4] StaffApp.builder(child=${child?.runtimeType})',
         );
         final mq = MediaQuery.of(context);
         return MediaQuery(

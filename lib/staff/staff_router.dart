@@ -37,7 +37,7 @@ final staffRouterProvider = Provider<GoRouter>((ref) {
         decision = '/staff/home';
       }
       debugPrint(
-        '[BUG-023-V2] router.redirect loc=$loc signedIn=$signedIn '
+        '[BUG-023-V4] router.redirect loc=$loc signedIn=$signedIn '
         'atLogin=$atLogin -> ${decision ?? "null (stay)"}',
       );
       return decision;
@@ -46,14 +46,14 @@ final staffRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/staff/login',
         builder: (_, __) {
-          debugPrint('[BUG-023-V2] route /staff/login builder fired');
+          debugPrint('[BUG-023-V4] route /staff/login builder fired');
           return const TabletLoginScreen();
         },
       ),
       GoRoute(
         path: '/staff/home',
         builder: (_, __) {
-          debugPrint('[BUG-023-V2] route /staff/home builder fired');
+          debugPrint('[BUG-023-V4] route /staff/home builder fired');
           return const StaffHomeScreen();
         },
       ),
@@ -141,7 +141,7 @@ final staffRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
     errorBuilder: (_, state) {
-      debugPrint('[BUG-023-V2] router.errorBuilder fired uri=${state.uri}');
+      debugPrint('[BUG-023-V4] router.errorBuilder fired uri=${state.uri}');
       return Scaffold(
         body: Center(child: Text('Route not found: ${state.uri}')),
       );

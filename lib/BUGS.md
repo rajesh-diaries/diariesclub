@@ -6,6 +6,25 @@ Running log of post-merge bugs. New entries at the top.
 
 # Phase 3: Pre-launch
 
+## BUG-028: DECISION-001 phone-pivot copy sweep was incomplete (OPEN 2026-05-06)
+
+Caught during BUG-023 V3 testing — the logout dialog opened ("Sign out tablet?" + tablet body copy), revealing user-facing tablet-era strings that DECISION-001's sweep missed.
+
+- **Severity:** 🟢 LOW (cosmetic; no functional impact)
+- **Misses (user-visible, in `lib/staff/widgets/staff_app_bar.dart`):**
+  - line 39 — `IconButton.tooltip: 'Sign out tablet'` → should be `'Sign out'`
+  - line 45 — dialog title `'Sign out tablet?'` → should be `'Sign out?'`
+  - line 47 — dialog content `'Signing out the tablet will require the device to be re-registered before any staff can use it.'` → should be `'Signing out will require this phone to be re-registered before any staff can use it.'`
+- **Identifier-only references** (lower priority, not user-visible — flag for a later wider rename pass):
+  - `tablet_login_screen.dart` (file name + class `TabletLoginScreen`)
+  - `staff_auth_provider.dart` (`tabletAuthStateProvider`, `isTabletSignedInProvider`, `tabletAuthUserIdProvider`, `currentTabletDeviceProvider`, `currentTabletVenueIdProvider`)
+  - `tablet_devices` table name in DB
+  - Comments referencing "tablet" across the staff path
+- **Fix policy:** user-visible copy fixes alone in this round; identifier rename is a separate refactor that touches DB schema (`tablet_devices` → `staff_devices`?) and would benefit from a planned design pass.
+- **Status:** OPEN, fix when BUG-023 closes (don't churn the file mid-investigation).
+
+---
+
 ## BUG-026: Staff app RLS — direct table reads return empty for staff users (OPEN 2026-05-06)
 
 Discovered while investigating BUG-023. Adjacent but separate bug — significant enough to track on its own.
@@ -72,6 +91,16 @@ Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone,
 - **Round 3 user test plan:**
   1. Uninstall + reinstall + launch normally → does the red box show?
   2. If still blank: re-launch with `flutter run --no-enable-impeller` → does the red box show now? If yes → confirmed Impeller bug, document workaround in `AndroidManifest.xml` via `io.flutter.embedding.android.EnableImpeller=false` meta-data.
+- **Round 3 result (2026-05-06):** Red kill-switch box rendered. Body slot paints. Logout dialog opens normally. **Definitively NOT** Impeller / GPU / Scaffold-body / touch-handling. Rules out the entire rendering pipeline. Bug is inside the original `StaffHomeScreen` body widget tree — one of `[SafeArea, SingleChildScrollView, Column, _StatsBar, _ActionsGrid, _EndShiftCta]` is rendering at zero size or behind something, making the whole body LOOK blank. Most likely candidates: an unintended `SizedBox.shrink()`, `Container(height: 0)`, `Expanded`/`Flexible` chain producing zero height inside `SingleChildScrollView`, or a `Visibility(visible: false)` somewhere downstream.
+- **Round 4 instrumentation (commit pending):** restored original body but wrapped each child in a coloured-border `_DebugWrap`:
+  - `_StatsBar` — RED border, label "STATS_BAR"
+  - `_ActionsGrid` — BLUE border, label "ACTIONS_GRID"
+  - `_EndShiftCta` — GREEN border, label "END_SHIFT"
+  - Top sentinel kept (orange "BUG-023 V4 body entry" box) so we can see the body itself paints
+  - All `debugPrint` tags bumped to `[BUG-023-V4]`
+- **Round 4 user test:** which coloured borders + labels appear on screen?
+  - All three borders visible but inner content blank → children have non-zero outer size but zero inner content; isolate per-child data/state.
+  - One or more borders missing → that child has zero size; likely `Visibility(visible: false)`, `SizedBox.shrink()`, or constraint pathology in that subtree.
 
 ---
 
