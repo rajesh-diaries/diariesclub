@@ -206,77 +206,104 @@ class _StatTile extends StatelessWidget {
 class _ActionsGrid extends StatelessWidget {
   const _ActionsGrid();
 
+  static const double _cellHeight = 112;
+  static const double _gap = 16;
+
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      childAspectRatio: 1.4,
+    // BUG-023 fix candidate B: replaced GridView.count(shrinkWrap, NeverScroll)
+    // with a manual Column of three Rows. GridView's sliver/viewport internals
+    // collapsed to zero content on Vivo Funtouch Android 15 inside a ListView
+    // (and previously inside a SingleChildScrollView). Pure RenderBox layout
+    // (Column + Row + Expanded + SizedBox) is deterministic and avoids the
+    // sliver path entirely.
+    final cards = <_ActionCard>[
+      _ActionCard(
+        icon: PhosphorIconsFill.qrCode,
+        label: 'Scan QR',
+        onTap: () => _withPin(
+          context,
+          actionLabel: 'Scan session QR',
+          route: '/staff/qr',
+        ),
+      ),
+      _ActionCard(
+        icon: PhosphorIconsFill.phoneCall,
+        label: 'Manual session',
+        onTap: () => _withPin(
+          context,
+          actionLabel: 'Create manual session',
+          route: '/staff/manual',
+        ),
+      ),
+      _ActionCard(
+        icon: PhosphorIconsFill.clock,
+        label: 'Active sessions',
+        onTap: () => context.push('/staff/sessions'),
+      ),
+      _ActionCard(
+        icon: PhosphorIconsFill.cookingPot,
+        label: 'Kitchen (KDS)',
+        onTap: () => context.push('/staff/kds'),
+      ),
+      _ActionCard(
+        icon: PhosphorIconsFill.carrot,
+        label: 'Healthy Bite',
+        onTap: () => context.push('/staff/healthy-bite'),
+      ),
+      _ActionCard(
+        icon: PhosphorIconsFill.arrowUUpLeft,
+        label: 'Refund',
+        onTap: () => _withPin(
+          context,
+          actionLabel: 'Issue refund',
+          route: '/staff/refund',
+        ),
+      ),
+      _ActionCard(
+        icon: PhosphorIconsFill.cashRegister,
+        label: 'Walk-in POS',
+        onTap: () => _withPin(
+          context,
+          actionLabel: 'Walk-in cash checkout',
+          route: '/staff/walkin',
+        ),
+      ),
+      _ActionCard(
+        icon: PhosphorIconsFill.toggleRight,
+        label: 'Menu availability',
+        onTap: () => context.push('/staff/menu'),
+      ),
+      _ActionCard(
+        icon: PhosphorIconsFill.fileText,
+        label: 'Audit log',
+        onTap: () => context.push('/staff/audit'),
+      ),
+    ];
+
+    Widget rowOf3(int start) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: _gap),
+        child: SizedBox(
+          height: _cellHeight,
+          child: Row(
+            children: [
+              Expanded(child: cards[start]),
+              const SizedBox(width: _gap),
+              Expanded(child: cards[start + 1]),
+              const SizedBox(width: _gap),
+              Expanded(child: cards[start + 2]),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
       children: [
-        _ActionCard(
-          icon: PhosphorIconsFill.qrCode,
-          label: 'Scan QR',
-          onTap: () => _withPin(
-            context,
-            actionLabel: 'Scan session QR',
-            route: '/staff/qr',
-          ),
-        ),
-        _ActionCard(
-          icon: PhosphorIconsFill.phoneCall,
-          label: 'Manual session',
-          onTap: () => _withPin(
-            context,
-            actionLabel: 'Create manual session',
-            route: '/staff/manual',
-          ),
-        ),
-        _ActionCard(
-          icon: PhosphorIconsFill.clock,
-          label: 'Active sessions',
-          onTap: () => context.push('/staff/sessions'),
-        ),
-        _ActionCard(
-          icon: PhosphorIconsFill.cookingPot,
-          label: 'Kitchen (KDS)',
-          onTap: () => context.push('/staff/kds'),
-        ),
-        _ActionCard(
-          icon: PhosphorIconsFill.carrot,
-          label: 'Healthy Bite',
-          onTap: () => context.push('/staff/healthy-bite'),
-        ),
-        _ActionCard(
-          icon: PhosphorIconsFill.arrowUUpLeft,
-          label: 'Refund',
-          onTap: () => _withPin(
-            context,
-            actionLabel: 'Issue refund',
-            route: '/staff/refund',
-          ),
-        ),
-        _ActionCard(
-          icon: PhosphorIconsFill.cashRegister,
-          label: 'Walk-in POS',
-          onTap: () => _withPin(
-            context,
-            actionLabel: 'Walk-in cash checkout',
-            route: '/staff/walkin',
-          ),
-        ),
-        _ActionCard(
-          icon: PhosphorIconsFill.toggleRight,
-          label: 'Menu availability',
-          onTap: () => context.push('/staff/menu'),
-        ),
-        _ActionCard(
-          icon: PhosphorIconsFill.fileText,
-          label: 'Audit log',
-          onTap: () => context.push('/staff/audit'),
-        ),
+        rowOf3(0),
+        rowOf3(3),
+        rowOf3(6),
       ],
     );
   }

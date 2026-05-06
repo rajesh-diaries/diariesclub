@@ -97,7 +97,7 @@ Discovered while investigating BUG-023. Adjacent but separate bug — significan
 
 ---
 
-## BUG-023: Staff app blank /staff/home body (FIX-CANDIDATE-A 2026-05-06)
+## BUG-023: Staff app blank /staff/home body (FIX-CANDIDATE-B 2026-05-06)
 
 Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone, but the body still paints blank with a non-tappable logout. Loop and blank-body were two stacked bugs, not one.
 
@@ -146,6 +146,10 @@ Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone,
 - **Fix candidate A (commit pending):** structural — replace `SafeArea > SingleChildScrollView > Column(crossAxisAlignment: stretch)` with `SafeArea > ListView`. ListView gives children bounded width by default and avoids the stretched-Column-in-Scrollable interaction. Same body content, simpler tree. Removed all V1–V4 debug instrumentation (orange box, _DebugWrap, debugPrint calls, [BUG-023-V*] tags) since the diagnostic phase is over.
 - **What to test:** uninstall + reinstall + sign in with `stafftest@gmail.com` / `testing@123`. Body should now paint: 4 stat tiles row → 3×3 action grid → "End shift" pill at the bottom. Layout will be cramped on portrait phone (BUG-024-style, separate cosmetic) but functional.
 - **If candidate A doesn't paint:** candidate B is to replace `_ActionsGrid` GridView.count(shrinkWrap) with a manual Column-of-Rows. Avoids GridView entirely.
+- **Candidate A result (2026-05-06):** still blank on phone. The SCV→ListView structural change wasn't sufficient; the GridView inside is the actual culprit. GridView's sliver/viewport pipeline appears broken on Vivo Funtouch Android 15 when nested inside another scrollable, independent of whether the outer is SingleChildScrollView or ListView.
+- **Fix candidate B (commit pending):** `_ActionsGrid` rewritten as a manual `Column` of three `Row`s. Each row is `SizedBox(height: 112) > Row > [Expanded(card), gap, Expanded(card), gap, Expanded(card)]` with a 16px gap between rows. No GridView, no shrinkWrap, no NeverScrollableScrollPhysics — pure RenderBox layout that bypasses the sliver path entirely.
+- **What to test:** uninstall + reinstall + sign in. Body should show 4 stat tiles → 9 action tiles in a clean 3×3 → End shift bar.
+- **If candidate B still doesn't paint:** the failure is deeper. Next moves: (1) replace `_StatsBar`'s Row-of-Expanded with explicit-width SizedBoxes (rule out Row+Expanded), (2) wrap each subwidget in `RepaintBoundary` to isolate paint vs layout, (3) drop the `MediaQuery` wrapper in `app_staff.dart` MaterialApp.builder to rule out the textScaler clamp.
 
 ---
 
