@@ -24,13 +24,12 @@ class StaffHomeScreen extends ConsumerWidget {
     // so the original blank-body symptom on phone (BUG-023) should
     // resolve. If a null-check crash persists post-0043, it's a real
     // BUG-023 separate from BUG-026 and we'll re-bisect.
-    // BUG-031 parent bisect: Scaffold body stripped to a bare
-    // GestureDetector + 100×100 red Container. No Padding, no Column,
-    // no children. If THIS doesn't tap, the issue is at
-    // Scaffold/StaffAppBar/MaterialApp.builder level — not anywhere
-    // inside the body tree.
+    // BUG-031 parent bisect step 2: replaced StaffAppBar with a plain
+    // AppBar. If THIS taps, StaffAppBar is absorbing pointer events.
+    // If still nothing, the issue is higher (MaterialApp.builder
+    // MediaQuery wrapper, or app shell).
     return Scaffold(
-      appBar: const StaffAppBar(),
+      appBar: AppBar(title: const Text('test')),
       body: GestureDetector(
         onTap: () {
           // ignore: avoid_print
