@@ -23,6 +23,20 @@ Original spec assumed a single shared venue tablet; revised to each staff member
 
 ---
 
+## DEFERRED-001: iOS staff display name needs xcconfig + scheme split (DEFERRED 2026-05-06)
+
+When wrapping up DECISION-001 (staff phone-only), Android `staffProd` got renamed to "Diaries Staff". iOS could not be updated in the same batch:
+
+- `ios/Runner/Info.plist` has a single hardcoded `CFBundleDisplayName` ("Diaries Club") — no per-flavor override exists.
+- Per `FLAVORS.md` "iOS — single bundle ID for now ⚠️", all iOS builds (including staff) currently render as "Diaries Club" because iOS flavor scaffolding (`Runner-staff` scheme + xcconfig + `INFOPLIST_KEY_CFBundleDisplayName` build setting) doesn't exist in this repo.
+- The work to fix this overlaps with the existing follow-up already noted in `FLAVORS.md` (per-bundle-ID iOS schemes for dev / staging / prod). When that scheme split happens, add `staffDev` + `staffProd` schemes in the same pass and set `CFBundleDisplayName` per-scheme to "Diaries Staff Dev" / "Diaries Staff".
+
+**Why deferred:** Xcode UI work, hard to do reliably from CLI without breaking `project.pbxproj`. Doesn't block any build today (staff flavor still installs and runs on iOS — just shows the customer name on the home screen, which is wrong but not broken).
+
+**Pickup:** when next opening Xcode for the FLAVORS.md customer-app scheme work.
+
+---
+
 # Phase 2: Admin web — modules
 
 ## ARCHITECTURE-001: Storage bucket public/private split (DECIDED 2026-05-05)

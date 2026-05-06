@@ -51,8 +51,9 @@ android {
             dimension = "default"
             resValue("string", "app_name", "Diaries Club")
         }
-        // Staff flavors (Session 10). Different applicationId from the
-        // customer app so both can coexist on the same tablet during dev.
+        // Staff flavors (Session 10, phone-only per DECISION-001).
+        // Different applicationId from the customer app so both can
+        // coexist on the same device.
         create("staffDev") {
             dimension = "default"
             applicationId = "com.diariesclub.staff"
@@ -64,7 +65,7 @@ android {
             dimension = "default"
             applicationId = "com.diariesclub.staff"
             versionNameSuffix = "-staff"
-            resValue("string", "app_name", "Diaries Club Staff")
+            resValue("string", "app_name", "Diaries Staff")
         }
     }
 

@@ -7,9 +7,9 @@ import '../core/theme/app_text_styles.dart';
 import '../core/widgets/primary_button.dart';
 import 'providers/staff_auth_provider.dart';
 
-/// One-time tablet sign-in. Email/password against the long-lived tablet
-/// auth user (e.g., tablet-kondapur-001@diariesclub.local). Session
-/// persists across app kills via Supabase's default refresh-token flow.
+/// One-time per-phone sign-in. Email/password against the long-lived
+/// staff auth user. Session persists across app kills via Supabase's
+/// default refresh-token flow.
 ///
 /// On success we invalidate currentTabletDeviceProvider so the venue id
 /// resolves immediately; the router redirects to /staff/home.
@@ -61,7 +61,7 @@ class _TabletLoginScreenState extends ConsumerState<TabletLoginScreen> {
         setState(() {
           _busy = false;
           _errorText =
-              'This tablet is not registered (or has been revoked). Contact admin.';
+              'This phone is not registered (or has been revoked). Contact admin.';
         });
         return;
       }
@@ -94,16 +94,16 @@ class _TabletLoginScreenState extends ConsumerState<TabletLoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.tablet_mac, size: 56, color: AppColors.navy),
+                const Icon(Icons.phone_iphone, size: 56, color: AppColors.navy),
                 const SizedBox(height: 16),
                 Text(
-                  'Diaries Staff Tablet',
+                  'Diaries Staff',
                   style: AppTextStyles.h1(context),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sign in once per device. Per-action staff PINs are entered separately.',
+                  "One-time sign-in per phone. You'll still tap your PIN for each action.",
                   style: AppTextStyles.body(
                     context,
                     color: AppColors.lightTextSecondary,
@@ -118,8 +118,8 @@ class _TabletLoginScreenState extends ConsumerState<TabletLoginScreen> {
                   autofillHints: const [AutofillHints.username],
                   textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
-                    labelText: 'Tablet email',
-                    hintText: 'tablet-kondapur-001@diariesclub.local',
+                    labelText: 'Email',
+                    hintText: 'staff@diariesclub.local',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -148,7 +148,7 @@ class _TabletLoginScreenState extends ConsumerState<TabletLoginScreen> {
                 ],
                 const SizedBox(height: 24),
                 PrimaryButton(
-                  label: 'Sign in tablet',
+                  label: 'Sign in',
                   loading: _busy,
                   onPressed: _busy ? null : _signIn,
                 ),

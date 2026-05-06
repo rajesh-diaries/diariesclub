@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'bootstrap.dart';
@@ -10,18 +9,9 @@ import 'flavors.dart';
 ///   flutter run --flavor staffDev -t lib/main_staff_dev.dart \
 ///     --dart-define-from-file=env/staff_dev.json
 ///
-/// staffProd / staffStaging entries land later when we wire CI; this dev
-/// flavor is what the founder uses on the Kondapur tablet emulator today.
+/// staffProd / staffStaging entries land later when we wire CI.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Lock landscape on the tablet — the customer app stays unlocked because
-  // it's used on phones in portrait. SystemChrome runs after the binding
-  // init so this fires before the first frame.
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
 
   F = FlavorConfig(
     flavor: Flavor.staffDev,

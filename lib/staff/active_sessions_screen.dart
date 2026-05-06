@@ -146,14 +146,15 @@ class _SessionTile extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               OutlinedButton.icon(
                 icon: const Icon(PhosphorIconsRegular.plusCircle),
                 label: const Text('Extend 1hr'),
                 onPressed: () => _extend(context, ref, 60),
               ),
-              const SizedBox(width: 8),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.adminRed,

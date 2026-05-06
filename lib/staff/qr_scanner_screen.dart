@@ -106,16 +106,22 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
             controller: _controller,
             onDetect: _onDetect,
           ),
-          // Overlay box
-          Center(
-            child: Container(
-              width: 320,
-              height: 320,
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.gold, width: 3),
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
+          // Overlay box — clamps to viewport so it fits narrow phones.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final size = constraints.biggest.shortestSide - 48;
+              final box = size > 320 ? 320.0 : size.clamp(180.0, 320.0);
+              return Center(
+                child: Container(
+                  width: box,
+                  height: box,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.gold, width: 3),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              );
+            },
           ),
           if (_errorText != null)
             Positioned(

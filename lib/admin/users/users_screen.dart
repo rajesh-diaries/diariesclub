@@ -46,7 +46,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
             child: TabBar(
               controller: _tab,
               tabs: const [
-                Tab(text: 'Staff (tablet PIN)'),
+                Tab(text: 'Staff (PIN)'),
                 Tab(text: 'Admin users (web)'),
               ],
             ),
@@ -140,7 +140,7 @@ class _StaffTab extends ConsumerWidget {
       builder: (c) => AlertDialog(
         title: Text('Deactivate ${staff['name']}?'),
         content: const Text(
-          'They will not be able to verify PIN at the tablet. Reactivation '
+          'They will not be able to verify PIN on their phone. Reactivation '
           'requires editing the row in Supabase Studio (no UI for it yet).',
         ),
         actions: [
