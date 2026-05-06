@@ -6,6 +6,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
 import '../core/utils/currency.dart';
+import 'providers/staff_auth_provider.dart';
 import 'providers/venue_streams_provider.dart';
 import 'widgets/staff_app_bar.dart';
 import 'widgets/staff_pin_sheet.dart';
@@ -18,35 +19,28 @@ class StaffHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Body restored to the real layout. After migration 0043 added the
-    // tablet_devices/sessions/orders RLS policies, the providers that
-    // these widgets depend on actually return data instead of null —
-    // so the original blank-body symptom on phone (BUG-023) should
-    // resolve. If a null-check crash persists post-0043, it's a real
-    // BUG-023 separate from BUG-026 and we'll re-bisect.
-    // BUG-031 bisect step 3: StaffAppBar restored, but the StaffAppBar
-    // widget itself has been simplified to a bare StatelessWidget
-    // returning AppBar(title: Text(...)). No ConsumerWidget, no
-    // ref.watch, no actions, no IconButton. If body taps fire now,
-    // we know the simplified StaffAppBar shape is OK — then build
-    // back complexity in staff_app_bar.dart to find the absorber.
+    // BUG-031 final: StaffAppBar is now a plain StatelessWidget that
+    // accepts the device label as a constructor param. The screen reads
+    // the provider once here and passes the resolved label in. This
+    // decouples the AppBar from Riverpod rebuilds, which the bisect
+    // identified as the source of the body-tap-absorbing behaviour
+    // on Flutter web.
+    final device = ref.watch(currentTabletDeviceProvider).valueOrNull;
+    final deviceLabel = device?['device_label'] as String?;
+
     return Scaffold(
-      appBar: const StaffAppBar(),
-      body: GestureDetector(
-        onTap: () {
-          // ignore: avoid_print
-          print('[BUG-031 PARENT-BISECT] body tapped');
-        },
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          width: 100,
-          height: 100,
-          color: Colors.red,
-          alignment: Alignment.center,
-          child: const Text(
-            'TAP ME',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-          ),
+      appBar: StaffAppBar(deviceLabel: deviceLabel),
+      body: const Padding(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _StatsBar(),
+            SizedBox(height: 24),
+            _ActionsGrid(),
+            SizedBox(height: 24),
+            _EndShiftCta(),
+          ],
         ),
       ),
     );
@@ -363,34 +357,38 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // BUG-031 revert: 99da1fa swapped this to Material(clipBehavior:antiAlias)
-    // > InkWell to fix what looked like a mouse_tracker ripple/hit-test
-    // mismatch. The bisect for BUG-023 later proved ListView was the actual
-    // culprit, not this widget — and the Material wrapper's clipping appears
-    // to swallow tap events on this Flutter+web build, leaving cards visually
-    // present but unresponsive. Reverted to the original InkWell > Container
-    // pattern that was known to be tappable.
-    // BUG-031 isolation test (Option A): _ActionCard body stripped to
-    // bare GestureDetector + 100×100 red Container + print('tap').
-    // If THIS taps → problem was in the widget complexity, build it back.
-    // If THIS does NOT tap → problem is the parent gesture chain
-    // (Padding, Column, Scaffold, app shell), not _ActionCard.
-    return GestureDetector(
-      onTap: () {
-        // ignore: avoid_print
-        print('[BUG-031 OPTION-A] card tapped: $label');
-        onTap();
-      },
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: 100,
-        height: 100,
-        color: Colors.red,
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white, fontSize: 10),
+    // BUG-031 final shape: Material(color, shape) > InkWell(onTap,
+    // borderRadius) > Padding > Column. No clipBehavior (that was the
+    // tap-swallower in 99da1fa). Material provides the visible surface;
+    // InkWell paints ripples on it; hit-test region == paint region.
+    // BUG-029 fit kept: icon 28, gap 8, padding 12, body font, 2-line ellipsis.
+    return Material(
+      color: AppColors.lightSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.lightBorder),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 28, color: AppColors.navy),
+              const SizedBox(height: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  style: AppTextStyles.body(context),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
