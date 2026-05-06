@@ -1,3 +1,7 @@
+// BUG-023 bisect step 1: _StatsBar removed from body. _StatsBar class
+// kept in this file but temporarily unreferenced.
+// ignore_for_file: unused_element
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,8 +33,9 @@ class StaffHomeScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: const [
-          _StatsBar(),
-          SizedBox(height: 24),
+          // BUG-023 bisect step 1: _StatsBar removed.
+          // _StatsBar(),
+          // SizedBox(height: 24),
           _ActionsGrid(),
           SizedBox(height: 24),
           _EndShiftCta(),
