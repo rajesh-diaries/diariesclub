@@ -14,9 +14,19 @@ Running log of post-merge bugs. New entries at the top.
 
 ---
 
-## BUG-026: Staff app RLS — direct table reads return empty for staff users (OPEN 2026-05-06)
+## BUG-026: Staff app RLS — direct table reads return empty for staff users (PARTIALLY FIXED 2026-05-06)
 
-(unchanged — pickup after BUG-023 closes; design pass needed)
+- **Severity:** 🔴 BLOCKER originally — login was rejecting all staff users on web; phone "got past" only via a router redirect race in the device-check await.
+- **Why it surfaced today:** user tested on web (`localhost:55916/#/staff/login`); login showed "This phone is not registered (or has been revoked). Contact admin." despite valid credentials. Web doesn't have the redirect race the phone had, so the login screen's `device == null` branch fired correctly — and the device check returned null because `tablet_devices` had RLS enabled with zero policies for the staff user.
+- **Fix shipped (migration `0043_staff_app_rls_minimum`):**
+  - `tablet_devices_self_read` policy: `FOR SELECT TO authenticated USING (auth_user_id = auth.uid())`. Lets a signed-in user read their own device row(s). `is_active` filter applied client-side so admin can audit revoked rows without policy churn.
+  - `_is_active_tablet_for_venue(p_venue_id)` SECURITY DEFINER helper: returns true iff `auth.uid()` owns an active tablet_devices row for `p_venue_id`.
+  - `sessions_staff_venue_read` + `orders_staff_venue_read` policies: layered alongside existing family policies; staff/tablet users get venue-scoped reads.
+  - Verified via SET-LOCAL-ROLE simulation as `stafftest@gmail.com`: `tablet_devices=1, sessions=5, orders=0` (was all zeros pre-fix).
+- **Still open / not in this migration:**
+  - `staff` table — intentionally left unexposed. PIN verification runs server-side via `verify_staff_pin` RPC; client never needs `pin_hash`.
+  - Other staff-side direct reads in `kds_screen.dart`, `menu_availability_screen.dart`, `shift_close_screen.dart`, `walkin_pos_screen.dart`, `refund_screen.dart` — when staff actions exercise these, additional policies (or RPCs) will be needed. Pickup case-by-case as testing surfaces them.
+  - Bigger architectural decision (SECURITY DEFINER RPCs across the board vs full RLS coverage) deferred — current fix is the minimum unblocker.
 
 ---
 
