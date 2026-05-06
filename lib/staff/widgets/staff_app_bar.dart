@@ -36,15 +36,15 @@ class StaffAppBar extends ConsumerWidget implements PreferredSizeWidget {
       actions: [
         ...?extraActions,
         IconButton(
-          tooltip: 'Sign out tablet',
+          tooltip: 'Sign out',
           icon: const Icon(Icons.logout),
           onPressed: () async {
             final confirm = await showDialog<bool>(
               context: context,
               builder: (c) => AlertDialog(
-                title: const Text('Sign out tablet?'),
+                title: const Text('Sign out?'),
                 content: const Text(
-                  'Signing out the tablet will require the device to be re-registered before any staff can use it.',
+                  'Signing out will require this phone to be re-registered before any staff can use it.',
                 ),
                 actions: [
                   TextButton(

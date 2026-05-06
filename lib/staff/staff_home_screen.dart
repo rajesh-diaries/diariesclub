@@ -18,97 +18,27 @@ class StaffHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[BUG-023-V4] StaffHomeScreen.build()');
-    // BUG-023 V4 — restore original body, wrap each child in a coloured
-    // border so we can see WHICH child fails to paint. Border visible →
-    // child has non-zero size. Border missing → child collapsed.
+    // BUG-023 fix: replaced `SafeArea > SingleChildScrollView >
+    // Column(crossAxisAlignment: stretch)` with `SafeArea > ListView`.
+    // Diagnostic rounds confirmed body slot paints (V3 kill switch) and
+    // every widget calls build() (V2 logs); the SCV+stretched-Column
+    // combo was rendering at zero content size on Vivo Funtouch Android
+    // 15. ListView gives children bounded width naturally and avoids
+    // the constraint pathology that triggered on this device.
     return Scaffold(
       appBar: const StaffAppBar(),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: ListView(
           padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.20),
-                  border: Border.all(color: Colors.deepOrange, width: 2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'DEBUG: BUG-023 V4 body entry — coloured borders mark each child',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: Colors.deepOrange,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const _DebugWrap(
-                label: 'STATS_BAR',
-                color: Colors.red,
-                child: _StatsBar(),
-              ),
-              const SizedBox(height: 16),
-              const _DebugWrap(
-                label: 'ACTIONS_GRID',
-                color: Colors.blue,
-                child: _ActionsGrid(),
-              ),
-              const SizedBox(height: 16),
-              const _DebugWrap(
-                label: 'END_SHIFT',
-                color: Colors.green,
-                child: _EndShiftCta(),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
+          children: const [
+            _StatsBar(),
+            SizedBox(height: 24),
+            _ActionsGrid(),
+            SizedBox(height: 24),
+            _EndShiftCta(),
+            SizedBox(height: 16),
+          ],
         ),
-      ),
-    );
-  }
-}
-
-/// BUG-023 V4 helper — wraps a child in a coloured border + label header
-/// so we can see which children are rendering at zero size on the device.
-/// Remove once root cause is found.
-class _DebugWrap extends StatelessWidget {
-  final String label;
-  final Color color;
-  final Widget child;
-  const _DebugWrap({
-    required this.label,
-    required this.color,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    debugPrint('[BUG-023-V4] _DebugWrap($label).build()');
-    return Container(
-      decoration: BoxDecoration(border: Border.all(color: color, width: 2)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            color: color,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-          child,
-        ],
       ),
     );
   }
@@ -119,7 +49,6 @@ class _StatsBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[BUG-023-V4] _StatsBar.build()');
     final activeAsync = ref.watch(venueActiveSessionsProvider);
     final ordersAsync = ref.watch(venueOrdersProvider);
     final todayAsync = ref.watch(todaySessionsCountProvider);
@@ -132,16 +61,10 @@ class _StatsBar extends ConsumerWidget {
       ('todayCashCollected', cashAsync),
     ];
 
-    // BUG-023 diagnostic — surface provider errors visibly instead of
-    // swallowing them via `valueOrNull ?? 0`. Remove the explicit
-    // error/loading branches once root cause is found and revert to
-    // the prior render path.
+    // Surface provider errors visibly so RLS/network failures don't
+    // silently degrade tiles to "0". Loading shows an inline spinner.
     final errors = asyncs.where((e) => e.$2.hasError).toList();
     if (errors.isNotEmpty) {
-      debugPrint(
-        '[BUG-023-V4] _StatsBar errors: '
-        '${errors.map((e) => "${e.$1}=${e.$2.error}").join(", ")}',
-      );
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -285,7 +208,6 @@ class _ActionsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[BUG-023-V4] _ActionsGrid.build()');
     return GridView.count(
       crossAxisCount: 3,
       shrinkWrap: true,
@@ -414,7 +336,6 @@ class _EndShiftCta extends StatelessWidget {
   const _EndShiftCta();
   @override
   Widget build(BuildContext context) {
-    debugPrint('[BUG-023-V4] _EndShiftCta.build()');
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(

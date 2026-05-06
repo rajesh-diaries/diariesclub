@@ -14,7 +14,6 @@ class StaffApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[BUG-023-V4] StaffApp.build()');
     final themeMode = ref.watch(appThemeModeProvider);
     final router = ref.watch(staffRouterProvider);
 
@@ -36,9 +35,6 @@ class StaffApp extends ConsumerWidget {
       // Type headroom parents do. 1.3× cap keeps KDS cards readable without
       // breaking 4-up grids.
       builder: (context, child) {
-        debugPrint(
-          '[BUG-023-V4] StaffApp.builder(child=${child?.runtimeType})',
-        );
         final mq = MediaQuery.of(context);
         return MediaQuery(
           data: mq.copyWith(

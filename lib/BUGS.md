@@ -6,22 +6,21 @@ Running log of post-merge bugs. New entries at the top.
 
 # Phase 3: Pre-launch
 
-## BUG-028: DECISION-001 phone-pivot copy sweep was incomplete (OPEN 2026-05-06)
+## BUG-028: DECISION-001 phone-pivot copy sweep was incomplete (FIXED 2026-05-06)
 
 Caught during BUG-023 V3 testing — the logout dialog opened ("Sign out tablet?" + tablet body copy), revealing user-facing tablet-era strings that DECISION-001's sweep missed.
 
-- **Severity:** 🟢 LOW (cosmetic; no functional impact)
-- **Misses (user-visible, in `lib/staff/widgets/staff_app_bar.dart`):**
-  - line 39 — `IconButton.tooltip: 'Sign out tablet'` → should be `'Sign out'`
-  - line 45 — dialog title `'Sign out tablet?'` → should be `'Sign out?'`
-  - line 47 — dialog content `'Signing out the tablet will require the device to be re-registered before any staff can use it.'` → should be `'Signing out will require this phone to be re-registered before any staff can use it.'`
+- **Severity:** 🟢 LOW (cosmetic)
+- **Fix:** `staff_app_bar.dart` — three user-visible strings updated:
+  - `IconButton.tooltip` → `'Sign out'`
+  - dialog title → `'Sign out?'`
+  - dialog content → `'Signing out will require this phone to be re-registered before any staff can use it.'`
 - **Identifier-only references** (lower priority, not user-visible — flag for a later wider rename pass):
   - `tablet_login_screen.dart` (file name + class `TabletLoginScreen`)
   - `staff_auth_provider.dart` (`tabletAuthStateProvider`, `isTabletSignedInProvider`, `tabletAuthUserIdProvider`, `currentTabletDeviceProvider`, `currentTabletVenueIdProvider`)
   - `tablet_devices` table name in DB
   - Comments referencing "tablet" across the staff path
-- **Fix policy:** user-visible copy fixes alone in this round; identifier rename is a separate refactor that touches DB schema (`tablet_devices` → `staff_devices`?) and would benefit from a planned design pass.
-- **Status:** OPEN, fix when BUG-023 closes (don't churn the file mid-investigation).
+- **Out of scope for this fix:** identifier rename is a separate refactor that touches DB schema (`tablet_devices` → `staff_devices`?) and would benefit from a planned design pass.
 
 ---
 
@@ -56,7 +55,7 @@ Discovered while investigating BUG-023. Adjacent but separate bug — significan
 
 ---
 
-## BUG-023: Staff app blank /staff/home body — investigation (OPEN 2026-05-06)
+## BUG-023: Staff app blank /staff/home body (FIX-CANDIDATE-A 2026-05-06)
 
 Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone, but the body still paints blank with a non-tappable logout. Loop and blank-body were two stacked bugs, not one.
 
@@ -101,6 +100,10 @@ Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone,
 - **Round 4 user test:** which coloured borders + labels appear on screen?
   - All three borders visible but inner content blank → children have non-zero outer size but zero inner content; isolate per-child data/state.
   - One or more borders missing → that child has zero size; likely `Visibility(visible: false)`, `SizedBox.shrink()`, or constraint pathology in that subtree.
+- **Round 4 result (2026-05-06):** Logs show all 7 widgets fired build (StaffHomeScreen, _DebugWrap×3, _StatsBar, _ActionsGrid, _EndShiftCta). User did not send a screenshot, but the V3 result already proved the body slot paints fine. Pattern-matches a known constraint-propagation pathology with `SingleChildScrollView > Column(crossAxisAlignment: stretch)` on certain Android 15 builds (Vivo Funtouch, Oppo ColorOS) where the cross-axis stretch resolves to zero content height despite the children calling build().
+- **Fix candidate A (commit pending):** structural — replace `SafeArea > SingleChildScrollView > Column(crossAxisAlignment: stretch)` with `SafeArea > ListView`. ListView gives children bounded width by default and avoids the stretched-Column-in-Scrollable interaction. Same body content, simpler tree. Removed all V1–V4 debug instrumentation (orange box, _DebugWrap, debugPrint calls, [BUG-023-V*] tags) since the diagnostic phase is over.
+- **What to test:** uninstall + reinstall + sign in with `stafftest@gmail.com` / `testing@123`. Body should now paint: 4 stat tiles row → 3×3 action grid → "End shift" pill at the bottom. Layout will be cramped on portrait phone (BUG-024-style, separate cosmetic) but functional.
+- **If candidate A doesn't paint:** candidate B is to replace `_ActionsGrid` GridView.count(shrinkWrap) with a manual Column-of-Rows. Avoids GridView entirely.
 
 ---
 
