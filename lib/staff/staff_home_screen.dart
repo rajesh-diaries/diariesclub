@@ -1,3 +1,5 @@
+import 'dart:developer' as dev;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,20 +20,42 @@ class StaffHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const Scaffold(
-      appBar: StaffAppBar(),
+    dev.log('build()', name: 'staff_home.StaffHomeScreen');
+    return Scaffold(
+      appBar: const StaffAppBar(),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(20),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _StatsBar(),
-              SizedBox(height: 24),
-              _ActionsGrid(),
-              SizedBox(height: 24),
-              _EndShiftCta(),
-              SizedBox(height: 16),
+              // BUG-023 diagnostic. If you see this orange box on the
+              // device, the body IS rendering — issue is occlusion above.
+              // If you don't, body never built — issue is higher in the
+              // tree. Remove once root cause is found.
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.20),
+                  border: Border.all(color: Colors.deepOrange, width: 2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'DEBUG: StaffHomeScreen body built — BUG-023 v1',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.deepOrange,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const _StatsBar(),
+              const SizedBox(height: 24),
+              const _ActionsGrid(),
+              const SizedBox(height: 24),
+              const _EndShiftCta(),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -45,12 +69,87 @@ class _StatsBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activeSessions =
-        ref.watch(venueActiveSessionsProvider).valueOrNull?.length ?? 0;
-    final pendingOrders =
-        ref.watch(venueOrdersProvider).valueOrNull?.length ?? 0;
-    final todaySessions = ref.watch(todaySessionsCountProvider).valueOrNull ?? 0;
-    final cashPaise = ref.watch(todayCashCollectedProvider).valueOrNull ?? 0;
+    dev.log('build()', name: 'staff_home._StatsBar');
+    final activeAsync = ref.watch(venueActiveSessionsProvider);
+    final ordersAsync = ref.watch(venueOrdersProvider);
+    final todayAsync = ref.watch(todaySessionsCountProvider);
+    final cashAsync = ref.watch(todayCashCollectedProvider);
+
+    final asyncs = <(String, AsyncValue<dynamic>)>[
+      ('venueActiveSessions', activeAsync),
+      ('venueOrders', ordersAsync),
+      ('todaySessionsCount', todayAsync),
+      ('todayCashCollected', cashAsync),
+    ];
+
+    // BUG-023 diagnostic — surface provider errors visibly instead of
+    // swallowing them via `valueOrNull ?? 0`. Remove the explicit
+    // error/loading branches once root cause is found and revert to
+    // the prior render path.
+    final errors = asyncs.where((e) => e.$2.hasError).toList();
+    if (errors.isNotEmpty) {
+      dev.log(
+        'errors: ${errors.map((e) => "${e.$1}=${e.$2.error}").join(", ")}',
+        name: 'staff_home._StatsBar',
+      );
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.adminRed.withValues(alpha: 0.10),
+          border:
+              Border.all(color: AppColors.adminRed.withValues(alpha: 0.40)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Stats provider errors:',
+              style: AppTextStyles.body(context, color: AppColors.adminRed)
+                  .copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            for (final (name, async) in errors)
+              Text(
+                '• $name: ${async.error}',
+                style:
+                    AppTextStyles.caption(context, color: AppColors.adminRed),
+              ),
+          ],
+        ),
+      );
+    }
+
+    final allLoading = asyncs.every((e) => e.$2.isLoading);
+    if (allLoading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Loading stats…',
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final activeSessions = activeAsync.valueOrNull?.length ?? 0;
+    final pendingOrders = ordersAsync.valueOrNull?.length ?? 0;
+    final todaySessions = todayAsync.valueOrNull ?? 0;
+    final cashPaise = cashAsync.valueOrNull ?? 0;
 
     return Row(
       children: [
@@ -136,6 +235,7 @@ class _ActionsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    dev.log('build()', name: 'staff_home._ActionsGrid');
     return GridView.count(
       crossAxisCount: 3,
       shrinkWrap: true,
@@ -264,6 +364,7 @@ class _EndShiftCta extends StatelessWidget {
   const _EndShiftCta();
   @override
   Widget build(BuildContext context) {
+    dev.log('build()', name: 'staff_home._EndShiftCta');
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(

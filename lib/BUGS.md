@@ -6,6 +6,60 @@ Running log of post-merge bugs. New entries at the top.
 
 # Phase 3: Pre-launch
 
+## BUG-026: Staff app RLS — direct table reads return empty for staff users (OPEN 2026-05-06)
+
+Discovered while investigating BUG-023. Adjacent but separate bug — significant enough to track on its own.
+
+- **Severity:** 🔴 BLOCKER (production staff app cannot read its own data)
+- **Finding:** RLS audit via `pg_policies` + simulated `SET LOCAL ROLE authenticated` query as `stafftest@gmail.com`:
+  | Table | RLS | Policies for staff/tablet user |
+  |---|---|---|
+  | `tablet_devices` | ✅ enabled | **0 policies** — only service_role can read |
+  | `staff` | ✅ enabled | **0 policies** |
+  | `sessions` | ✅ enabled | only `sessions_family` (`family_id = auth_family_id()`) |
+  | `orders` | ✅ enabled | only `orders_family` (same) |
+  Verified counts as the staff user: `tablet_devices=0, sessions=0, orders=0, staff=0`.
+- **Implication:** raw `.from(...).select()` calls in the staff app return empty for any signed-in staff/tablet user. Touch points (every staff-side direct query):
+  - `lib/staff/providers/staff_auth_provider.dart` (`tablet_devices` for venue lookup)
+  - `lib/staff/providers/venue_streams_provider.dart` (`sessions`, `orders` realtime streams)
+  - `lib/staff/menu_availability_screen.dart`
+  - `lib/staff/kds_screen.dart`
+  - `lib/staff/shift_close_screen.dart`
+  - `lib/staff/walkin_pos_screen.dart`
+  - `lib/staff/refund_screen.dart`
+- **Why login still appears to succeed:** the login screen's `device == null → signOut` branch is meant to catch this, but the GoRouter redirect on `signInWithPassword` success races ahead of the device-check await, navigating to `/staff/home` before the check completes. User lands on home with a dud device row; tile fallbacks render "0" / fallback labels everywhere.
+- **Original design intent (probable):** SECURITY DEFINER RPCs for staff queries (matches the admin pattern — admin web routes everything through `admin_*` RPCs). The staff providers were written against direct table reads, possibly assuming RLS was permissive or a future migration would add staff-role policies that never landed.
+- **Decision needed before fix:**
+  1. **Option A — SECURITY DEFINER RPCs across the board.** Matches admin pattern. Audit-log ready. Need to write RPCs for every read currently done as `.from()`. More boilerplate, fewer RLS surprises.
+  2. **Option B — Staff-role-aware RLS policies.** Add `staff_can_read_*` policies that check `auth.uid() IN (SELECT auth_user_id FROM tablet_devices WHERE is_active)`. Keeps providers as-is. Risk: realtime subscriptions inherit RLS and may behave subtly differently.
+  3. **Option C — Hybrid.** Direct reads for safe-to-expose tables (sessions/orders filtered by venue), RPCs for sensitive ones (`staff` table — has `pin_hash`). Probably the right answer.
+- **Status:** OPEN, design pass not started. Picking up after BUG-023 closes.
+
+---
+
+## BUG-023: Staff app blank /staff/home body — investigation (OPEN 2026-05-06)
+
+Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone, but the body still paints blank with a non-tappable logout. Loop and blank-body were two stacked bugs, not one.
+
+- **Severity:** 🔴 BLOCKER
+- **Symptom:** post-login, `StaffAppBar` renders ("Diaries Staff" + logout icon) but body is fully white, logout taps non-responsive. No widget tree errors, no route logs.
+- **Code-review walkthrough:**
+  - `StaffHomeScreen` body tree: `SafeArea > SingleChildScrollView > Column(crossAxisAlignment: stretch) > [_StatsBar, gap, _ActionsGrid, gap, _EndShiftCta, gap]`. Static structure — no async gates that could hang the body itself.
+  - **Async consumers found** (all using `valueOrNull` with silent fallback):
+    - `StaffAppBar` watches `currentTabletDeviceProvider` → `device?[label] ?? 'Diaries Staff'`
+    - `_StatsBar` watches 4 providers → each `valueOrNull?.length ?? 0`
+    - All swallow loading + error invisibly. If they failed, tiles still render "0" — they don't make the body blank.
+  - **Modal-overlay search** (`showDialog`, `showModalBottomSheet`, `Stack`, `Overlay`, `absorb`): no automatic modal opens between login → home. Only triggered by user action (logout, action grid, etc.).
+- **Hypothesis remaining:** The non-tappable logout strongly suggests an overlay above the Scaffold absorbing taps and obscuring the body — but no source found in code. Could be a stuck route from the login → home transition, or something device-specific. Need device telemetry.
+- **Diagnostic instrumentation pushed (commit pending):**
+  1. Visible orange "DEBUG: StaffHomeScreen body built — BUG-023 v1" box at the top of the body. If user sees this on device → body IS rendering, issue is occlusion above. If they don't → body never built, issue is higher in the tree.
+  2. `_StatsBar` rewritten to surface provider errors as a red banner (previously swallowed by `valueOrNull ?? 0`) and to show a centred spinner when all 4 providers are still loading.
+  3. `dev.log` traces at every subwidget `build()` — flutter logs will show which widgets fired. Filter by `staff_home`.
+- **Adjacent finding:** BUG-026 (RLS misconfig) surfaced during this investigation. Logged separately above. Does not explain blank body — empty data renders as "0" in tiles, not blank.
+- **Status:** OPEN, awaiting device re-run + screenshot to branch the diagnosis.
+
+---
+
 ## BUG-022: Staff app infinite layout loop on Android 15 post-login (FIXED 2026-05-06)
 
 - Discovered: 2026-05-06 Phase 3 testing on I2306 phone (Android 15, portrait).
