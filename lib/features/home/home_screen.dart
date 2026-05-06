@@ -66,11 +66,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             PostSessionHomeView(session: session),
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => FriendlyErrorScreen(
-          code: 'E-HOME',
-          userMessage: "Couldn't load home",
-          technicalDetails: e.toString(),
-        ),
+        error: (e, st) {
+          // BUG-033 diagnostic: surface the actual error so we can see
+          // what's failing instead of just "E-HOME". Console + UI.
+          debugPrint('[E-HOME] homeStateProvider error: $e');
+          debugPrint('[E-HOME] stack: $st');
+          return FriendlyErrorScreen(
+            code: 'E-HOME',
+            userMessage: "Couldn't load home",
+            technicalDetails: e.toString(),
+          );
+        },
       ),
     );
   }

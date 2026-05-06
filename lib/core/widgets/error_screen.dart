@@ -69,6 +69,25 @@ class FriendlyErrorScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              if (technicalDetails != null && technicalDetails!.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.lightBackground,
+                    border: Border.all(color: AppColors.lightBorder),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    technicalDetails!,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      color: AppColors.lightTextSecondary,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
