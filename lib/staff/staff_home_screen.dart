@@ -18,27 +18,25 @@ class StaffHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // BUG-023 fix: replaced `SafeArea > SingleChildScrollView >
-    // Column(crossAxisAlignment: stretch)` with `SafeArea > ListView`.
-    // Diagnostic rounds confirmed body slot paints (V3 kill switch) and
-    // every widget calls build() (V2 logs); the SCV+stretched-Column
-    // combo was rendering at zero content size on Vivo Funtouch Android
-    // 15. ListView gives children bounded width naturally and avoids
-    // the constraint pathology that triggered on this device.
+    // BUG-023 fix candidate C — drop SafeArea entirely. The V3 kill
+    // switch worked WITHOUT SafeArea; candidates A and B both kept it
+    // and stayed blank. Scaffold already accounts for the AppBar +
+    // bottom system inset (resizeToAvoidBottomInset=true by default),
+    // so SafeArea was redundant; on Vivo Funtouch Android 15 it appears
+    // to compute padding that collapses content. Body now uses plain
+    // Padding for layout chrome and ListView for scrolling.
     return Scaffold(
       appBar: const StaffAppBar(),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: const [
-            _StatsBar(),
-            SizedBox(height: 24),
-            _ActionsGrid(),
-            SizedBox(height: 24),
-            _EndShiftCta(),
-            SizedBox(height: 16),
-          ],
-        ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: const [
+          _StatsBar(),
+          SizedBox(height: 24),
+          _ActionsGrid(),
+          SizedBox(height: 24),
+          _EndShiftCta(),
+          SizedBox(height: 16),
+        ],
       ),
     );
   }

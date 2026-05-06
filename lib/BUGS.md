@@ -97,7 +97,7 @@ Discovered while investigating BUG-023. Adjacent but separate bug — significan
 
 ---
 
-## BUG-023: Staff app blank /staff/home body (FIX-CANDIDATE-B 2026-05-06)
+## BUG-023: Staff app blank /staff/home body (FIX-CANDIDATE-C 2026-05-06)
 
 Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone, but the body still paints blank with a non-tappable logout. Loop and blank-body were two stacked bugs, not one.
 
@@ -150,6 +150,11 @@ Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone,
 - **Fix candidate B (commit pending):** `_ActionsGrid` rewritten as a manual `Column` of three `Row`s. Each row is `SizedBox(height: 112) > Row > [Expanded(card), gap, Expanded(card), gap, Expanded(card)]` with a 16px gap between rows. No GridView, no shrinkWrap, no NeverScrollableScrollPhysics — pure RenderBox layout that bypasses the sliver path entirely.
 - **What to test:** uninstall + reinstall + sign in. Body should show 4 stat tiles → 9 action tiles in a clean 3×3 → End shift bar.
 - **If candidate B still doesn't paint:** the failure is deeper. Next moves: (1) replace `_StatsBar`'s Row-of-Expanded with explicit-width SizedBoxes (rule out Row+Expanded), (2) wrap each subwidget in `RepaintBoundary` to isolate paint vs layout, (3) drop the `MediaQuery` wrapper in `app_staff.dart` MaterialApp.builder to rule out the textScaler clamp.
+- **Candidate B result (2026-05-06):** still blank. Manual Column-of-Rows didn't help. Eliminates GridView as the sole culprit.
+- **Common thread between A & B (both blank):** both use `SafeArea`. The V3 kill switch (which painted) did NOT use SafeArea. Likely root cause for this device.
+- **Fix candidate C (commit pending):** drop `SafeArea` entirely. Scaffold already accounts for the AppBar + bottom system insets via `resizeToAvoidBottomInset=true` (default). SafeArea atop that was redundant; on Vivo Funtouch Android 15 it appears to compute padding that collapses the body. Body is now `ListView(padding: 20) > [_StatsBar, gap, _ActionsGrid, gap, _EndShiftCta]` — no SafeArea wrapper.
+- **What to test:** uninstall + reinstall + sign in. Body should finally show 4 stat tiles + action grid + end shift bar.
+- **If candidate C also blank:** the failure pattern is something inside the StaffApp shell itself, not the screen. Next moves: drop the MediaQuery textScaler-clamp wrapper in `app_staff.dart`, then try `Scaffold` without AppBar (move logout into a floating widget) to fully match V3's working shape.
 
 ---
 
