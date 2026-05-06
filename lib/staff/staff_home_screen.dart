@@ -368,41 +368,27 @@ class _ActionCard extends StatelessWidget {
     // to swallow tap events on this Flutter+web build, leaving cards visually
     // present but unresponsive. Reverted to the original InkWell > Container
     // pattern that was known to be tappable.
-    // BUG-031 fix (v3): bypass mouse_tracker entirely.
-    //   - 99da1fa Material(clipBehavior:antiAlias) > InkWell → clip swallowed taps
-    //   - 7490a4a InkWell > Container(decoration) → mouse_tracker.dart:199 assertion
-    //   - 327bd86 Card > InkWell → mouse_tracker.dart:199 STILL asserts
-    // InkWell uses MouseRegion under the hood for hover tracking, which is
-    // exactly what asserts on this Flutter+web build. Replacing InkWell
-    // with GestureDetector skips the MouseRegion path entirely. We lose
-    // the ripple animation on tap; acceptable to unblock app function.
-    //
-    // BUG-029 fit kept: icon 28, gap 8, padding 12, body font, 2-line ellipsis.
+    // BUG-031 isolation test (Option A): _ActionCard body stripped to
+    // bare GestureDetector + 100×100 red Container + print('tap').
+    // If THIS taps → problem was in the widget complexity, build it back.
+    // If THIS does NOT tap → problem is the parent gesture chain
+    // (Padding, Column, Scaffold, app shell), not _ActionCard.
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        // ignore: avoid_print
+        print('[BUG-031 OPTION-A] card tapped: $label');
+        onTap();
+      },
       behavior: HitTestBehavior.opaque,
       child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.lightSurface,
-          border: Border.all(color: AppColors.lightBorder),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 28, color: AppColors.navy),
-            const SizedBox(height: 8),
-            Flexible(
-              child: Text(
-                label,
-                style: AppTextStyles.body(context),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
+        width: 100,
+        height: 100,
+        color: Colors.red,
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white, fontSize: 10),
         ),
       ),
     );
