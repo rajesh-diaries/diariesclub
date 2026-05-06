@@ -107,7 +107,7 @@ Discovered while investigating BUG-023. Adjacent but separate bug — significan
 
 ---
 
-## BUG-023: Staff app blank /staff/home body (FIX-CANDIDATE-D 2026-05-06)
+## BUG-023: Staff app blank /staff/home body (LIKELY RESOLVED via BUG-026 fix 2026-05-06)
 
 Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone, but the body still paints blank with a non-tappable logout. Loop and blank-body were two stacked bugs, not one.
 
@@ -171,6 +171,9 @@ Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone,
   - If D renders → the bug is in `_StatsBar` / `_ActionsGrid` / `_EndShiftCta`. Tomorrow: bisect by re-introducing one at a time.
   - If D still blank → the failure is upstream (StaffApp MediaQuery wrapper, theme, or AppBar). Tomorrow: drop the MediaQuery wrapper and re-test.
 - **For tomorrow morning, the user should also scroll up in `flutter logs` and find the FIRST `Another exception` message — its stack trace will name the user-code line, not just the framework path.**
+- **Reframed (2026-05-06, after web testing surfaced BUG-026):** the user's web test today caught the login screen rejecting at the device-check stage — same root cause as the phone's blank body, two visible symptoms. On phone yesterday, sign-in completed via a router redirect race ahead of the device check; the home screen then mounted with `currentTabletDeviceProvider == null` (RLS-blocked), every downstream provider produced empty/null data, and the cumulative effect somewhere in the realtime stream / sliver pipeline manifested as the repeated `Null check operator used on a null value` log spam. Hypothesis: **BUG-023 is downstream of BUG-026**, not a separate bug.
+- **Action (2026-05-06):** restored the original body (rolled back candidate D) now that migration 0043 has unblocked the provider chain. If staff home now renders normally on web AND phone, BUG-023 closes as a duplicate of BUG-026.
+- **What to test:** sign in on web first (`localhost:55916/#/staff/login`) — login should pass, home should show stat tiles + 3×3 action grid + end shift bar. Then phone — same expectation. If web works and phone still has the null-check crash, that's a separate device-specific bug worth its own entry.
 
 ---
 
