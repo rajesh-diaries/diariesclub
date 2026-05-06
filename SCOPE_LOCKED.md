@@ -40,11 +40,11 @@ Plus follow-ups:
 - Submit to stores
 - Store review (3-7 days each)
 
-### Launch scope (DECIDED 2026-05-06 after BUG-031 deferral)
+### Launch scope (DECIDED 2026-05-06 after BUG-031 deferral — updated after ListTile fallback also failed)
 - **Customer app:** full launch.
 - **Admin web:** full launch.
-- **Staff app:** functional launch. Sign-in works. Home navigation uses a Material `ListTile` fallback list (icon + label + chevron rows) instead of the polished 3×3 card grid. All routes accessible; gated routes still require staff PIN. The polished card grid (`_ActionCard` with Material+InkWell shape) lands in v1.1 once BUG-031 is properly investigated.
-- Customer + admin are the launch blockers; staff app polish is not.
+- **Staff app:** sign-in functional, home navigation deferred. Staff signs in successfully and lands on a v1 home page that lists all 9 routes + their URL paths. Navigation is via URL bar / bookmarks (e.g. `/staff/sessions`, `/staff/kds`, `/staff/qr`); all individual route screens and their RPCs are fully wired and work. The interactive home (3×3 card grid OR ListTile rows) lands in v1.1 — both shapes failed on Flutter web today with mouse_tracker hit-test assertions that need dedicated investigation.
+- Customer + admin are the launch blockers; staff app polish is not. Day-1 venue ops can run with URL-bar navigation while v1.1 fix is in flight.
 
 ### Deferred to v1.1
 - BUG-031 — staff home polished 3×3 action card grid (10 fix attempts on 2026-05-06, all failed; deep Flutter web hit-test issue, needs dedicated investigation; fallback ListTile shipped for v1)

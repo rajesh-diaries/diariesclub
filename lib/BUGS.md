@@ -107,14 +107,19 @@ Discovered while investigating BUG-023. Adjacent but separate bug — significan
 
 ---
 
-## BUG-031: Staff home action cards non-tappable on Flutter web (DEFERRED to v1.1, 2026-05-06)
+## BUG-031: Staff home interactive widgets fully non-tappable on Flutter web (DEFERRED to v1.1, 2026-05-06)
 
-After 10 fix attempts (Material+InkWell variants, Card+InkWell, GestureDetector, removing SafeArea, Padding+Column, etc.) action cards on `/staff/home` consistently absorb taps on Chrome web with `mouse_tracker.dart:199` / `box.dart:251` assertions firing every frame. Bisect identified the cause as the original `StaffAppBar`'s `ConsumerWidget extends + ref.watch` rebuild loop bleeding hit-test paths into the body region — but even after decoupling StaffAppBar from Riverpod (commit `59c8e50`), the polished card grid still fails. Root cause is a deep Flutter web rendering / hit-test interaction that needs dedicated investigation, not more incremental patches.
+After 11 fix attempts on 2026-05-06 (Material+InkWell variants, Card+InkWell, GestureDetector with HitTestBehavior.opaque, SafeArea drops, Padding+Column wraps, ListTile fallback as last resort, etc.) — including a full bisect that proved bare `Text('hello')` + plain `AppBar(title: Text('test'))` works — every interactive widget shape on `/staff/home` absorbs taps with `mouse_tracker.dart:199` and `box.dart:251` assertions firing every frame on screen entry. Even after decoupling StaffAppBar from Riverpod (commit `59c8e50`) and replacing custom cards with plain Material ListTile (commit `d37391d`), taps still don't fire. Root cause is a deep Flutter-web hit-test interaction with this app shell that needs dedicated investigation, not more incremental patches.
 
-- **Severity:** 🔴 BLOCKER for the polished home → DEFERRED v1.1
-- **v1 fallback shipped (this commit):** `_ActionsGrid` now renders as a `Column` of plain Material `ListTile` rows (icon + label + chevron, onTap → same routes, same PIN gating). ListTile is the most-tested tappable widget in Flutter; very unlikely to hit the same hit-test pathology.
-- **What lands in v1.1:** restore the polished 3×3 card grid (last working shape lives at commit `59c8e50` — `Material > InkWell > Padding > Column`). Need to figure out the actual Flutter-web interaction first.
-- **Investigation pointers for v1.1 pickup:** customer app's `CardGridItem` (`lib/features/adventure/widgets/card_grid_item.dart`) uses the same InkWell+Container shape and works fine on web. Difference is somewhere in the staff shell — the previous bisect ruled out StaffAppBar after the Riverpod decoupling, so the next layer to test is `app_staff.dart`'s `MaterialApp.router > builder` MediaQuery wrapper, the StaffApp ProviderScope topology, or a Riverpod stream that's emitting at framerate.
+- **Severity:** 🔴 BLOCKER for the polished home → DEFERRED to v1.1
+- **v1 ship state (this commit):** StaffHomeScreen replaced with a plain `Padding > Column > Text` page that lists all 9 routes + their URL paths. Staff navigates by typing paths in the URL bar or using bookmarks. Sign-in works, all routes (sessions / kds / qr / etc.) accessible directly via URL. Functional, just not polished.
+- **Routes preserved:** all 9 staff routes still wired in `staff_router.dart` and reachable directly: `/staff/sessions`, `/staff/kds`, `/staff/qr`, `/staff/manual`, `/staff/healthy-bite`, `/staff/refund`, `/staff/walkin`, `/staff/menu`, `/staff/audit`.
+- **What lands in v1.1:** restore interactive home (3×3 polished card grid OR ListTile rows — whichever survives debug). Last working render shape lives at commit `d37391d` (ListTile fallback) and `59c8e50` (Material+InkWell card grid).
+- **Investigation pointers for v1.1 pickup:**
+  - Customer app's tappable widgets (`CardGridItem` in `lib/features/adventure/widgets/card_grid_item.dart`) work fine on web with the same InkWell+Container shape — difference is somewhere in the staff shell, NOT the widget pattern.
+  - Bisect ruled out: StaffAppBar (after Riverpod decoupling), individual children (StatsBar, ActionsGrid, EndShiftCta tested in pairs).
+  - Bisect did NOT rule out: `_StatsBar`'s 4 Riverpod stream subscriptions (Realtime channels emit on data changes; if they emit at frame rate during initial subscribe, MouseRegions re-register continuously and hit-test paths invalidate); `app_staff.dart`'s `MaterialApp.router > builder` MediaQuery wrapper; the StaffApp ProviderScope topology; or `AppTextStyles`'s GoogleFonts loading on web.
+  - Suggested first move in v1.1: drop the `MaterialApp.router > builder` MediaQuery wrapper in `app_staff.dart` and re-test. If that fixes it → builder rebuild is the absorber. If not → bisect `_StatsBar`'s stream subscriptions.
 
 ---
 
