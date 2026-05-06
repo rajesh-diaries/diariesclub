@@ -25,11 +25,11 @@ class ActiveSessionsScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text("Couldn't load: $e")),
         data: (sessions) {
-          if (sessions.isEmpty) {
-            return const _EmptyState();
-          }
           final active = sessions.where((s) => s['status'] == 'active').toList();
           final grace = sessions.where((s) => s['status'] == 'grace').toList();
+          if (active.isEmpty && grace.isEmpty) {
+            return const _EmptyState();
+          }
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -50,27 +50,70 @@ class ActiveSessionsScreen extends ConsumerWidget {
   }
 }
 
+/// Empty state — uses CONVENTION-001 hero glyph row (Rafi/Ellie/Gerry/Zena
+/// coloured circles) until real artwork lands per the v1.1 deferred item.
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              PhosphorIconsRegular.clock,
-              size: 56,
-              color: AppColors.lightTextSecondary,
-            ),
-            const SizedBox(height: 12),
-            Text('No active sessions',
-                style: AppTextStyles.bodyLarge(context)),
-          ],
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(width: 240, child: _HeroIdleRow()),
+              const SizedBox(height: 24),
+              Text(
+                'The floor is quiet right now.',
+                style: AppTextStyles.bodyLarge(context),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Sessions will appear here as soon as a family scans in.',
+                style: AppTextStyles.body(
+                  context,
+                  color: AppColors.lightTextSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _HeroIdleRow extends StatelessWidget {
+  const _HeroIdleRow();
+
+  static const _cells = <(IconData, Color)>[
+    (PhosphorIconsFill.shieldStar, AppColors.rafiCoral),
+    (PhosphorIconsFill.heart, AppColors.ellieBlue),
+    (PhosphorIconsFill.magnifyingGlass, AppColors.gerryAmber),
+    (PhosphorIconsFill.palette, AppColors.zenaGreen),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        for (final (icon, color) in _cells)
+          Container(
+            width: 56,
+            height: 56,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+      ],
     );
   }
 }

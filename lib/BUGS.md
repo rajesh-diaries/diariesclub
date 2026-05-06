@@ -6,6 +6,23 @@ Running log of post-merge bugs. New entries at the top.
 
 # Phase 3: Pre-launch
 
+## CONVENTION-001: Hero illustration placeholder (NOTED 2026-05-06)
+
+Until real artwork lands (v1.1 deferred item — see `SCOPE_LOCKED.md`), empty states use a `_HeroIdleRow` pattern: four 56px coloured circles holding `PhosphorIconsFill` glyphs in the four hero brand colours (Rafi coral / Ellie blue / Gerry amber / Zena green). Reference implementation: `lib/features/adventure/widgets/cafe_only_empty_state.dart`. Mirror locally per-screen until repeated ≥3 times, then extract to `core/widgets/`.
+
+---
+
+## BUG-021: Staff active sessions screen — blank empty state (FIXED 2026-05-06)
+
+- Discovered: 2026-05-06 Phase 3 testing on I2306 phone (staff Android, post-DECISION-001 build).
+- Severity: 🟡 IMPORTANT
+- Symptom: When no active sessions exist, screen body rendered as a small grey clock + "No active sessions" — felt blank against the design system.
+- Second issue surfaced during fix: the data branch returned an empty `ListView` (zero children) when `sessions` was non-empty but contained only non-`active`/non-`grace` rows — that path was genuinely blank, not just visually weak.
+- Fix: replaced `_EmptyState` with the `_HeroIdleRow` pattern per CONVENTION-001 (4 hero glyphs + heading "The floor is quiet right now." + body "Sessions will appear here as soon as a family scans in."). Empty check moved from `sessions.isEmpty` to `active.isEmpty && grace.isEmpty` so the second case also lands on the empty state.
+- Scope: this screen only. Other staff empty states get their own bug entries when found in real testing.
+
+---
+
 ## DECISION-001: Staff app phone-only, not tablet (LOCKED 2026-05-06)
 
 Original spec assumed a single shared venue tablet; revised to each staff member using their own phone.
