@@ -329,27 +329,35 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.lightSurface,
-          border: Border.all(color: AppColors.lightBorder),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 36, color: AppColors.navy),
-            const SizedBox(height: 12),
-            Text(
-              label,
-              style: AppTextStyles.bodyLarge(context),
-              textAlign: TextAlign.center,
-            ),
-          ],
+    // BUG-023 fix: was `InkWell > Container(decoration: ...)` which is an
+    // anti-pattern — the Container's background paints over the ripple and
+    // on web the MouseTracker hit-test disagrees with the visible region,
+    // throwing `Assertion failed at mouse_tracker.dart:199` on every frame.
+    // Canonical pattern: Material(shape, color) provides the surface;
+    // InkWell paints ripples directly on it; no Container underneath.
+    return Material(
+      color: AppColors.lightSurface,
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: AppColors.lightBorder),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 36, color: AppColors.navy),
+              const SizedBox(height: 12),
+              Text(
+                label,
+                style: AppTextStyles.bodyLarge(context),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
