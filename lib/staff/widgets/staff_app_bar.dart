@@ -25,7 +25,7 @@ class StaffAppBar extends ConsumerWidget implements PreferredSizeWidget {
       automaticallyImplyLeading: false,
       title: Row(
         children: [
-          const Icon(Icons.tablet_mac, color: AppColors.navy, size: 20),
+          const Icon(Icons.phone_iphone, color: AppColors.navy, size: 20),
           const SizedBox(width: 8),
           Text(
             title ?? label,

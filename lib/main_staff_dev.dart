@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'bootstrap.dart';
@@ -12,6 +13,18 @@ import 'flavors.dart';
 /// staffProd / staffStaging entries land later when we wire CI.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Declare all four orientations explicitly. Functionally equivalent to
+  // omitting the call, but on some Android 15 ROMs the absence of any
+  // preference triggers an inbound viewport-metrics thrash from the OS
+  // post-launch (BUG-022 candidate). Explicit declaration gives the
+  // engine a definitive answer and lets it stop renegotiating insets.
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
 
   F = FlavorConfig(
     flavor: Flavor.staffDev,
