@@ -18,9 +18,10 @@ class StaffAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       automaticallyImplyLeading: false,
       title: Text(title ?? 'Diaries Staff'),
-      // BUG-031 bisect step 4: add IconButton in actions, NO tooltip.
+      // BUG-031 bisect step 5: add tooltip back on the IconButton.
       actions: [
         IconButton(
+          tooltip: 'Sign out',
           icon: const Icon(Icons.logout),
           onPressed: () {},
         ),
