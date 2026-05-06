@@ -368,49 +368,41 @@ class _ActionCard extends StatelessWidget {
     // to swallow tap events on this Flutter+web build, leaving cards visually
     // present but unresponsive. Reverted to the original InkWell > Container
     // pattern that was known to be tappable.
-    // BUG-031 fix (v2): canonical Card + InkWell pattern.
-    //   - 99da1fa used Material(clipBehavior: antiAlias) → cards rendered
-    //     but onTap never fired (clip swallowed taps).
-    //   - 7490a4a reverted to InkWell > Container(decoration) → cards
-    //     tappable but mouse_tracker.dart:199 assertion fired again
-    //     because the Container's painted region didn't match InkWell's
-    //     hit-test region.
-    // Card widget defaults to clipBehavior: none; it provides the visible
-    // surface (color + shape + border via RoundedRectangleBorder.side) so
-    // hit-test region == paint region == InkWell ripple region. No
-    // mismatch, no assertion, taps work.
+    // BUG-031 fix (v3): bypass mouse_tracker entirely.
+    //   - 99da1fa Material(clipBehavior:antiAlias) > InkWell → clip swallowed taps
+    //   - 7490a4a InkWell > Container(decoration) → mouse_tracker.dart:199 assertion
+    //   - 327bd86 Card > InkWell → mouse_tracker.dart:199 STILL asserts
+    // InkWell uses MouseRegion under the hood for hover tracking, which is
+    // exactly what asserts on this Flutter+web build. Replacing InkWell
+    // with GestureDetector skips the MouseRegion path entirely. We lose
+    // the ripple animation on tap; acceptable to unblock app function.
     //
-    // BUG-029 fit: icon 28, gap 8, padding 12, body font, 2-line ellipsis
-    // — comfortably inside the 112px cell on phone portrait.
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      color: AppColors.lightSurface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.lightBorder),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 28, color: AppColors.navy),
-              const SizedBox(height: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  style: AppTextStyles.body(context),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+    // BUG-029 fit kept: icon 28, gap 8, padding 12, body font, 2-line ellipsis.
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.lightSurface,
+          border: Border.all(color: AppColors.lightBorder),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 28, color: AppColors.navy),
+            const SizedBox(height: 8),
+            Flexible(
+              child: Text(
+                label,
+                style: AppTextStyles.body(context),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
