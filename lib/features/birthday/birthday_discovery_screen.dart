@@ -84,9 +84,7 @@ class BirthdayDiscoveryScreen extends ConsumerWidget {
               if (selectedChild != null)
                 _BirthdayInterestCard(child: selectedChild),
               const SizedBox(height: 16),
-              _MainCta(
-                childName: (selectedChild?['name'] as String?) ?? 'your child',
-              ),
+              const _MainCta(),
               const SizedBox(height: 16),
               const _PackagesTeaser(),
               const SizedBox(height: 16),
@@ -161,11 +159,13 @@ class _Hero extends StatelessWidget {
 }
 
 class _MainCta extends StatelessWidget {
-  final String childName;
-  const _MainCta({required this.childName});
+  const _MainCta();
 
   @override
   Widget build(BuildContext context) {
+    // Heading deliberately omits the child's name — the hero card
+    // immediately above this CTA already shows "$name's birthday"
+    // and repeating the name reads as filler. (BUG-027)
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -177,7 +177,7 @@ class _MainCta extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Plan $childName's birthday with us",
+            'Plan the celebration with us',
             style: AppTextStyles.h3(context),
           ),
           const SizedBox(height: 4),

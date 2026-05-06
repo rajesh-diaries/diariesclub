@@ -6,6 +6,48 @@ Running log of post-merge bugs. New entries at the top.
 
 # Phase 3: Pre-launch
 
+## BUG-027: Birthday discovery — child name appears twice in close proximity (FIXED 2026-05-06)
+
+- **Severity:** 🟢 LOW (cosmetic; reads as filler)
+- **Cause:** `BirthdayDiscoveryScreen._Hero` renders "$name's birthday" then `_MainCta` immediately below renders "Plan $name's birthday with us" — the name was repeated within a single viewport.
+- **Fix:** `_MainCta` heading changed to "Plan the celebration with us" and the `childName` parameter dropped. The hero card is the single source of truth for whose birthday it is.
+
+---
+
+## BUG-026: Staff app RLS — direct table reads return empty for staff users (OPEN 2026-05-06)
+
+(unchanged — pickup after BUG-023 closes; design pass needed)
+
+---
+
+## BUG-025: OTP "same number" rejection in dev mock-mode (FIXED 2026-05-06)
+
+- **Severity:** 🟡 IMPORTANT (blocked dev testing flows)
+- **Reported as:** OTP rejecting same-number sign-in attempts during dev testing.
+- **Cause (most likely):** the rate limit in `auth-otp/index.ts` (3 sends per phone per 15 min) was applied uniformly across modes. Dev test cycles repeatedly hitting "send" with the same number quickly exhaust the budget; the user sees `rate_limited` and perceives it as same-number rejection. Compounded by the fact that mock mode doesn't actually send SMS, so the rate limit serves no protective purpose there.
+- **Fix:** `auth-otp` Edge Function v12 deployed. The rate-limit branch now runs only when `OTP_MODE !== "mock"`. Real (production) mode unchanged — still 3 per 15 min to protect MSG91 credit. Mock mode skips the limit entirely.
+- **Note for follow-up:** if the user is reporting a *different* failure mode (e.g., "verify rejects same number"), the user-lookup path in `handleVerify` (around line 258) uses GoTrue's `/admin/users?phone=` filter which may not work consistently in older GoTrue builds. That's a separate fix candidate if mock-mode bypass doesn't resolve testing pain.
+
+---
+
+## BUG-024: Profile FilledButton infinite width (OPEN 2026-05-06)
+
+- **Severity:** 🟢 LOW (cosmetic)
+- **Status:** OPEN — couldn't pinpoint specific button from description alone. Code review found 7 FilledButton call sites in `lib/features/profile/`:
+  - `profile_screen.dart:121` — "Top up" inside `ListTile.trailing > Row(MainAxisSize.min)` — sized via `padding: horizontal 14, visualDensity: compact`. Should be intrinsic; possibly larger than intended on Material 3 default `minimumSize: Size(64, 40)`.
+  - `profile_screen.dart:307` — "Sign out" inside `AlertDialog.actions` (dialog-bounded, unlikely the bug).
+  - `pre_booking_screen.dart:436` — "Add a child" empty-state CTA.
+  - `pre_booking_screen.dart:521` — "Done" inside `Column(crossAxisAlignment: stretch)` after `Spacer()` — full-width by design.
+  - `delete_account_screen.dart:228` — "Permanently delete my account" inside `Column(stretch)` — full-width by design.
+  - `edit_child_screen.dart:160` — "Remove" inside `AlertDialog.actions`.
+  - `farewell_screen.dart:47` — "Back to start" inside `Column(stretch)` — full-width by design.
+  - `widgets/empty_state.dart:43` — generic CTA, intrinsic-width via `Column(mainAxisSize.min)`.
+- **Most likely candidate:** `profile_screen.dart:121` "Top up" — the only one in a non-stretch context where unexpected sizing is plausible. Fix candidate: add `minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap` to its `FilledButton.styleFrom`.
+- **Why deferred:** "guess and ship" risks regressing one of the deliberately full-width primary CTAs (delete account, done, back to start) which are conventional UX. Need user to point at the specific screen.
+- **For pickup:** confirm with user which screen + what "infinite width" means visually (button stretching where it shouldn't, RenderFlex exception in logs, or something else), then apply the targeted fix.
+
+---
+
 ## BUG-028: DECISION-001 phone-pivot copy sweep was incomplete (FIXED 2026-05-06)
 
 Caught during BUG-023 V3 testing — the logout dialog opened ("Sign out tablet?" + tablet body copy), revealing user-facing tablet-era strings that DECISION-001's sweep missed.

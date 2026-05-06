@@ -105,20 +105,25 @@ async function handleSend(phone: string): Promise<Response> {
   try { await admin.rpc("otp_codes_cleanup"); } catch (_e) { /* ignore */ }
 
   // Rate limit: count sends for this phone in the rolling window.
-  const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MIN * 60_000).toISOString();
-  const { count, error: countError } = await admin
-    .from("otp_codes")
-    .select("id", { count: "exact", head: true })
-    .eq("phone", phone)
-    .gte("created_at", windowStart);
+  // Skip in mock mode — dev testing repeatedly hits the 3-send limit
+  // and gets stuck with the same number across rebuilds (BUG-025).
+  // Real (production) mode keeps the limit so we don't burn MSG91 credit.
+  if (OTP_MODE !== "mock") {
+    const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MIN * 60_000).toISOString();
+    const { count, error: countError } = await admin
+      .from("otp_codes")
+      .select("id", { count: "exact", head: true })
+      .eq("phone", phone)
+      .gte("created_at", windowStart);
 
-  if (countError) {
-    console.error("rate_limit_check_failed", countError);
-    return jsonResponse({ ok: false, error: "internal" }, 500);
-  }
+    if (countError) {
+      console.error("rate_limit_check_failed", countError);
+      return jsonResponse({ ok: false, error: "internal" }, 500);
+    }
 
-  if ((count ?? 0) >= RATE_LIMIT_MAX_SENDS) {
-    return jsonResponse({ ok: false, error: "rate_limited" }, 429);
+    if ((count ?? 0) >= RATE_LIMIT_MAX_SENDS) {
+      return jsonResponse({ ok: false, error: "rate_limited" }, 429);
+    }
   }
 
   const code = OTP_MODE === "mock" ? MOCK_CODE : generateOtp();
