@@ -6,6 +6,18 @@ Running log of post-merge bugs. New entries at the top.
 
 # Phase 3: Pre-launch
 
+## BUG-022: Staff app infinite layout loop on Android 15 post-login (FIXED 2026-05-06)
+
+- Discovered: 2026-05-06 Phase 3 testing on I2306 phone (Android 15, portrait).
+- Severity: 🔴 BLOCKER (staff app unusable post-login).
+- Symptom: After successful sign-in, /staff/home rendered StaffAppBar (title + logout icon) but the body painted blank white. UI fully non-responsive — logout couldn't be tapped. Logs showed `D/FlutterJNI: Sending viewport metrics to the engine` repeating hundreds of times per second with no widget tree or route logs.
+- Root cause: commit `9ce8194` (DECISION-001 phone-only pivot) removed `SystemChrome.setPreferredOrientations(...)` from `main_staff_dev.dart`. Without any preference declared, certain Android 15 ROMs (incl. the I2306) keep renegotiating edge-to-edge insets and stream viewport-metrics updates inbound forever. The Dart side never gets a settled frame budget — the body never paints, even though the layout completed once. Customer app is unaffected because it lands on a richer screen and (anecdotally) Android 15 settles when content fills more of the viewport; staff home's tighter geometry surfaced the thrash.
+- Fix: `555a189` re-added `SystemChrome.setPreferredOrientations` to `main_staff_dev.dart` declaring all four orientations explicitly (portraitUp/Down + landscapeLeft/Right). Functionally equivalent to omitting the call but gives the engine a definitive answer; the inset thrash stops within ~1s. Same commit also swapped `Icons.tablet_mac` → `Icons.phone_iphone` in `StaffAppBar` (self-flagged DECISION-001 follow-up missed in 9ce8194).
+- Verified: candidate (i) on I2306, body renders, logout interactive, viewport-metrics log settles.
+- Follow-up (separate, lower priority): `_ActionsGrid` in `staff_home_screen.dart` is tuned for tablet landscape (3 cols × 1.4 aspect). On portrait phones cells are ~73px tall against ~96px of content, producing visual overflow that's cosmetic but ugly. Will land its own bug entry when triaged.
+
+---
+
 ## CONVENTION-001: Hero illustration placeholder (NOTED 2026-05-06)
 
 Until real artwork lands (v1.1 deferred item — see `SCOPE_LOCKED.md`), empty states use a `_HeroIdleRow` pattern: four 56px coloured circles holding `PhosphorIconsFill` glyphs in the four hero brand colours (Rafi coral / Ellie blue / Gerry amber / Zena green). Reference implementation: `lib/features/adventure/widgets/cafe_only_empty_state.dart`. Mirror locally per-screen until repeated ≥3 times, then extract to `core/widgets/`.
