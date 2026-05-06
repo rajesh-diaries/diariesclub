@@ -33,6 +33,7 @@ Plus follow-ups:
 
 ### Phase 3 — Pre-launch (PENDING)
 - Account deletion feature (~2-3h, MANDATORY for App Store + Play Store)
+- Staff app phone-only refactor (DECISION-001, +1-2 days)
 - Pre-launch testing pass
 - App store metadata (descriptions, screenshots, keywords)
 - Production builds (iOS + Android)
@@ -77,3 +78,4 @@ See lib/BUGS.md for full rationale on each.
 - FIT meal builder: normalized schema (Pattern 1)
 - Storage buckets: marketing public, user content private with signed URLs
 - Cart: heterogeneous client-side with type discriminator
+- DECISION-001 (2026-05-06): Staff app phone-only, not shared tablet — landscape lock removed, app renamed, +1-2d Phase 3

@@ -4,6 +4,25 @@ Running log of post-merge bugs. New entries at the top.
 
 ---
 
+# Phase 3: Pre-launch
+
+## DECISION-001: Staff app phone-only, not tablet (LOCKED 2026-05-06)
+
+Original spec assumed a single shared venue tablet; revised to each staff member using their own phone.
+
+**Implications:**
+- Remove forced landscape orientation
+- Redesign staff screens for phone form factor (portrait, smaller width budget, different touch targets)
+- Rename "Diaries Staff Tablet" → "Diaries Staff" (app display name, store listing, in-app copy)
+- Rethink "sign in once per device" copy — now device == personal phone, not shared kiosk
+- Login UX should feel like a personal-app login, not a kiosk handover
+
+**Phase 3 scope impact:** +1-2 days estimated. Cuts into the launch buffer; if we slip, deferred-list items are first to drop, not the timeline.
+
+**Touch points** (to verify before Phase 3 work begins): orientation lock in `ios/Runner/Info.plist` + `android/app/src/main/AndroidManifest.xml`, app display name in both manifests, staff screens under `lib/staff/`, any "tablet" copy across login + onboarding strings.
+
+---
+
 # Phase 2: Admin web — modules
 
 ## ARCHITECTURE-001: Storage bucket public/private split (DECIDED 2026-05-05)
