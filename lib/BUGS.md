@@ -56,7 +56,16 @@ Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone,
   2. `_StatsBar` rewritten to surface provider errors as a red banner (previously swallowed by `valueOrNull ?? 0`) and to show a centred spinner when all 4 providers are still loading.
   3. `dev.log` traces at every subwidget `build()` — flutter logs will show which widgets fired. Filter by `staff_home`.
 - **Adjacent finding:** BUG-026 (RLS misconfig) surfaced during this investigation. Logged separately above. Does not explain blank body — empty data renders as "0" in tiles, not blank.
-- **Status:** OPEN, awaiting device re-run + screenshot to branch the diagnosis.
+- **Round 1 result (2026-05-06):** No `[staff_home...]` log lines fired. Orange box not visible. Logs show only "Sending viewport metrics × 2" then silence.
+- **Round 1 paradox:** only `StaffHomeScreen` uses `StaffAppBar`, and only `StaffAppBar` has the logout icon. So if logout is visible on screen, `StaffHomeScreen.build()` MUST have fired. Two possible resolutions:
+  1. The build is firing but `dev.log` (via `dart:developer`) is being filtered at the wrong log level by the user's `flutter run` setup.
+  2. The APK on device is stale (pre-`021f0d8`) — no instrumentation compiled in.
+- **Round 2 instrumentation (commit pending):** switched all logs to `debugPrint` (always surfaces in `flutter run` output, no level filter) and tagged with `[BUG-023-V2]` so user can grep to confirm build is current. Added instrumentation higher in tree:
+  - `app_staff.dart` — `StaffApp.build` and the `MaterialApp.router` builder
+  - `staff/staff_router.dart` — redirect callback (logs decision per nav), `/staff/login` builder, `/staff/home` builder, `errorBuilder`
+  - `staff_home_screen.dart` — already instrumented in v1; switched to debugPrint with `[BUG-023-V2]` tag
+  - Orange box copy bumped to "BUG-023 V2" — visual confirmation of fresh build
+- **What we'll know after Round 2:** if user sees `[BUG-023-V2]` in logs at all → fresh build is loaded; if the `/staff/home` route builder fires but `StaffHomeScreen.build()` doesn't, that's a Flutter bug (impossible under normal semantics). If neither fires but redirect logs show `→ /staff/home`, navigation completed but the screen isn't building — extreme rarity.
 
 ---
 

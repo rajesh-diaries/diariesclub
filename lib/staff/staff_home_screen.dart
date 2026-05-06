@@ -1,5 +1,3 @@
-import 'dart:developer' as dev;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,7 +18,7 @@ class StaffHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    dev.log('build()', name: 'staff_home.StaffHomeScreen');
+    debugPrint('[BUG-023-V2] StaffHomeScreen.build()');
     return Scaffold(
       appBar: const StaffAppBar(),
       body: SafeArea(
@@ -41,7 +39,7 @@ class StaffHomeScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text(
-                  'DEBUG: StaffHomeScreen body built — BUG-023 v1',
+                  'DEBUG: StaffHomeScreen body built — BUG-023 V2',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
@@ -69,7 +67,7 @@ class _StatsBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    dev.log('build()', name: 'staff_home._StatsBar');
+    debugPrint('[BUG-023-V2] _StatsBar.build()');
     final activeAsync = ref.watch(venueActiveSessionsProvider);
     final ordersAsync = ref.watch(venueOrdersProvider);
     final todayAsync = ref.watch(todaySessionsCountProvider);
@@ -88,9 +86,9 @@ class _StatsBar extends ConsumerWidget {
     // the prior render path.
     final errors = asyncs.where((e) => e.$2.hasError).toList();
     if (errors.isNotEmpty) {
-      dev.log(
-        'errors: ${errors.map((e) => "${e.$1}=${e.$2.error}").join(", ")}',
-        name: 'staff_home._StatsBar',
+      debugPrint(
+        '[BUG-023-V2] _StatsBar errors: '
+        '${errors.map((e) => "${e.$1}=${e.$2.error}").join(", ")}',
       );
       return Container(
         padding: const EdgeInsets.all(12),
@@ -235,7 +233,7 @@ class _ActionsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    dev.log('build()', name: 'staff_home._ActionsGrid');
+    debugPrint('[BUG-023-V2] _ActionsGrid.build()');
     return GridView.count(
       crossAxisCount: 3,
       shrinkWrap: true,
@@ -364,7 +362,7 @@ class _EndShiftCta extends StatelessWidget {
   const _EndShiftCta();
   @override
   Widget build(BuildContext context) {
-    dev.log('build()', name: 'staff_home._EndShiftCta');
+    debugPrint('[BUG-023-V2] _EndShiftCta.build()');
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(

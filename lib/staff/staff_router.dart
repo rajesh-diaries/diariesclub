@@ -30,18 +30,32 @@ final staffRouterProvider = Provider<GoRouter>((ref) {
       final signedIn = ref.read(isTabletSignedInProvider);
       final loc = state.matchedLocation;
       final atLogin = loc == '/staff/login';
-      if (!signedIn && !atLogin) return '/staff/login';
-      if (signedIn && atLogin) return '/staff/home';
-      return null;
+      String? decision;
+      if (!signedIn && !atLogin) {
+        decision = '/staff/login';
+      } else if (signedIn && atLogin) {
+        decision = '/staff/home';
+      }
+      debugPrint(
+        '[BUG-023-V2] router.redirect loc=$loc signedIn=$signedIn '
+        'atLogin=$atLogin -> ${decision ?? "null (stay)"}',
+      );
+      return decision;
     },
     routes: [
       GoRoute(
         path: '/staff/login',
-        builder: (_, __) => const TabletLoginScreen(),
+        builder: (_, __) {
+          debugPrint('[BUG-023-V2] route /staff/login builder fired');
+          return const TabletLoginScreen();
+        },
       ),
       GoRoute(
         path: '/staff/home',
-        builder: (_, __) => const StaffHomeScreen(),
+        builder: (_, __) {
+          debugPrint('[BUG-023-V2] route /staff/home builder fired');
+          return const StaffHomeScreen();
+        },
       ),
       GoRoute(
         path: '/staff/pin-change',
@@ -126,9 +140,12 @@ final staffRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const _AuditPlaceholder(),
       ),
     ],
-    errorBuilder: (_, state) => Scaffold(
-      body: Center(child: Text('Route not found: ${state.uri}')),
-    ),
+    errorBuilder: (_, state) {
+      debugPrint('[BUG-023-V2] router.errorBuilder fired uri=${state.uri}');
+      return Scaffold(
+        body: Center(child: Text('Route not found: ${state.uri}')),
+      );
+    },
   );
 });
 
