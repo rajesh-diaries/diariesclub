@@ -24,27 +24,28 @@ class StaffHomeScreen extends ConsumerWidget {
     // so the original blank-body symptom on phone (BUG-023) should
     // resolve. If a null-check crash persists post-0043, it's a real
     // BUG-023 separate from BUG-026 and we'll re-bisect.
-    // BUG-023 root cause confirmed via bisect (commits eb8ca7d / cdf5234 /
-    // 2687528): bare Text('hello') in body renders, ListView with any
-    // children blanks with mouse_tracker.dart:199 + Unexpected null value
-    // assertions on web. Issue is ListView's sliver pipeline on this
-    // Flutter+web build, NOT any of _StatsBar / _ActionsGrid / _EndShiftCta.
-    // Replaced ListView with a plain Padding > Column. No scrolling on
-    // home (~600px content fits ≥720px viewport); add SingleChildScrollView
-    // back later if a smaller-screen device overflows.
-    return const Scaffold(
-      appBar: StaffAppBar(),
-      body: Padding(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _StatsBar(),
-            SizedBox(height: 24),
-            _ActionsGrid(),
-            SizedBox(height: 24),
-            _EndShiftCta(),
-          ],
+    // BUG-031 parent bisect: Scaffold body stripped to a bare
+    // GestureDetector + 100×100 red Container. No Padding, no Column,
+    // no children. If THIS doesn't tap, the issue is at
+    // Scaffold/StaffAppBar/MaterialApp.builder level — not anywhere
+    // inside the body tree.
+    return Scaffold(
+      appBar: const StaffAppBar(),
+      body: GestureDetector(
+        onTap: () {
+          // ignore: avoid_print
+          print('[BUG-031 PARENT-BISECT] body tapped');
+        },
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: 100,
+          height: 100,
+          color: Colors.red,
+          alignment: Alignment.center,
+          child: const Text(
+            'TAP ME',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+          ),
         ),
       ),
     );
