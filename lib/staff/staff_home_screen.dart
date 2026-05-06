@@ -1,7 +1,3 @@
-// BUG-023 bisect step 3: ALL three body children removed; body is bare
-// Text('hello'). Original widgets kept in file but unreferenced.
-// ignore_for_file: unused_element
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -28,9 +24,29 @@ class StaffHomeScreen extends ConsumerWidget {
     // so the original blank-body symptom on phone (BUG-023) should
     // resolve. If a null-check crash persists post-0043, it's a real
     // BUG-023 separate from BUG-026 and we'll re-bisect.
+    // BUG-023 root cause confirmed via bisect (commits eb8ca7d / cdf5234 /
+    // 2687528): bare Text('hello') in body renders, ListView with any
+    // children blanks with mouse_tracker.dart:199 + Unexpected null value
+    // assertions on web. Issue is ListView's sliver pipeline on this
+    // Flutter+web build, NOT any of _StatsBar / _ActionsGrid / _EndShiftCta.
+    // Replaced ListView with a plain Padding > Column. No scrolling on
+    // home (~600px content fits ≥720px viewport); add SingleChildScrollView
+    // back later if a smaller-screen device overflows.
     return const Scaffold(
       appBar: StaffAppBar(),
-      body: Text('hello'),
+      body: Padding(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _StatsBar(),
+            SizedBox(height: 24),
+            _ActionsGrid(),
+            SizedBox(height: 24),
+            _EndShiftCta(),
+          ],
+        ),
+      ),
     );
   }
 }

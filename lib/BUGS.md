@@ -107,7 +107,26 @@ Discovered while investigating BUG-023. Adjacent but separate bug — significan
 
 ---
 
-## BUG-023: Staff app blank /staff/home body (LIKELY RESOLVED via BUG-026 fix 2026-05-06)
+## BUG-023: Staff app blank /staff/home body (FIXED 2026-05-06)
+
+**Final root cause via 3-step bisect on web:**
+- Bisect 1 (`eb8ca7d`): `_ActionsGrid` + `_EndShiftCta` only → still blank.
+- Bisect 2 (`cdf5234`): `_StatsBar` + `_EndShiftCta` only → still blank.
+- Bisect 3 (`2687528`): body = `Text('hello')` → **renders**.
+
+So none of the three children were the bug. The `ListView` itself was. On this Flutter+web build, the sliver pipeline (`RenderSliverList` / `RenderSliverPadding`) was throwing `Unexpected null value` + `mouse_tracker.dart:199` assertions every frame regardless of children.
+
+**Fix:** replace `ListView` with `Padding > Column(crossAxisAlignment: stretch)`. Body content (~600px stat tiles + 3×3 grid + end-shift bar) fits without scrolling on standard phone viewports; if a smaller-screen device overflows, wrap in `SingleChildScrollView` later — but NOT `ListView`, which the bisect proved is the broken primitive in this context.
+
+**Earlier "fixes" that were chasing wrong leads** (kept here as anti-pattern record so future-Claude doesn't redo them):
+- `555a189` re-add orientation declaration → fixed BUG-022 viewport loop, NOT BUG-023.
+- `7f7be71` SCV→ListView → moved one symptom to another.
+- `da30fe9` GridView→manual Column-of-Rows in `_ActionsGrid` → independently correct (avoids nested-sliver issues) but not the BUG-023 fix.
+- `15d0188` drop SafeArea → cleanup, didn't fix the bug.
+- `421f46c` candidate D minimum body → diagnostic, not a fix.
+- `99da1fa` Material+InkWell pattern in `_ActionCard` → independently correct (canonical pattern) but not the BUG-023 fix.
+
+**The actual fix is just the Padding+Column wrap (this commit). The bisect was right; pattern-matching from logs was wrong.**
 
 Distinct from BUG-022 (which fixed the viewport-metrics loop): the loop is gone, but the body still paints blank with a non-tappable logout. Loop and blank-body were two stacked bugs, not one.
 
