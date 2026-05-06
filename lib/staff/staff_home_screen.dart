@@ -368,6 +368,10 @@ class _ActionCard extends StatelessWidget {
     // to swallow tap events on this Flutter+web build, leaving cards visually
     // present but unresponsive. Reverted to the original InkWell > Container
     // pattern that was known to be tappable.
+    // BUG-029 fix: cell height 112 was tablet-tuned; on phone portrait
+    // 3-col layout the inside (icon+gap+2-line label+padding) overflowed
+    // by 12-46px. Tightened icon, gap, padding, and font so 2-line labels
+    // fit comfortably in the same cell height.
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -377,16 +381,20 @@ class _ActionCard extends StatelessWidget {
           border: Border.all(color: AppColors.lightBorder),
           borderRadius: BorderRadius.circular(16),
         ),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 36, color: AppColors.navy),
-            const SizedBox(height: 12),
-            Text(
-              label,
-              style: AppTextStyles.bodyLarge(context),
-              textAlign: TextAlign.center,
+            Icon(icon, size: 28, color: AppColors.navy),
+            const SizedBox(height: 8),
+            Flexible(
+              child: Text(
+                label,
+                style: AppTextStyles.body(context),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
