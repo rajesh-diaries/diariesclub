@@ -1,5 +1,5 @@
-// BUG-023 bisect step 2: _ActionsGrid removed from body. _ActionsGrid
-// class kept in this file but temporarily unreferenced.
+// BUG-023 bisect step 3: ALL three body children removed; body is bare
+// Text('hello'). Original widgets kept in file but unreferenced.
 // ignore_for_file: unused_element
 
 import 'package:flutter/material.dart';
@@ -28,20 +28,9 @@ class StaffHomeScreen extends ConsumerWidget {
     // so the original blank-body symptom on phone (BUG-023) should
     // resolve. If a null-check crash persists post-0043, it's a real
     // BUG-023 separate from BUG-026 and we'll re-bisect.
-    return Scaffold(
-      appBar: const StaffAppBar(),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: const [
-          _StatsBar(),
-          SizedBox(height: 24),
-          // BUG-023 bisect step 2: _ActionsGrid removed.
-          // _ActionsGrid(),
-          // SizedBox(height: 24),
-          _EndShiftCta(),
-          SizedBox(height: 16),
-        ],
-      ),
+    return const Scaffold(
+      appBar: StaffAppBar(),
+      body: Text('hello'),
     );
   }
 }
