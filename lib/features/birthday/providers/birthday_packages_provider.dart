@@ -1,19 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// One-shot fetch of all active birthday packages for the venue. Packages
-/// don't change at runtime — admin tweaks would require a venue_config
-/// edit + app refresh. No Realtime stream.
+/// Realtime list of active birthday packages. Switched from FutureProvider
+/// to StreamProvider in migration 0051 — admin can now edit packages
+/// (price, inclusions, photos) via the admin web's package_edit_screen,
+/// and customers in active sessions should see those edits within ~2s
+/// rather than only after an app refresh. The previous one-shot fetch
+/// pre-dated the admin CRUD landing.
+///
+/// `birthday_packages` was added to the supabase_realtime publication in
+/// migration 0051 to make this stream possible.
 final birthdayPackagesProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final rows = await Supabase.instance.client
+    StreamProvider<List<Map<String, dynamic>>>((ref) async* {
+  final stream = Supabase.instance.client
       .from('birthday_packages')
-      .select()
+      .stream(primaryKey: ['id'])
       .eq('is_active', true)
       .order('sort_order', ascending: true);
-  return (rows as List)
-      .map((r) => Map<String, dynamic>.from(r as Map))
-      .toList();
+  await for (final rows in stream) {
+    yield rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
 });
 
 /// Single package by id (package detail screen).
