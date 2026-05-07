@@ -250,18 +250,27 @@ class _GraceCtaPair extends ConsumerWidget {
 
   Future<void> _wrapUp(BuildContext context) async {
     debugPrint('[BUG-038] _wrapUp invoked, sessionId=$sessionId');
+    // BUG-038 root cause: previous version called `Navigator.pop(context, …)`
+    // inside the dialog actions, where `context` was the captured OUTER
+    // (SessionHomeView) context — not the dialog's own. On Flutter web that
+    // can resolve to the wrong Navigator (root vs dialog), silently fails to
+    // pop, and `await showDialog<bool>` hangs forever — which is exactly the
+    // symptom the BUG-038 instrumentation showed (only "_wrapUp invoked"
+    // printed; "dialog returned ok=…" never reached).
+    // Fix: bind the action callbacks to the dialog's own context (`dialogCtx`
+    // from the builder) so the pop targets the dialog's Navigator directly.
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Wrap up the session?'),
         content: const Text('We\'ll mark this play session complete.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogCtx, false),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogCtx, true),
             child: const Text("I'm wrapping up"),
           ),
         ],
