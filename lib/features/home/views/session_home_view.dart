@@ -266,6 +266,16 @@ class _GraceCtaPair extends ConsumerWidget {
       await Supabase.instance.client
           .rpc<Map<String, dynamic>>('session_complete',
               params: {'p_session_id': sessionId});
+      if (!context.mounted) return;
+      // BUG-038: explicit success confirmation. Stream will re-classify the
+      // completed session into Idle (PostSession branch dropped — see
+      // home_state_provider for v1 fallback).
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Session complete! Thanks for visiting.'),
+          duration: Duration(seconds: 4),
+        ),
+      );
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

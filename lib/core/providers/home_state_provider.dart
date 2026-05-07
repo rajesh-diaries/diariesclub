@@ -65,23 +65,12 @@ HomeState _classify(List<Map<String, dynamic>> rows) {
     }
   }
 
-  // Most recent completed/auto_closed session, if it's recent + reflection
-  // hasn't been done.
-  for (final r in rows) {
-    final status = r['status'] as String?;
-    if (status != 'completed' && status != 'auto_closed') continue;
-
-    final reflection = r['reflection_status'] as String?;
-    if (reflection != 'pending') continue;
-
-    final completedAt = r['completed_at'] as String?;
-    if (completedAt == null) continue;
-
-    final closedAt = DateTime.parse(completedAt);
-    if (DateTime.now().toUtc().difference(closedAt.toUtc()).inMinutes <= 30) {
-      return HomeStatePostSession(r);
-    }
-  }
-
+  // BUG-038 v1 fallback: PostSession branch disabled. PostSessionHomeView
+  // was rendering blank after `session_complete` (root cause not pinpointed
+  // in v1; tracked as v1.1 follow-up). For v1 the customer lands on Idle
+  // immediately after wrap-up, sees a "Session complete!" snackbar, and can
+  // reach the hero recap via the recap notification deep-link or the past-
+  // sessions list at /profile/sessions. The branch + class are kept in
+  // code so we can re-enable cleanly in v1.1 once the blank-page is fixed.
   return const HomeStateIdle();
 }
