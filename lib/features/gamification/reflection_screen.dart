@@ -302,62 +302,81 @@ class _Body extends StatelessWidget {
     const order = ['rafi', 'ellie', 'gerry', 'zena'];
     debugPrint('[BUG-039a] _Body byTrait counts: '
         '${order.map((t) => "$t=${byTrait[t]?.length ?? 0}").join(", ")}');
+    debugPrint('[BUG-039a] _Body before-return (constructing widget tree)');
 
     return Column(
       children: [
-        Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('How was $childName today?',
-                          style: AppTextStyles.h1(context)),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Tap moments that felt true. We split XP across the '
-                        'four heroes based on what you tap.',
-                        style: AppTextStyles.body(
-                          context,
-                          color: AppColors.lightTextSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                for (final trait in order)
+        Builder(builder: (_) {
+          debugPrint('[BUG-039a] _Body Expanded>SCV>Column wrapper building');
+          return Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Builder(builder: (_) {
-                    debugPrint(
-                        '[BUG-039a] _Body building TraitSection trait=$trait '
-                        'cards=${(byTrait[trait] ?? const []).length}');
-                    return TraitSection(
-                      trait: trait,
-                      cards: (byTrait[trait] ?? const []).cast(),
-                      selectedTags: selected,
-                      onToggle: onToggle,
+                    debugPrint('[BUG-039a] _Body title block building');
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('How was $childName today?',
+                              style: AppTextStyles.h1(context)),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Tap moments that felt true. We split XP across the '
+                            'four heroes based on what you tap.',
+                            style: AppTextStyles.body(
+                              context,
+                              color: AppColors.lightTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     );
                   }),
-                if (errorText != null)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                    child: Text(
-                      errorText!,
-                      style: AppTextStyles.caption(
-                        context,
-                        color: AppColors.adminRed,
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 120),
-              ],
+                  for (final trait in order)
+                    Builder(builder: (_) {
+                      debugPrint(
+                          '[BUG-039a] _Body building TraitSection trait=$trait '
+                          'cards=${(byTrait[trait] ?? const []).length}');
+                      return TraitSection(
+                        trait: trait,
+                        cards: (byTrait[trait] ?? const []).cast(),
+                        selectedTags: selected,
+                        onToggle: onToggle,
+                      );
+                    }),
+                  Builder(builder: (_) {
+                    debugPrint('[BUG-039a] _Body after-traits, '
+                        'errorText=${errorText == null ? "null" : "set"}');
+                    return errorText != null
+                        ? Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                            child: Text(
+                              errorText!,
+                              style: AppTextStyles.caption(
+                                context,
+                                color: AppColors.adminRed,
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink();
+                  }),
+                  Builder(builder: (_) {
+                    debugPrint('[BUG-039a] _Body trailing spacer building');
+                    return const SizedBox(height: 120);
+                  }),
+                ],
+              ),
             ),
-          ),
-        ),
-        bottomBar,
+          );
+        }),
+        Builder(builder: (_) {
+          debugPrint('[BUG-039a] _Body bottomBar slot building');
+          return bottomBar;
+        }),
       ],
     );
   }
@@ -378,6 +397,8 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[BUG-039a] _BottomBar.build entered '
+        'selectedCount=$selectedCount submitting=$submitting');
     return SafeArea(
       top: false,
       child: Container(
@@ -399,16 +420,19 @@ class _BottomBar extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: PrimaryButton(
-                label: selectedCount == 0
-                    ? 'Skip and split equally'
-                    : 'Continue',
-                onPressed: submitting ? null : onSubmit,
-                loading: submitting,
-              ),
-            ),
+            Builder(builder: (_) {
+              debugPrint('[BUG-039a] _BottomBar PrimaryButton slot building');
+              return SizedBox(
+                width: double.infinity,
+                child: PrimaryButton(
+                  label: selectedCount == 0
+                      ? 'Skip and split equally'
+                      : 'Continue',
+                  onPressed: submitting ? null : onSubmit,
+                  loading: submitting,
+                ),
+              );
+            }),
             const SizedBox(height: 4),
             TextButton(
               onPressed: submitting ? null : onLater,

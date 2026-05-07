@@ -19,6 +19,8 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[BUG-039a] PrimaryButton.build label="$label" '
+        'loading=$loading hasOnPressed=${onPressed != null}');
     return FilledButton(
       onPressed: loading ? null : onPressed,
       style: FilledButton.styleFrom(
