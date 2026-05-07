@@ -18,10 +18,18 @@ class WorkshopCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final id = workshop['id'] as String;
+    // Defensive parsing — realtime stream payloads can transiently arrive
+    // without all fields, and a single null cast in here will assert
+    // every list item and panic the SliverList (BUG-051).
+    final id = (workshop['id'] as String?) ?? '';
+    if (id.isEmpty) return const SizedBox.shrink();
+
     final title = (workshop['title'] as String?) ?? '';
     final cover = workshop['cover_image_url'] as String?;
-    final scheduled = DateTime.parse(workshop['scheduled_at'] as String);
+    final scheduled =
+        DateTime.tryParse((workshop['scheduled_at'] as String?) ?? '');
+    if (scheduled == null) return const SizedBox.shrink();
+
     final duration = (workshop['duration_minutes'] as int?) ?? 0;
     final price = (workshop['price_paise'] as int?) ?? 0;
     final ageMin = workshop['age_group_min'] as int?;
@@ -34,17 +42,20 @@ class WorkshopCard extends ConsumerWidget {
     final isFull = spots == 0;
     final isLow = spots > 0 && spots <= 3;
 
-    return InkWell(
-      onTap: () => context.push('/club/workshop/$id'),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.lightSurface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.lightBorder),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => context.push('/club/workshop/$id'),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.lightSurface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.lightBorder),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Stack(
@@ -136,6 +147,7 @@ class WorkshopCard extends ConsumerWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
