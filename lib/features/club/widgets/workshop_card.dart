@@ -42,112 +42,140 @@ class WorkshopCard extends ConsumerWidget {
     final isFull = spots == 0;
     final isLow = spots > 0 && spots <= 3;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => context.push('/club/workshop/$id'),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.lightSurface,
         borderRadius: BorderRadius.circular(20),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.lightSurface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.lightBorder),
-          ),
-          clipBehavior: Clip.antiAlias,
+        border: Border.all(color: AppColors.lightBorder),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.push('/club/workshop/$id'),
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: cover == null
-                      ? Container(color: AppColors.gold.withValues(alpha: 0.20))
-                      : CachedNetworkImage(
-                          imageUrl: cover,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Container(
-                            color: AppColors.gold.withValues(alpha: 0.20),
-                          ),
-                        ),
-                ),
-                if (trait != null)
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: TraitPill(trait: trait, light: true),
-                  ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // stretch is load-bearing: gives Stack/AspectRatio below a
+            // tight horizontal constraint. Without it, AspectRatio sees
+            // loose width from start-aligned Column → BUG-024 family
+            // box.dart:251 "infinite width" assertion → entire
+            // SliverList collapses, body renders blank.
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Stack(
                 children: [
-                  Text(
-                    DateFormat('EEE MMM d · h:mm a').format(scheduled.toLocal()),
-                    style: AppTextStyles.caption(
-                      context,
-                      color: AppColors.lightTextSecondary,
-                    ),
+                  AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: cover == null
+                        ? Container(
+                            color: AppColors.gold.withValues(alpha: 0.20),
+                          )
+                        : CachedNetworkImage(
+                            imageUrl: cover,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Container(
+                              color: AppColors.gold.withValues(alpha: 0.20),
+                            ),
+                          ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(title, style: AppTextStyles.h3(context)),
-                  const SizedBox(height: 6),
-                  Text(
-                    [
-                      if (ageMin != null && ageMax != null)
-                        'Ages $ageMin–$ageMax',
-                      '$duration min',
-                      Money.fromPaise(price),
-                    ].join(' · '),
-                    style: AppTextStyles.caption(
-                      context,
-                      color: AppColors.lightTextSecondary,
+                  if (trait != null)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: TraitPill(trait: trait, light: true),
                     ),
-                  ),
-                  if (trait != null && xp > 0) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      '+$xp XP to ${_heroName(trait)}',
-                      style: AppTextStyles.caption(
-                        context,
-                        color: _heroColor(trait),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _SpotsLabel(
-                          isFull: isFull,
-                          isLow: isLow,
-                          spots: spots,
-                          capacity: capacity,
-                        ),
-                      ),
-                      FilledButton(
-                        onPressed: isFull
-                            ? null
-                            : () => context.push('/club/workshop/$id'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.navy,
-                          foregroundColor: Colors.white,
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                        ),
-                        child: Text(isFull ? 'Full' : 'Register'),
-                      ),
-                    ],
-                  ),
                 ],
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DateFormat('EEE MMM d · h:mm a')
+                          .format(scheduled.toLocal()),
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(title, style: AppTextStyles.h3(context)),
+                    const SizedBox(height: 6),
+                    Text(
+                      [
+                        if (ageMin != null && ageMax != null)
+                          'Ages $ageMin–$ageMax',
+                        '$duration min',
+                        Money.fromPaise(price),
+                      ].join(' · '),
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    if (trait != null && xp > 0) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '+$xp XP to ${_heroName(trait)}',
+                        style: AppTextStyles.caption(
+                          context,
+                          color: _heroColor(trait),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SpotsLabel(
+                            isFull: isFull,
+                            isLow: isLow,
+                            spots: spots,
+                            capacity: capacity,
+                          ),
+                        ),
+                        // Material+InkWell instead of FilledButton —
+                        // FilledButton inside a Row containing Expanded
+                        // is the BUG-024 anti-pattern that crashed
+                        // Profile and Reflection on web.
+                        Material(
+                          color: isFull
+                              ? AppColors.navy.withValues(alpha: 0.40)
+                              : AppColors.navy,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            onTap: isFull
+                                ? null
+                                : () =>
+                                    context.push('/club/workshop/$id'),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              child: Text(
+                                isFull ? 'Full' : 'Register',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
