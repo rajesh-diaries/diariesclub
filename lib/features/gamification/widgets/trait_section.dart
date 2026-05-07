@@ -63,31 +63,38 @@ class TraitSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: List<Widget>.generate(3, (i) {
-              final spacer = i > 0
-                  ? const SizedBox(width: 10)
-                  : const SizedBox.shrink();
-              if (i >= cards.length) {
+          // IntrinsicHeight bounds the row's vertical extent to the tallest
+          // card's intrinsic height before crossAxisAlignment.stretch fires.
+          // Without it, stretch demands a tight infinite vertical constraint
+          // (parent is a Column inside SingleChildScrollView → unbounded
+          // height) which trips box.dart:251 on web and blanks the screen.
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: List<Widget>.generate(3, (i) {
+                final spacer = i > 0
+                    ? const SizedBox(width: 10)
+                    : const SizedBox.shrink();
+                if (i >= cards.length) {
+                  return Expanded(
+                    child: Row(children: [spacer, const Spacer()]),
+                  );
+                }
+                final card = cards[i];
                 return Expanded(
-                  child: Row(children: [spacer, const Spacer()]),
-                );
-              }
-              final card = cards[i];
-              return Expanded(
-                child: Row(children: [
-                  spacer,
-                  Expanded(
-                    child: ReflectionCardWidget(
-                      moment: card,
-                      selected: selectedTags.contains(card.tag),
-                      onTap: () => onToggle(card.tag),
+                  child: Row(children: [
+                    spacer,
+                    Expanded(
+                      child: ReflectionCardWidget(
+                        moment: card,
+                        selected: selectedTags.contains(card.tag),
+                        onTap: () => onToggle(card.tag),
+                      ),
                     ),
-                  ),
-                ]),
-              );
-            }),
+                  ]),
+                );
+              }),
+            ),
           ),
         ],
       ),
