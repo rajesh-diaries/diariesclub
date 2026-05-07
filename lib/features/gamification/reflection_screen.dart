@@ -258,7 +258,13 @@ class _Body extends StatelessWidget {
     }
     const order = ['rafi', 'ellie', 'gerry', 'zena'];
 
+    // crossAxisAlignment.stretch is load-bearing here: bottomBar contains
+    // a SizedBox(width: double.infinity) wrapping PrimaryButton. Without
+    // stretch, children get loose horizontal constraints and the infinite
+    // width propagates → "BoxConstraints forces an infinite width" on web,
+    // blanking the screen with no recoverable AppBar.
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           child: SingleChildScrollView(
