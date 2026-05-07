@@ -143,7 +143,7 @@ BEGIN
       p_child_id     => p_child_id,
       p_family_id    => v_session.family_id,
       p_venue_id     => v_session.venue_id,
-      p_event_type   => 'healthy_bite_token',
+      p_event_type   => 'healthy_bite',  -- must match xp_events check constraint
       p_xp_rafi      => 5,
       p_xp_ellie     => 5,
       p_xp_gerry     => 5,
