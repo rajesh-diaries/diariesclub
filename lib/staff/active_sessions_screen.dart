@@ -198,6 +198,41 @@ class _SessionTile extends ConsumerWidget {
                 label: const Text('Extend 1hr'),
                 onPressed: () => _extend(context, ref, 60),
               ),
+              // FEATURE-002: mark complimentary Healthy Bite claimed.
+              // Idempotent; button stays clickable and the RPC returns
+              // already_claimed=true on retries.
+              if (session['healthy_bite_claimed_at'] == null)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.gold,
+                    side: const BorderSide(color: AppColors.gold),
+                  ),
+                  icon: const Icon(PhosphorIconsRegular.gift),
+                  label: const Text('Healthy Bite claimed'),
+                  onPressed: () => _claimHealthyBite(context),
+                )
+              else
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(PhosphorIconsFill.checkCircle,
+                          color: AppColors.gold, size: 16),
+                      SizedBox(width: 6),
+                      Text('Healthy Bite given',
+                          style: TextStyle(
+                            color: AppColors.gold,
+                            fontWeight: FontWeight.w700,
+                          )),
+                    ],
+                  ),
+                ),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.adminRed,
@@ -222,6 +257,36 @@ class _SessionTile extends ConsumerWidget {
     final m = r.inMinutes;
     if (m <= 0) return 'ending';
     return '${m}m left';
+  }
+
+  Future<void> _claimHealthyBite(BuildContext context) async {
+    try {
+      final raw = await Supabase.instance.client.rpc<dynamic>(
+        'claim_healthy_bite',
+        params: {'p_session_id': session['id']},
+      );
+      final result =
+          raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+      final already = result['already_claimed'] == true;
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(already
+              ? 'Already marked as claimed.'
+              : 'Healthy Bite claim recorded.'),
+        ),
+      );
+    } on PostgrestException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't mark claimed: ${e.message}")),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't mark claimed.")),
+      );
+    }
   }
 
   Future<void> _extend(BuildContext context, WidgetRef ref, int mins) async {

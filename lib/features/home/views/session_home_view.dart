@@ -13,6 +13,7 @@ import '../../../core/widgets/session_timer.dart';
 import '../../club/widgets/while_you_wait_card.dart';
 import '../../sessions/widgets/extend_session_sheet.dart';
 import '../widgets/birthday_card.dart';
+import '../widgets/healthy_bite_reminder_banner.dart';
 import '../widgets/healthy_bite_widget.dart';
 import '../widgets/wallet_card.dart';
 
@@ -126,6 +127,9 @@ class _DominantLayout extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // FEATURE-002 — complimentary Healthy Bite reminder. Self-hides
+        // outside the 10-min window, when claimed, or when dismissed.
+        HealthyBiteReminderBanner(session: session),
         const SizedBox(height: 24),
         SessionTimerWidget(
           expiresAt: expiresAt,
@@ -193,6 +197,8 @@ class _CompactLayout extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // FEATURE-002 — Healthy Bite reminder above the compact timer too.
+        HealthyBiteReminderBanner(session: session),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
