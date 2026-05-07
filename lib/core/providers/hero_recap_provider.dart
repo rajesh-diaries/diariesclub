@@ -48,9 +48,14 @@ final pendingRecapsProvider =
       if (r['reflection_status'] != 'pending') continue;
       final deadline = r['reflection_deadline'] as String?;
       if (deadline == null) continue;
-      if (DateTime.parse(deadline).toUtc().isBefore(now)) continue;
+      try {
+        if (DateTime.parse(deadline).toUtc().isBefore(now)) continue;
+      } catch (_) { continue; }
       live.add(r);
     }
+    // ignore: avoid_print
+    print('[BUG-039] pendingRecapsProvider: ${rows.length} raw rows '
+        '→ ${live.length} pending+live');
     yield live;
   }
 });

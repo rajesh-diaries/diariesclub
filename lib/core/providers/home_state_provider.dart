@@ -58,14 +58,12 @@ final homeStateProvider = StreamProvider<HomeState>((ref) async* {
 });
 
 HomeState _classify(List<Map<String, dynamic>> rows) {
-  if (rows.isEmpty) return const HomeStateIdle();
+  if (rows.isEmpty) {
+    // ignore: avoid_print
+    print('[BUG-039] _classify: rows empty → Idle');
+    return const HomeStateIdle();
+  }
 
-  // Open session: status must be 'active' or 'grace' AND expires_at must
-  // not be hours in the past. The expires_at sanity check defends against
-  // stale realtime state (e.g. Chrome tab backgrounded while staff/server
-  // closed the session) — without it, the customer can be trapped on a
-  // phantom overrun timer that no UI gesture clears. 2 hours covers the
-  // configured grace + force-close max with margin.
   final now = DateTime.now();
   for (final r in rows) {
     final status = r['status'] as String?;
@@ -76,22 +74,49 @@ HomeState _classify(List<Map<String, dynamic>> rows) {
       try {
         final expiresAt = DateTime.parse(expiresAtStr);
         if (now.difference(expiresAt).inHours > 2) {
-          // Session is stuck. Skip — let the customer see Idle so they're
-          // not trapped. Server reconciliation will eventually flip status.
-          continue;
+          continue; // stuck-session escape (BUG-038)
         }
-      } catch (_) {
-        // If we can't parse expires_at, fall through and trust the status.
-      }
+      } catch (_) { /* fall through */ }
     }
 
+    // ignore: avoid_print
+    print('[BUG-039] _classify: returning InSession sessionId=${r['id']} '
+        'status=$status');
     return HomeStateInSession(r);
   }
 
-  // BUG-038 v1 fallback: PostSession branch disabled. PostSessionHomeView
-  // was rendering blank after `session_complete` (root cause not pinpointed
-  // in v1; tracked as v1.1 follow-up). For v1 the customer lands on Idle
-  // immediately after wrap-up; recap reachable via notification or
-  // /profile/sessions list.
+  // BUG-039 — PostSession branch RE-ENABLED. The branch was disabled in
+  // commit 3182553 because PostSessionHomeView was rendering blank; with
+  // it disabled, the reflection prompt never surfaces and Adventure tab's
+  // children.total_xp gate stays at 0 forever. Re-enabling so the
+  // diagnostic instrumentation can capture which downstream widget /
+  // provider is the actual source of the blank render.
+  for (final r in rows) {
+    final status = r['status'] as String?;
+    if (status != 'completed' && status != 'auto_closed') continue;
+
+    final reflection = r['reflection_status'] as String?;
+    if (reflection != 'pending') continue;
+
+    final completedAt = r['completed_at'] as String?;
+    if (completedAt == null) continue;
+
+    try {
+      final closedAt = DateTime.parse(completedAt);
+      if (DateTime.now().toUtc().difference(closedAt.toUtc()).inMinutes > 30) {
+        continue; // older than 30 min, not in post-session window
+      }
+    } catch (_) { continue; }
+
+    // ignore: avoid_print
+    print('[BUG-039] _classify: returning PostSession sessionId=${r['id']} '
+        'status=$status reflection_status=$reflection '
+        'completed_at=$completedAt total_xp_earned=${r['total_xp_earned']} '
+        'reflection_deadline=${r['reflection_deadline']}');
+    return HomeStatePostSession(r);
+  }
+
+  // ignore: avoid_print
+  print('[BUG-039] _classify: no matching row → Idle');
   return const HomeStateIdle();
 }

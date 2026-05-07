@@ -15,12 +15,17 @@ class HeroRecapCardWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    debugPrint('[BUG-039] HeroRecapCardWidget.build entered, '
+        'recap.runtimeType=${recap.runtimeType} keys=${recap.keys.toList()}');
     final sessionId = recap['session_id'] as String;
     final totalXp = (recap['total_xp_pool'] as int?) ?? 0;
     final childName =
         ((recap['children'] as Map?)?['name'] as String?) ?? 'Your hero';
     final deadline = recap['reflection_deadline'] as String?;
     final hoursLeft = _hoursUntilDeadline(deadline);
+    debugPrint('[BUG-039] HeroRecapCardWidget resolved: '
+        'sessionId=$sessionId totalXp=$totalXp childName=$childName '
+        'deadline=$deadline hoursLeft=$hoursLeft');
 
     return GestureDetector(
       onTap: () => context.push('/reflection/$sessionId'),

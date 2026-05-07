@@ -21,12 +21,20 @@ class PostSessionHomeView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    debugPrint('[BUG-039] PostSessionHomeView.build entered');
     final sessionId = session['id'] as String;
-    final pending = ref.watch(pendingRecapsProvider).valueOrNull ?? const [];
+    final pendingAsync = ref.watch(pendingRecapsProvider);
+    debugPrint('[BUG-039] pendingRecapsProvider state='
+        'isLoading=${pendingAsync.isLoading} '
+        'hasError=${pendingAsync.hasError} '
+        'hasValue=${pendingAsync.hasValue}');
+    if (pendingAsync.hasError) {
+      debugPrint('[BUG-039] pendingRecapsProvider error='
+          '${pendingAsync.error}');
+    }
+    final pending = pendingAsync.valueOrNull ?? const [];
+    debugPrint('[BUG-039] pending count=${pending.length}');
 
-    // Prefer the realtime recap row if we have it (gives us total_xp_pool +
-    // child name + deadline). Fall back to a minimal map keyed off the
-    // session row so the card still renders before the recap stream wakes.
     final primary = pending.firstWhere(
       (r) => r['session_id'] == sessionId,
       orElse: () => <String, dynamic>{
@@ -36,17 +44,26 @@ class PostSessionHomeView extends ConsumerWidget {
         'children': const {'name': 'Your hero'},
       },
     );
+    debugPrint('[BUG-039] primary recap fields: '
+        'session_id=${primary['session_id']} '
+        'total_xp_pool=${primary['total_xp_pool']} '
+        'reflection_deadline=${primary['reflection_deadline']} '
+        'children=${primary['children']}');
 
     final extraRecapCount = pending
         .where((r) => r['session_id'] != primary['session_id'])
         .length;
+    debugPrint('[BUG-039] extraRecapCount=$extraRecapCount');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          HeroRecapCardWidget(recap: primary),
+          Builder(builder: (_) {
+            debugPrint('[BUG-039] building HeroRecapCardWidget');
+            return HeroRecapCardWidget(recap: primary);
+          }),
           if (extraRecapCount > 0) ...[
             const SizedBox(height: 8),
             Center(
@@ -63,7 +80,10 @@ class PostSessionHomeView extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 16),
-          const IdleHomeBody(),
+          Builder(builder: (_) {
+            debugPrint('[BUG-039] building IdleHomeBody');
+            return const IdleHomeBody();
+          }),
         ],
       ),
     );
