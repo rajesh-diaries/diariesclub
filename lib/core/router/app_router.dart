@@ -337,11 +337,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/reflection/:sessionId',
         name: 'reflection',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) {
-          final sid = state.pathParameters['sessionId']!;
-          debugPrint('[BUG-039a] /reflection route builder fired sessionId=$sid');
-          return ReflectionScreen(sessionId: sid);
-        },
+        builder: (context, state) =>
+            ReflectionScreen(sessionId: state.pathParameters['sessionId']!),
       ),
 
       // ── Hero card unboxing (entered from healthy_bite_distribute) ─────

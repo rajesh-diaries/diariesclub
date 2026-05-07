@@ -72,8 +72,6 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
   }
 
   Future<void> _submit({required String childName, required String childId}) async {
-    debugPrint('[BUG-039a] _submit invoked sessionId=${widget.sessionId} '
-        'tags=${_selected.toList()}');
     setState(() {
       _submitting = true;
       _errorText = null;
@@ -81,7 +79,6 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
 
     Map<String, dynamic> result;
     try {
-      debugPrint('[BUG-039a] calling reflection_submit RPC');
       result = await Supabase.instance.client.rpc<Map<String, dynamic>>(
         'reflection_submit',
         params: {
@@ -89,20 +86,14 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
           'p_moment_tags': _selected.toList(),
         },
       );
-      debugPrint('[BUG-039a] reflection_submit returned keys=${result.keys.toList()}');
-    } on PostgrestException catch (e, st) {
-      debugPrint('[BUG-039a] reflection_submit PostgrestException '
-          'code=${e.code} message=${e.message} details=${e.details}');
-      debugPrint('[BUG-039a] stack: $st');
+    } on PostgrestException catch (e) {
       if (!mounted) return;
       setState(() {
         _submitting = false;
         _errorText = _mapError(e.message);
       });
       return;
-    } catch (e, st) {
-      debugPrint('[BUG-039a] reflection_submit threw: $e');
-      debugPrint('[BUG-039a] stack: $st');
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _submitting = false;
@@ -174,20 +165,8 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[BUG-039a] ReflectionScreen.build entered '
-        'sessionId=${widget.sessionId}');
     final recapAsync = ref.watch(heroRecapBySessionProvider(widget.sessionId));
     final momentsAsync = ref.watch(reflectionMomentsProvider(widget.sessionId));
-    debugPrint('[BUG-039a] recapAsync isLoading=${recapAsync.isLoading} '
-        'hasError=${recapAsync.hasError} hasValue=${recapAsync.hasValue}');
-    debugPrint('[BUG-039a] momentsAsync isLoading=${momentsAsync.isLoading} '
-        'hasError=${momentsAsync.hasError} hasValue=${momentsAsync.hasValue}');
-    if (recapAsync.hasError) {
-      debugPrint('[BUG-039a] recapAsync error=${recapAsync.error}');
-    }
-    if (momentsAsync.hasError) {
-      debugPrint('[BUG-039a] momentsAsync error=${momentsAsync.error}');
-    }
 
     return PopScope(
       canPop: false,
@@ -204,23 +183,14 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
           elevation: 0,
         ),
         body: recapAsync.when(
-          loading: () {
-            debugPrint('[BUG-039a] recapAsync → loading branch');
-            return const Center(child: CircularProgressIndicator());
-          },
-          error: (e, _) {
-            debugPrint('[BUG-039a] recapAsync → error branch e=$e');
-            return FriendlyErrorScreen(
-              code: 'E-RFL',
-              userMessage: "Couldn't load reflection",
-              technicalDetails: e.toString(),
-            );
-          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => FriendlyErrorScreen(
+            code: 'E-RFL',
+            userMessage: "Couldn't load reflection",
+            technicalDetails: e.toString(),
+          ),
           data: (recap) {
-            debugPrint('[BUG-039a] recapAsync → data branch '
-                'recap=${recap == null ? "null" : recap.keys.toList()}');
             if (recap == null) {
-              debugPrint('[BUG-039a] recap null → showing placeholder');
               return const Center(
                 child: Padding(
                   padding: EdgeInsets.all(24),
@@ -231,41 +201,30 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
             final childName =
                 ((recap['children'] as Map?)?['name'] as String?) ?? 'Today';
             final childId = recap['child_id'] as String;
-            debugPrint('[BUG-039a] resolved childName=$childName childId=$childId');
 
             return momentsAsync.when(
-              loading: () {
-                debugPrint('[BUG-039a] momentsAsync → loading branch');
-                return const Center(child: CircularProgressIndicator());
-              },
-              error: (e, _) {
-                debugPrint('[BUG-039a] momentsAsync → error branch e=$e');
-                return FriendlyErrorScreen(
-                  code: 'E-RFL-2',
-                  userMessage: "Couldn't load reflection moments",
-                  technicalDetails: e.toString(),
-                );
-              },
-              data: (moments) {
-                debugPrint('[BUG-039a] momentsAsync → data branch '
-                    'count=${moments.length}');
-                return _Body(
-                  childName: childName,
-                  moments: moments,
-                  selected: _selected,
-                  onToggle: _toggle,
-                  errorText: _errorText,
-                  bottomBar: _BottomBar(
-                    selectedCount: _selected.length,
-                    submitting: _submitting,
-                    onSubmit: () => _submit(
-                      childName: childName,
-                      childId: childId,
-                    ),
-                    onLater: _close,
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => FriendlyErrorScreen(
+                code: 'E-RFL-2',
+                userMessage: "Couldn't load reflection moments",
+                technicalDetails: e.toString(),
+              ),
+              data: (moments) => _Body(
+                childName: childName,
+                moments: moments,
+                selected: _selected,
+                onToggle: _toggle,
+                errorText: _errorText,
+                bottomBar: _BottomBar(
+                  selectedCount: _selected.length,
+                  submitting: _submitting,
+                  onSubmit: () => _submit(
+                    childName: childName,
+                    childId: childId,
                   ),
-                );
-              },
+                  onLater: _close,
+                ),
+              ),
             );
           },
         ),
@@ -293,90 +252,62 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[BUG-039a] _Body.build entered '
-        'childName=$childName moments=${moments.length}');
     final byTrait = <String, List<dynamic>>{};
     for (final m in moments) {
       byTrait.putIfAbsent(m.primaryTrait as String, () => []).add(m);
     }
     const order = ['rafi', 'ellie', 'gerry', 'zena'];
-    debugPrint('[BUG-039a] _Body byTrait counts: '
-        '${order.map((t) => "$t=${byTrait[t]?.length ?? 0}").join(", ")}');
-    debugPrint('[BUG-039a] _Body before-return (constructing widget tree)');
 
     return Column(
       children: [
-        Builder(builder: (_) {
-          debugPrint('[BUG-039a] _Body Expanded>SCV>Column wrapper building');
-          return Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Builder(builder: (_) {
-                    debugPrint('[BUG-039a] _Body title block building');
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('How was $childName today?',
-                              style: AppTextStyles.h1(context)),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Tap moments that felt true. We split XP across the '
-                            'four heroes based on what you tap.',
-                            style: AppTextStyles.body(
-                              context,
-                              color: AppColors.lightTextSecondary,
-                            ),
-                          ),
-                        ],
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('How was $childName today?',
+                          style: AppTextStyles.h1(context)),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Tap moments that felt true. We split XP across the '
+                        'four heroes based on what you tap.',
+                        style: AppTextStyles.body(
+                          context,
+                          color: AppColors.lightTextSecondary,
+                        ),
                       ),
-                    );
-                  }),
-                  for (final trait in order)
-                    Builder(builder: (_) {
-                      debugPrint(
-                          '[BUG-039a] _Body building TraitSection trait=$trait '
-                          'cards=${(byTrait[trait] ?? const []).length}');
-                      return TraitSection(
-                        trait: trait,
-                        cards: (byTrait[trait] ?? const []).cast(),
-                        selectedTags: selected,
-                        onToggle: onToggle,
-                      );
-                    }),
-                  Builder(builder: (_) {
-                    debugPrint('[BUG-039a] _Body after-traits, '
-                        'errorText=${errorText == null ? "null" : "set"}');
-                    return errorText != null
-                        ? Padding(
-                            padding:
-                                const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                            child: Text(
-                              errorText!,
-                              style: AppTextStyles.caption(
-                                context,
-                                color: AppColors.adminRed,
-                              ),
-                            ),
-                          )
-                        : const SizedBox.shrink();
-                  }),
-                  Builder(builder: (_) {
-                    debugPrint('[BUG-039a] _Body trailing spacer building');
-                    return const SizedBox(height: 120);
-                  }),
-                ],
-              ),
+                    ],
+                  ),
+                ),
+                for (final trait in order)
+                  TraitSection(
+                    trait: trait,
+                    cards: (byTrait[trait] ?? const []).cast(),
+                    selectedTags: selected,
+                    onToggle: onToggle,
+                  ),
+                if (errorText != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: Text(
+                      errorText!,
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.adminRed,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 120),
+              ],
             ),
-          );
-        }),
-        Builder(builder: (_) {
-          debugPrint('[BUG-039a] _Body bottomBar slot building');
-          return bottomBar;
-        }),
+          ),
+        ),
+        bottomBar,
       ],
     );
   }
@@ -397,8 +328,6 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[BUG-039a] _BottomBar.build entered '
-        'selectedCount=$selectedCount submitting=$submitting');
     return SafeArea(
       top: false,
       child: Container(
@@ -420,19 +349,16 @@ class _BottomBar extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            Builder(builder: (_) {
-              debugPrint('[BUG-039a] _BottomBar PrimaryButton slot building');
-              return SizedBox(
-                width: double.infinity,
-                child: PrimaryButton(
-                  label: selectedCount == 0
-                      ? 'Skip and split equally'
-                      : 'Continue',
-                  onPressed: submitting ? null : onSubmit,
-                  loading: submitting,
-                ),
-              );
-            }),
+            SizedBox(
+              width: double.infinity,
+              child: PrimaryButton(
+                label: selectedCount == 0
+                    ? 'Skip and split equally'
+                    : 'Continue',
+                onPressed: submitting ? null : onSubmit,
+                loading: submitting,
+              ),
+            ),
             const SizedBox(height: 4),
             TextButton(
               onPressed: submitting ? null : onLater,

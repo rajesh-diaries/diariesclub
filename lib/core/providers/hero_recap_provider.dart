@@ -7,26 +7,13 @@ import 'auth_provider.dart';
 /// reflection screen to pull the row's child_id, total_xp_pool, deadline.
 final heroRecapBySessionProvider = FutureProvider.family<
     Map<String, dynamic>?, String>((ref, sessionId) async {
-  // ignore: avoid_print
-  print('[BUG-039a] heroRecapBySessionProvider fetching sessionId=$sessionId');
-  try {
-    final row = await Supabase.instance.client
-        .from('hero_recaps')
-        .select('*, children(name, photo_url)')
-        .eq('session_id', sessionId)
-        .maybeSingle();
-    // ignore: avoid_print
-    print('[BUG-039a] heroRecapBySessionProvider returned '
-        'row=${row == null ? "null" : row.keys.toList()}');
-    if (row == null) return null;
-    return Map<String, dynamic>.from(row);
-  } catch (e, st) {
-    // ignore: avoid_print
-    print('[BUG-039a] heroRecapBySessionProvider threw: $e');
-    // ignore: avoid_print
-    print('[BUG-039a] stack: $st');
-    rethrow;
-  }
+  final row = await Supabase.instance.client
+      .from('hero_recaps')
+      .select('*, children(name, photo_url)')
+      .eq('session_id', sessionId)
+      .maybeSingle();
+  if (row == null) return null;
+  return Map<String, dynamic>.from(row);
 });
 
 /// Live list of pending recaps for the current family — Realtime stream

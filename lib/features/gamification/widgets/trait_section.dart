@@ -26,12 +26,8 @@ class TraitSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[BUG-039a] TraitSection.build trait=$trait '
-        'cards=${cards.length} selectedSize=${selectedTags.length}');
     final color = _heroColor(trait);
-    debugPrint('[BUG-039a] TraitSection trait=$trait color resolved');
     final iconData = _heroIcon(trait);
-    debugPrint('[BUG-039a] TraitSection trait=$trait icon resolved');
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -51,15 +47,11 @@ class TraitSection extends StatelessWidget {
                 child: Icon(iconData, color: color, size: 18),
               ),
               const SizedBox(width: 10),
-              Builder(builder: (_) {
-                debugPrint('[BUG-039a] TraitSection trait=$trait '
-                    'building hero-name Text');
-                return Text(
-                  _heroName(trait).toUpperCase(),
-                  style: AppTextStyles.caption(context, color: color)
-                      .copyWith(letterSpacing: 1.4, fontWeight: FontWeight.w800),
-                );
-              }),
+              Text(
+                _heroName(trait).toUpperCase(),
+                style: AppTextStyles.caption(context, color: color)
+                    .copyWith(letterSpacing: 1.4, fontWeight: FontWeight.w800),
+              ),
               const SizedBox(width: 6),
               Text(
                 '· ${_traitLabel(trait).toLowerCase()}',
@@ -74,8 +66,6 @@ class TraitSection extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: List<Widget>.generate(3, (i) {
-              debugPrint('[BUG-039a] TraitSection trait=$trait '
-                  'building card slot i=$i (cards.length=${cards.length})');
               final spacer = i > 0
                   ? const SizedBox(width: 10)
                   : const SizedBox.shrink();
@@ -85,9 +75,6 @@ class TraitSection extends StatelessWidget {
                 );
               }
               final card = cards[i];
-              debugPrint('[BUG-039a] TraitSection trait=$trait card[$i]: '
-                  'tag=${card.tag} primaryTrait=${card.primaryTrait} '
-                  'icon=${card.icon} displayText.len=${card.displayText.length}');
               return Expanded(
                 child: Row(children: [
                   spacer,
