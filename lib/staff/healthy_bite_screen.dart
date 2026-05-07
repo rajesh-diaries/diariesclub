@@ -16,18 +16,27 @@ class HealthyBiteScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pending = ref.watch(venuePendingHealthyBitesProvider);
+    final pendingAsync = ref.watch(venuePendingHealthyBitesProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Healthy Bite')),
-      body: pending.isEmpty
-          ? const _EmptyState()
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: pending.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (_, i) => _ClaimTile(session: pending[i]),
-            ),
+      body: pendingAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text("Couldn't load pending list.\n$e"),
+          ),
+        ),
+        data: (pending) => pending.isEmpty
+            ? const _EmptyState()
+            : ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: pending.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (_, i) => _ClaimTile(session: pending[i]),
+              ),
+      ),
     );
   }
 }
@@ -52,7 +61,7 @@ class _EmptyState extends StatelessWidget {
                 style: AppTextStyles.bodyLarge(context)),
             const SizedBox(height: 4),
             Text(
-              'Bites are earned at the 2-hour session mark.',
+              'Bites become eligible 10 minutes before a session ends.',
               style: AppTextStyles.caption(
                 context,
                 color: AppColors.lightTextSecondary,

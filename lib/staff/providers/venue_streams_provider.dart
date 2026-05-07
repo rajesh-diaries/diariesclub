@@ -48,17 +48,45 @@ final venueOrdersProvider =
   }
 });
 
-/// Sessions where Healthy Bite was earned but not yet handed to the child.
-/// Filter is client-side (the underlying stream is already venue-scoped).
+/// Sessions where Healthy Bite was earned but not yet handed to the
+/// child. Has its OWN stream rather than deriving from
+/// venueActiveSessionsProvider — that one filters out completed/auto_closed
+/// sessions, but a customer can still walk to the counter post-session
+/// (within ~4 hours) and the staff app needs to see them. Without this,
+/// late-distribution becomes impossible and the "pending" list shows
+/// empty even when the customer screen is asking them to come collect
+/// (BUG-045).
+///
+/// Window: started_at within last 4 hours. Beyond that, treat as
+/// abandoned — admin can still distribute via direct DB tooling if a
+/// customer follows up later.
 final venuePendingHealthyBitesProvider =
-    Provider<List<Map<String, dynamic>>>((ref) {
-  final sessions =
-      ref.watch(venueActiveSessionsProvider).valueOrNull ?? const [];
-  return sessions
-      .where((s) =>
-          s['healthy_bite_earned'] == true &&
-          s['healthy_bite_distributed'] != true)
-      .toList();
+    StreamProvider<List<Map<String, dynamic>>>((ref) async* {
+  final venueId = ref.watch(currentTabletVenueIdProvider);
+  if (venueId == null) {
+    yield const [];
+    return;
+  }
+  final stream = Supabase.instance.client
+      .from('sessions')
+      .stream(primaryKey: ['id'])
+      .eq('venue_id', venueId)
+      .order('started_at', ascending: true);
+  await for (final rows in stream) {
+    final cutoff = DateTime.now().toUtc().subtract(const Duration(hours: 4));
+    yield rows.where((s) {
+      if (s['healthy_bite_earned'] != true) return false;
+      if (s['healthy_bite_distributed'] == true) return false;
+      final startedRaw = s['started_at'] as String?;
+      final started =
+          startedRaw == null ? null : DateTime.tryParse(startedRaw);
+      if (started == null || started.toUtc().isBefore(cutoff)) return false;
+      // Allow active, grace, completed, auto_closed — staff can still
+      // hand over the bite even if the timer has expired.
+      const ok = {'active', 'grace', 'completed', 'auto_closed'};
+      return ok.contains(s['status']);
+    }).toList();
+  }
 });
 
 /// Today's cash collected (cash + cash_walkin) — sessions + orders combined.

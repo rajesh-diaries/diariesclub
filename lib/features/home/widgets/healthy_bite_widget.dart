@@ -7,57 +7,76 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
-/// Pulsing card shown when the latest completed session has
+/// Informational card shown on home when a session has
 /// `healthy_bite_earned=true` AND `healthy_bite_distributed=false`.
 ///
-/// Distribution itself is staff-side (Session 10). For now: "Show" deep-
-/// links to a bite-only QR (placeholder route) and "I got it" optimistically
-/// flips `healthy_bite_distributed=true` so the card disappears.
-class HealthyBiteWidget extends ConsumerStatefulWidget {
+/// Realtime via supabase stream — the moment staff confirms distribution
+/// (the unified healthy_bite_distribute RPC sets distributed=true and
+/// claimed_at=now()), this widget hides itself automatically.
+///
+/// History note: this used to have an "I got it" button that flipped
+/// distributed=true client-side. That was always RLS-blocked (customer
+/// JWT can't write that column) AND was architecturally wrong — under
+/// the v2 model (BUG-044, migration 0046), distribution is a staff RPC
+/// that mints a card and credits +20 XP. A customer self-mark would
+/// skip both. The button has been removed; the widget is purely
+/// informational.
+class HealthyBiteWidget extends ConsumerWidget {
   const HealthyBiteWidget({super.key});
 
   @override
-  ConsumerState<HealthyBiteWidget> createState() => _HealthyBiteWidgetState();
-}
-
-class _HealthyBiteWidgetState extends ConsumerState<HealthyBiteWidget> {
-  Future<void> _markGot(String sessionId) async {
-    try {
-      await Supabase.instance.client
-          .from('sessions')
-          .update({'healthy_bite_distributed': true}).eq('id', sessionId);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Couldn't update. Try again later.")),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final familyId = ref.watch(currentFamilyIdProvider);
     if (familyId == null) return const SizedBox.shrink();
 
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: Supabase.instance.client
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: Supabase.instance.client
           .from('sessions')
-          .select('id, child_id, children(name)')
+          .stream(primaryKey: ['id'])
           .eq('family_id', familyId)
-          .eq('healthy_bite_earned', true)
-          .eq('healthy_bite_distributed', false)
-          .order('completed_at', ascending: false)
-          .limit(1),
+          .order('started_at', ascending: false),
       builder: (context, snap) {
-        if (!snap.hasData || snap.data!.isEmpty) {
-          return const SizedBox.shrink();
+        final rows = snap.data ?? const <Map<String, dynamic>>[];
+        // Newest pending bite for this family; cap at the last 24h so a
+        // forgotten session from days ago doesn't ride along indefinitely.
+        final cutoff = DateTime.now().subtract(const Duration(hours: 24));
+        Map<String, dynamic>? row;
+        for (final r in rows) {
+          if (r['healthy_bite_earned'] != true) continue;
+          if (r['healthy_bite_distributed'] == true) continue;
+          final startedRaw = r['started_at'] as String?;
+          final started = startedRaw == null
+              ? null
+              : DateTime.tryParse(startedRaw);
+          if (started == null || started.isBefore(cutoff)) continue;
+          row = r;
+          break;
         }
-        final row = snap.data!.first;
-        final childName =
-            ((row['children'] as Map?)?['name'] as String?) ?? 'Your child';
-        final sessionId = row['id'] as String;
+        if (row == null) return const SizedBox.shrink();
 
+        final childId = row['child_id'] as String?;
+        return _Body(childId: childId);
+      },
+    );
+  }
+}
+
+class _Body extends StatelessWidget {
+  final String? childId;
+  const _Body({required this.childId});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: childId == null
+          ? Future.value(null)
+          : Supabase.instance.client
+              .from('children')
+              .select('name')
+              .eq('id', childId!)
+              .maybeSingle(),
+      builder: (context, snap) {
+        final childName = (snap.data?['name'] as String?) ?? 'Your child';
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -82,7 +101,7 @@ class _HealthyBiteWidgetState extends ConsumerState<HealthyBiteWidget> {
                       style: AppTextStyles.bodyLarge(context),
                     ),
                     Text(
-                      'Show this at the FIT counter',
+                      'Show this at the FIT counter — staff will hand it over.',
                       style: AppTextStyles.caption(
                         context,
                         color: AppColors.lightTextSecondary,
@@ -90,10 +109,6 @@ class _HealthyBiteWidgetState extends ConsumerState<HealthyBiteWidget> {
                     ),
                   ],
                 ),
-              ),
-              TextButton(
-                onPressed: () => _markGot(sessionId),
-                child: const Text('I got it'),
               ),
             ],
           ),
