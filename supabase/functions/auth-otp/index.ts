@@ -18,38 +18,39 @@
 //
 //  Session minting
 //  ---------------
-//  After a successful verify, we ensure the auth user exists (admin.createUser
-//  with phone_confirm:true), then call auth.admin.generateLink with type
-//  'magiclink' against a synthetic phone-tied email. We extract the
-//  `token_hash` from the returned action_link and return it to the client.
-//  The client redeems it via supabase.auth.verifyOtp({ token_hash, type:
-//  'magiclink' }) — that's what gives us a real session with refresh tokens.
-//  The synthetic email never leaves the server (we don't email it; we just
-//  need it to satisfy generateLink's signature).
+//  After a successful verify, we ensure the auth user exists, then call
+//  auth.admin.generateLink with type 'magiclink' against a synthetic
+//  phone-tied email. We extract the `token_hash` from the returned
+//  action_link and return it to the client. The client redeems it via
+//  supabase.auth.verifyOtp({ token_hash, type: 'magiclink' }) — that's
+//  what gives us a real session with refresh tokens. The synthetic
+//  email never leaves the server (we don't email it; we just need it
+//  to satisfy generateLink's signature).
+//
+//  Existing-user resolution (BUG-042 fix, v13)
+//  -------------------------------------------
+//  Synthetic email is deterministic per phone, so we look up the user
+//  by email FIRST via GoTrue's admin REST endpoint with `?email=` filter
+//  (which GoTrue actually supports, unlike the previous `?phone=` we
+//  used in v12 — `?phone=` was silently ignored and we walked the first
+//  50 users by hand, which broke once the user table grew past one page).
+//  If found → existing user, reuse id. If not found → createUser. This
+//  reverses the previous create-first-then-look-up dance and avoids
+//  hitting the broken `?phone=` filter at all.
 //
 //  Rate limiting
 //  -------------
-//    * 3 sends per phone per 15 minutes (returns 429)
+//    * 3 sends per phone per 15 minutes (returns 429) — REAL mode only.
+//      Mock mode skips the limit (BUG-025) so dev testing isn't blocked.
 //    * 3 verify attempts per code (after which the code row is deleted)
-//
-//  Audit / logging
-//  ---------------
-//  Edge Function logs (visible via `supabase functions logs auth-otp`) are
-//  the audit trail for OTP itself. Once the user is signed in and family_create
-//  runs, audit_log gets a 'family.create' entry — that's the durable record.
 // ===========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-// Use the built-in WebCrypto API (globalThis.crypto). It's available in
-// every modern runtime including Supabase Edge Functions, no extra import
-// needed. (We had a deno.land/std import here that crashed cold-start.)
 
 const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OTP_MODE                  = (Deno.env.get("OTP_MODE") ?? "mock").toLowerCase();
 
-// MSG91 — populated in Session 12. Referenced here so the real-mode code
-// compiles, but never exercised while OTP_MODE=mock.
 const MSG91_AUTH_KEY    = Deno.env.get("MSG91_AUTH_KEY")    ?? "";
 const MSG91_TEMPLATE_ID = Deno.env.get("MSG91_TEMPLATE_ID") ?? "";
 const MSG91_SENDER_ID   = Deno.env.get("MSG91_SENDER_ID")   ?? "DIARYC";
@@ -94,6 +95,37 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 // ---------------------------------------------------------------------------
+//  Look up an existing auth user by their synthetic email (the
+//  deterministic phone-derived address). Returns null if not found.
+//  Uses GoTrue's `?email=` admin filter, which is server-side exact match.
+// ---------------------------------------------------------------------------
+async function findUserBySyntheticEmail(
+  syntheticEmail: string,
+): Promise<{ id: string; email?: string; phone?: string } | null> {
+  const lookupRes = await fetch(
+    `${SUPABASE_URL}/auth/v1/admin/users?email=${encodeURIComponent(syntheticEmail)}`,
+    {
+      headers: {
+        apikey:        SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    },
+  );
+  if (!lookupRes.ok) {
+    const txt = await lookupRes.text();
+    console.error("user_lookup_failed", lookupRes.status, txt);
+    return null;
+  }
+  const lookup = await lookupRes.json();
+  const users = (lookup.users ?? []) as Array<{
+    id: string; email?: string; phone?: string;
+  }>;
+  // Server-side filter is exact-match, but defensively re-check.
+  const existing = users.find((u) => u.email === syntheticEmail);
+  return existing ?? null;
+}
+
+// ---------------------------------------------------------------------------
 //  Action: send
 // ---------------------------------------------------------------------------
 async function handleSend(phone: string): Promise<Response> {
@@ -101,13 +133,9 @@ async function handleSend(phone: string): Promise<Response> {
     return jsonResponse({ ok: false, error: "invalid_phone" }, 400);
   }
 
-  // Best-effort cleanup of stale rows.
   try { await admin.rpc("otp_codes_cleanup"); } catch (_e) { /* ignore */ }
 
-  // Rate limit: count sends for this phone in the rolling window.
-  // Skip in mock mode — dev testing repeatedly hits the 3-send limit
-  // and gets stuck with the same number across rebuilds (BUG-025).
-  // Real (production) mode keeps the limit so we don't burn MSG91 credit.
+  // Rate limit: skipped in mock mode so dev testing isn't blocked.
   if (OTP_MODE !== "mock") {
     const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MIN * 60_000).toISOString();
     const { count, error: countError } = await admin
@@ -142,7 +170,6 @@ async function handleSend(phone: string): Promise<Response> {
   if (OTP_MODE === "mock") {
     console.log(`[mock] OTP for ${phone} = ${MOCK_CODE} (expires ${expiresAt})`);
   } else {
-    // Session 12 wires the real MSG91 keys + DLT-approved template_id.
     if (!MSG91_AUTH_KEY || !MSG91_TEMPLATE_ID) {
       console.error("msg91_not_configured");
       return jsonResponse({ ok: false, error: "msg91_not_configured" }, 500);
@@ -188,15 +215,6 @@ async function handleVerify(phone: string, code: string): Promise<Response> {
     return jsonResponse({ ok: false, error: "invalid_code_format" }, 400);
   }
 
-  // Mock mode: belt-and-braces — verify against the stored hash like real
-  // mode does. We don't accept "any 6-digit code" — only "123456". The hash
-  // check below enforces that because mock-mode `send` only ever stores
-  // hash(MOCK_CODE).
-  // (We could also short-circuit `if (code !== MOCK_CODE) reject`, but going
-  // through the same path keeps the two modes' behaviour symmetric, including
-  // rate-limiting and attempts.)
-
-  // Latest unexpired row for this phone.
   const { data: rows, error: selectError } = await admin
     .from("otp_codes")
     .select("id, code_hash, expires_at, attempts")
@@ -238,54 +256,41 @@ async function handleVerify(phone: string, code: string): Promise<Response> {
   // Code matches — burn it.
   await admin.from("otp_codes").delete().eq("id", row.id);
 
-  // Ensure the auth user exists. Synthetic email so generateLink works.
+  // Synthetic email is deterministic from phone — derive once and use as
+  // the lookup key.
   const syntheticEmail = `${phone.replace("+", "")}@phone.diariesclub.local`;
   let userId: string;
 
-  // Try to create; if a user with this phone already exists, look it up.
-  const created = await admin.auth.admin.createUser({
-    phone,
-    email: syntheticEmail,
-    phone_confirm: true,
-    email_confirm: true,
-  });
-
-  if (!created.error && created.data.user) {
-    userId = created.data.user.id;
-  } else {
-    // Existing user. Look up via the GoTrue admin REST endpoint, which
-    // supports filtering by phone (the JS SDK doesn't expose this directly).
-    const lookupRes = await fetch(
-      `${SUPABASE_URL}/auth/v1/admin/users?phone=${encodeURIComponent(phone.replace("+", ""))}`,
-      {
-        headers: {
-          apikey:        SUPABASE_SERVICE_ROLE_KEY,
-          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        },
-      },
-    );
-    if (!lookupRes.ok) {
-      const txt = await lookupRes.text();
-      console.error("user_lookup_failed", lookupRes.status, txt);
-      return jsonResponse({ ok: false, error: "user_lookup_failed" }, 500);
-    }
-    const lookup = await lookupRes.json();
-    const existing = lookup.users?.find(
-      (u: { phone?: string }) => u.phone === phone.replace("+", ""),
-    );
-    if (!existing) {
-      console.error("user_not_found_after_create_conflict", created.error);
-      return jsonResponse({ ok: false, error: "user_lookup_failed" }, 500);
-    }
+  // BUG-042 fix: look up by email FIRST. GoTrue's `?email=` filter is
+  // server-side and reliable. The previous `?phone=` filter was silently
+  // ignored and we paginated through the first 50 users — broke once the
+  // user table grew past one page.
+  const existing = await findUserBySyntheticEmail(syntheticEmail);
+  if (existing) {
     userId = existing.id;
-
-    // Make sure the synthetic email + phone confirmation are set on the
-    // existing row — pre-existing rows from earlier sessions might lack them.
+    // Belt-and-braces: ensure phone + confirmations are set on the row.
     await admin.auth.admin.updateUserById(userId, {
-      email:         existing.email ?? syntheticEmail,
+      phone,
       phone_confirm: true,
       email_confirm: true,
     });
+  } else {
+    // New user — create.
+    const created = await admin.auth.admin.createUser({
+      phone,
+      email: syntheticEmail,
+      phone_confirm: true,
+      email_confirm: true,
+    });
+    if (created.error || !created.data.user) {
+      console.error("user_create_failed", created.error);
+      return jsonResponse({
+        ok: false,
+        error: "user_create_failed",
+        detail: created.error?.message,
+      }, 500);
+    }
+    userId = created.data.user.id;
   }
 
   // Mint a magic link → extract token_hash → client redeems it for a session.
@@ -299,8 +304,6 @@ async function handleVerify(phone: string, code: string): Promise<Response> {
     return jsonResponse({ ok: false, error: "session_mint_failed" }, 500);
   }
 
-  // generateLink returns the hashed token directly in `properties.hashed_token`.
-  // That's what the client passes to supabase.auth.verifyOtp(tokenHash:..., type: magiclink).
   const tokenHash = linkRes.data.properties.hashed_token as string | undefined;
 
   if (!tokenHash) {
@@ -352,8 +355,6 @@ Deno.serve(async (req) => {
     }
     return jsonResponse({ ok: false, error: "unknown_action" }, 400);
   } catch (err) {
-    // Surface the error message to the client so we can see what blew up.
-    // (Stub-only — we'd want to scrub before shipping to prod.)
     const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
     console.error("uncaught", msg, err);
     return jsonResponse({ ok: false, error: "uncaught", detail: msg }, 500);
