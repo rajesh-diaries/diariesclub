@@ -82,10 +82,14 @@ Deno.serve(async (req) => {
     }
 
     // Load session + child + venue_config in one shot.
+    // healthy_bite_distributed (NOT _earned) drives the badge — earned is
+    // now flipped 10 min before session end by cron, so it's set even for
+    // sessions where the customer didn't actually claim. Distributed
+    // means staff confirmed the hand-off.
     const { data: session, error: sErr } = await admin
       .from("sessions")
       .select(
-        "id, family_id, child_id, venue_id, duration_minutes, healthy_bite_earned, status, completed_at, child:children(name, favourite_hero)",
+        "id, family_id, child_id, venue_id, duration_minutes, healthy_bite_distributed, status, completed_at, child:children(name, favourite_hero)",
       )
       .eq("id", session_id)
       .maybeSingle();
@@ -103,17 +107,21 @@ Deno.serve(async (req) => {
 
     const { data: config } = await admin
       .from("venue_config")
-      .select("xp_per_minute, xp_healthy_bite_bonus, reflection_window_hours")
+      .select("xp_per_minute, reflection_window_hours")
       .eq("venue_id", session.venue_id)
       .maybeSingle();
 
     const xpPerMinute = (config?.xp_per_minute as number | null) ?? 1;
-    const xpHealthyBite = (config?.xp_healthy_bite_bonus as number | null) ?? 20;
     const reflectionHours = (config?.reflection_window_hours as number | null) ?? 24;
 
-    const baseXp = session.duration_minutes * xpPerMinute;
-    const bonusXp = session.healthy_bite_earned ? xpHealthyBite : 0;
-    const totalXp = baseXp + bonusXp;
+    // total_xp_pool is the reflection-distributable pool only — driven by
+    // session length. The +20 Healthy Bite bonus used to be added on top
+    // of this number for the recap image, but it was visual-only and
+    // never landed in xp_events. Now that healthy_bite_distribute credits
+    // those 20 XP for real (5/5/5/5 via xp_credit_with_split), the recap
+    // pool must NOT include them — otherwise the badge would double-show
+    // and the reflection split would over-allocate vs what was credited.
+    const totalXp = session.duration_minutes * xpPerMinute;
 
     const childName = (session.child as { name?: string } | null)?.name ?? "Hero";
     const hero = (session.child as { favourite_hero?: string } | null)?.favourite_hero ?? "rafi";
@@ -125,7 +133,7 @@ Deno.serve(async (req) => {
       heroName: heroDisplayName(hero),
       durationMinutes: session.duration_minutes,
       totalXp,
-      healthyBite: session.healthy_bite_earned,
+      healthyBite: session.healthy_bite_distributed,
     });
     const png = new Resvg(svg, { fitTo: { mode: "width", value: 1080 } })
       .render()
@@ -188,7 +196,7 @@ Deno.serve(async (req) => {
       entityType: "hero_recap",
       entityId: recap.id,
       venueId: session.venue_id,
-      newValue: { total_xp_pool: totalXp, healthy_bite: session.healthy_bite_earned },
+      newValue: { total_xp_pool: totalXp, healthy_bite: session.healthy_bite_distributed },
     });
 
     return jsonResponse(200, {
