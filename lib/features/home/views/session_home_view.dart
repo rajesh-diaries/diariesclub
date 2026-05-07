@@ -229,14 +229,21 @@ class _CompactLayout extends StatelessWidget {
         const SizedBox(height: 12),
         const WalletCard(compact: true),
         const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: onExtend,
-            icon: const Icon(PhosphorIconsRegular.plusCircle),
-            label: Text(isGrace ? 'Extend session' : 'Add more time'),
+        // BUG-041 fix: in grace, the compact layout used to show only an
+        // Extend button — no wrap-up CTA, leaving the customer with no way
+        // to end an overrun session from this layout. Now mirrors the
+        // dominant layout's _GraceCtaPair (Extend + "I'm wrapping up").
+        if (isGrace)
+          _GraceCtaPair(onExtend: onExtend, sessionId: session['id'] as String)
+        else
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onExtend,
+              icon: const Icon(PhosphorIconsRegular.plusCircle),
+              label: const Text('Add more time'),
+            ),
           ),
-        ),
         const SizedBox(height: 32),
       ],
     );
