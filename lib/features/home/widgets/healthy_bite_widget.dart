@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -8,24 +10,19 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
-/// Informational card shown on home when a session has
+/// Informational card shown on home when the latest session has
 /// `healthy_bite_earned=true` AND `healthy_bite_distributed=false`.
 ///
-/// Three ways the card can disappear:
-///   1. Staff confirms distribution → realtime stream sees
-///      `healthy_bite_distributed=true` and the row drops out.
-///   2. Customer taps the close X → local SharedPreferences flag
-///      `hb_widget_dismissed_<sessionId>` set; widget filters out
-///      that session for this device only. (Backend state untouched
-///      so they can still claim at the counter.)
-///   3. The session is older than 24h — auto-stale, stops showing.
+/// CRITICAL: stream subscription is created ONCE in initState and stored
+/// on the State. The earlier version constructed it inline inside build()
+/// which re-subscribes on every rebuild — within seconds the customer app
+/// had dozens of live realtime listeners and went unresponsive on
+/// Android (BUG-048).
 ///
-/// History note: this used to have an "I got it" button that flipped
-/// `distributed=true` client-side. That was RLS-blocked AND wrong
-/// architecturally — under v2 (BUG-044), distribution is a staff RPC
-/// that mints a card and credits +20 XP. The button is gone; tapping
-/// the close X is local-dismiss only and leaves the actual claim
-/// state intact so the customer can still walk to the counter.
+/// Realtime self-clear: the moment staff confirms distribution
+/// (healthy_bite_distribute RPC sets distributed=true), the stream emits
+/// and the card disappears. No client write — that was always RLS-blocked
+/// and would have skipped the card+XP grant.
 class HealthyBiteWidget extends ConsumerStatefulWidget {
   const HealthyBiteWidget({super.key});
 
@@ -34,7 +31,11 @@ class HealthyBiteWidget extends ConsumerStatefulWidget {
 }
 
 class _HealthyBiteWidgetState extends ConsumerState<HealthyBiteWidget> {
+  Stream<List<Map<String, dynamic>>>? _sessionsStream;
+  String? _streamFamilyId;
   Set<String> _dismissed = const {};
+  String? _childName;
+  String? _lastChildId;
 
   @override
   void initState() {
@@ -44,7 +45,8 @@ class _HealthyBiteWidgetState extends ConsumerState<HealthyBiteWidget> {
 
   Future<void> _loadDismissed() async {
     final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys()
+    final keys = prefs
+        .getKeys()
         .where((k) => k.startsWith('hb_widget_dismissed_'))
         .map((k) => k.substring('hb_widget_dismissed_'.length))
         .toSet();
@@ -52,12 +54,27 @@ class _HealthyBiteWidgetState extends ConsumerState<HealthyBiteWidget> {
     setState(() => _dismissed = keys);
   }
 
+  // Lazy-build the stream on first build (we need familyId from ref). After
+  // that, hold the same instance across rebuilds. Recreates only if the
+  // signed-in family changes (e.g. sign-out/sign-in within session).
+  Stream<List<Map<String, dynamic>>> _streamFor(String familyId) {
+    if (_sessionsStream != null && _streamFamilyId == familyId) {
+      return _sessionsStream!;
+    }
+    _streamFamilyId = familyId;
+    _sessionsStream = Supabase.instance.client
+        .from('sessions')
+        .stream(primaryKey: ['id'])
+        .eq('family_id', familyId)
+        .order('started_at', ascending: false);
+    return _sessionsStream!;
+  }
+
   Future<void> _dismiss(String sessionId) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('hb_widget_dismissed_$sessionId', true);
     if (!mounted) return;
     setState(() => _dismissed = {..._dismissed, sessionId});
-    // Subtle confirmation — reassures customer they can still claim.
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
@@ -68,17 +85,30 @@ class _HealthyBiteWidgetState extends ConsumerState<HealthyBiteWidget> {
     );
   }
 
+  Future<void> _resolveChildName(String childId) async {
+    if (_lastChildId == childId && _childName != null) return;
+    _lastChildId = childId;
+    try {
+      final row = await Supabase.instance.client
+          .from('children')
+          .select('name')
+          .eq('id', childId)
+          .maybeSingle();
+      if (!mounted) return;
+      setState(() => _childName = (row?['name'] as String?) ?? 'Your child');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _childName = 'Your child');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final familyId = ref.watch(currentFamilyIdProvider);
     if (familyId == null) return const SizedBox.shrink();
 
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: Supabase.instance.client
-          .from('sessions')
-          .stream(primaryKey: ['id'])
-          .eq('family_id', familyId)
-          .order('started_at', ascending: false),
+      stream: _streamFor(familyId),
       builder: (context, snap) {
         final rows = snap.data ?? const <Map<String, dynamic>>[];
         final cutoff = DateTime.now().subtract(const Duration(hours: 24));
@@ -89,9 +119,8 @@ class _HealthyBiteWidgetState extends ConsumerState<HealthyBiteWidget> {
           final id = r['id'] as String?;
           if (id == null || _dismissed.contains(id)) continue;
           final startedRaw = r['started_at'] as String?;
-          final started = startedRaw == null
-              ? null
-              : DateTime.tryParse(startedRaw);
+          final started =
+              startedRaw == null ? null : DateTime.tryParse(startedRaw);
           if (started == null || started.isBefore(cutoff)) continue;
           row = r;
           break;
@@ -100,38 +129,13 @@ class _HealthyBiteWidgetState extends ConsumerState<HealthyBiteWidget> {
 
         final sessionId = row['id'] as String;
         final childId = row['child_id'] as String?;
-        return _Body(
-          sessionId: sessionId,
-          childId: childId,
-          onDismiss: () => _dismiss(sessionId),
-        );
-      },
-    );
-  }
-}
+        if (childId != null && _lastChildId != childId) {
+          // Schedule child-name fetch out-of-build to avoid setState
+          // during build assertions.
+          scheduleMicrotask(() => _resolveChildName(childId));
+        }
+        final childName = _childName ?? 'Your child';
 
-class _Body extends StatelessWidget {
-  final String sessionId;
-  final String? childId;
-  final VoidCallback onDismiss;
-  const _Body({
-    required this.sessionId,
-    required this.childId,
-    required this.onDismiss,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, dynamic>?>(
-      future: childId == null
-          ? Future.value(null)
-          : Supabase.instance.client
-              .from('children')
-              .select('name')
-              .eq('id', childId!)
-              .maybeSingle(),
-      builder: (context, snap) {
-        final childName = (snap.data?['name'] as String?) ?? 'Your child';
         return Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
           decoration: BoxDecoration(
@@ -175,7 +179,7 @@ class _Body extends StatelessWidget {
                   size: 20,
                   color: AppColors.lightTextSecondary,
                 ),
-                onPressed: onDismiss,
+                onPressed: () => _dismiss(sessionId),
               ),
             ],
           ),
