@@ -35,6 +35,18 @@
 //  queries auth.users directly. service_role-only EXECUTE; no
 //  client can call it.
 //
+//  Family payload in verify response (BUG-043, v15)
+//  ------------------------------------------------
+//  After verifyOTP resolves on web, there's a microtask gap before
+//  the new JWT is attached to the PostgREST client. The OTP screen
+//  was reading `currentFamilyProvider` immediately, which queried
+//  `families` under the pre-signin context, hit `id = auth.uid()`
+//  RLS denial, got null, and routed existing users to onboarding.
+//  v15 returns the families row alongside the token_hash so the
+//  client can route off the response directly without depending on
+//  auth-state propagation. Eliminates the first-login-wrong-route
+//  race entirely.
+//
 //  Verbose error reporting
 //  -----------------------
 //  Every error branch now logs `console.error("step", ...)` and
@@ -312,13 +324,36 @@ async function handleVerify(phone: string, code: string): Promise<Response> {
     });
   }
 
-  console.log(`auth-otp.verify.ok phone=${phone} user_id=${userId}`);
+  // BUG-043 fix (v15): fetch the families row server-side and return it
+  // alongside the token_hash. Client routes off this directly so we don't
+  // depend on auth-state propagation timing post-verifyOTP.
+  const { data: familyRow, error: famErr } = await admin
+    .from("families")
+    .select("id, name, phone, has_children, is_cafe_only, deleted_at, is_anonymised")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (famErr) {
+    // Log but don't fail — client can fall back to its own family lookup.
+    console.error(`auth-otp.verify.family_lookup_warn msg=${famErr.message}`);
+  }
+
+  // Soft-treat soft-deleted / anonymised families as "no family" so the
+  // client routes through onboarding rather than into a tombstoned row.
+  const family = (familyRow &&
+    !familyRow.deleted_at &&
+    !familyRow.is_anonymised)
+    ? familyRow
+    : null;
+
+  console.log(`auth-otp.verify.ok phone=${phone} user_id=${userId} has_family=${family !== null}`);
   return jsonResponse({
     ok:         true,
     user_id:    userId,
     token_hash: tokenHash,
     type:       "magiclink",
     email:      syntheticEmail,
+    family,
   });
 }
 

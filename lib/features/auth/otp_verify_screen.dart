@@ -109,7 +109,10 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
     });
 
     try {
-      // 1) Ask the Edge Function to verify and return a magic-link token_hash.
+      // 1) Ask the Edge Function to verify and return a magic-link token_hash
+      //    plus (BUG-043 fix) the families row. Routing off the response
+      //    avoids the post-verifyOTP auth-state-propagation race that
+      //    previously sent existing users to onboarding on web.
       final res = await Supabase.instance.client.functions.invoke(
         'auth-otp',
         body: {'action': 'verify', 'phone': _phone, 'code': code},
@@ -132,11 +135,15 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
         type: OtpType.magiclink,
       );
 
-      // 3) Decide where to land. Returning user with full family + child →
-      // home; otherwise pick up the onboarding flow. Force a refresh so the
-      // family_id has propagated.
+      // 3) Route off the family payload returned by the Edge Function. No
+      //    DB read here — the new JWT may not have propagated to the
+      //    PostgREST client yet on web, and a families read under the
+      //    pre-signin context would get RLS-blocked → null → wrong route.
+      final family = (data['family'] as Map?)?.cast<String, dynamic>();
+
+      // Prime the local cache so other screens see the family without an
+      // extra round-trip. Safe even if family is null (caller will fetch).
       ref.invalidate(currentFamilyProvider);
-      final family = await ref.read(currentFamilyProvider.future);
 
       if (!mounted) return;
 
@@ -174,11 +181,22 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
         _isVerifying = false;
       });
       _clearBoxes();
-    } on FunctionException catch (_) {
+    } on FunctionException catch (e) {
+      // The Edge Function returns 4xx with a structured body for expected
+      // failures (code expired, wrong code, too many attempts). Parse the
+      // body so the user sees the right message instead of "Couldn't reach
+      // the server" — that catch-all was misleading for, e.g., re-using a
+      // burned OTP after going back to the OTP screen (BUG-043 collateral).
+      final body = (e.details as Map?)?.cast<String, dynamic>();
+      final errCode = body?['error'] as String?;
       setState(() {
-        _errorText = "Couldn't reach the server. Please try again.";
+        _errorText = errCode != null
+            ? _mapVerifyError(errCode)
+            : "Couldn't reach the server. Please try again.";
+        _attemptsRemaining = body?['attempts_remaining'] as int?;
         _isVerifying = false;
       });
+      _clearBoxes();
     } catch (_) {
       setState(() {
         _errorText = "Couldn't verify. Please try again.";
