@@ -56,16 +56,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(homeStateProvider);
 
+    debugPrint('[BUG-038] HomeScreen.build state=$state');
     return Scaffold(
       appBar: const HomeAppBar(),
       body: state.when(
-        data: (s) => switch (s) {
-          HomeStateIdle() => const IdleHomeView(),
-          HomeStateInSession(:final session) => SessionHomeView(session: session),
-          HomeStatePostSession(:final session) =>
-            PostSessionHomeView(session: session),
+        data: (s) {
+          debugPrint('[BUG-038] HomeScreen state.data = ${s.runtimeType}');
+          return switch (s) {
+            HomeStateIdle() => const IdleHomeView(),
+            HomeStateInSession(:final session) =>
+              SessionHomeView(session: session),
+            HomeStatePostSession(:final session) =>
+              PostSessionHomeView(session: session),
+          };
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () {
+          debugPrint('[BUG-038] HomeScreen state.loading');
+          return const Center(child: CircularProgressIndicator());
+        },
         error: (e, st) {
           // BUG-033 diagnostic: surface the actual error so we can see
           // what's failing instead of just "E-HOME". Console + UI.

@@ -49,7 +49,11 @@ final homeStateProvider = StreamProvider<HomeState>((ref) async* {
       .limit(5);
 
   await for (final rows in stream) {
-    yield _classify(rows);
+    final classified = _classify(rows);
+    // ignore: avoid_print
+    print('[BUG-038] homeStateProvider stream emitted ${rows.length} rows '
+        '→ ${classified.runtimeType}');
+    yield classified;
   }
 });
 

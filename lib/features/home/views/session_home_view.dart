@@ -249,6 +249,7 @@ class _GraceCtaPair extends ConsumerWidget {
   const _GraceCtaPair({required this.onExtend, required this.sessionId});
 
   Future<void> _wrapUp(BuildContext context) async {
+    debugPrint('[BUG-038] _wrapUp invoked, sessionId=$sessionId');
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -266,31 +267,52 @@ class _GraceCtaPair extends ConsumerWidget {
         ],
       ),
     );
-    if (ok != true || !context.mounted) return;
-    // session_complete is callable by the parent; the RPC enforces authority.
+    debugPrint('[BUG-038] dialog returned ok=$ok mounted=${context.mounted}');
+    if (ok != true || !context.mounted) {
+      debugPrint('[BUG-038] dialog cancelled or context unmounted, exiting');
+      return;
+    }
     try {
-      await Supabase.instance.client
-          .rpc<Map<String, dynamic>>('session_complete',
-              params: {'p_session_id': sessionId});
-      if (!context.mounted) return;
-      // BUG-038 retest fix: deferred snackbar + explicit /home navigation.
-      //   - Snackbar via post-frame callback so it doesn't race with the
-      //     SessionHomeView unmount (was triggering navigator.dart:4081
-      //     assertion when the messenger lookup happened mid-transition).
-      //   - context.go('/home') forces a clean route reload so the user
-      //     can't be trapped on a stale view if the realtime stream is
-      //     slow to re-emit.
+      debugPrint('[BUG-038] calling session_complete RPC');
+      final result = await Supabase.instance.client
+          .rpc<dynamic>('session_complete', params: {
+        'p_session_id': sessionId,
+      });
+      debugPrint('[BUG-038] RPC returned: $result');
+      if (!context.mounted) {
+        debugPrint('[BUG-038] context unmounted after RPC, skipping nav');
+        return;
+      }
+      debugPrint('[BUG-038] scheduling post-frame snackbar');
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        debugPrint('[BUG-038] post-frame fired, showing snackbar');
         final messenger = ScaffoldMessenger.maybeOf(context);
-        messenger?.showSnackBar(
+        if (messenger == null) {
+          debugPrint('[BUG-038] messenger is null, snackbar skipped');
+          return;
+        }
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('Session complete! Thanks for visiting.'),
             duration: Duration(seconds: 4),
           ),
         );
+        debugPrint('[BUG-038] snackbar shown');
       });
+      debugPrint('[BUG-038] before context.go(/home)');
       context.go('/home');
-    } catch (e) {
+      debugPrint('[BUG-038] after context.go(/home)');
+    } on PostgrestException catch (e, st) {
+      debugPrint('[BUG-038] PostgrestException: code=${e.code} '
+          'message=${e.message} details=${e.details} hint=${e.hint}');
+      debugPrint('[BUG-038] stack: $st');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't wrap up: ${e.message}")),
+      );
+    } catch (e, st) {
+      debugPrint('[BUG-038] generic exception: $e');
+      debugPrint('[BUG-038] stack: $st');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Couldn't wrap up: $e")),
