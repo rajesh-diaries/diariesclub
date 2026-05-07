@@ -365,13 +365,13 @@ Future<void> _showDeclineModal(BuildContext context, String childName) async {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Got it.',
+              'No worries!',
               style: AppTextStyles.h2(sheetCtx),
             ),
             const SizedBox(height: 12),
             Text(
-              'Whatever you celebrate with this year, $childName is still '
-              'part of our Play Diaries family.',
+              '$childName is always part of our Play Diaries family — '
+              'celebrate on!',
               style: AppTextStyles.body(sheetCtx),
             ),
             const SizedBox(height: 24),

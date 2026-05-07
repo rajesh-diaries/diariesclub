@@ -34,13 +34,14 @@
 </head>
 <body>
   <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
+    BUG-037: force CanvasKit renderer on web. The auto renderer falls back
+    to HTML on some browsers, which renders Material/Phosphor icon fonts
+    as placeholder boxes (icons-as-fonts don't load reliably under HTML
+    renderer). CanvasKit has consistent font handling across browsers.
   -->
+  <script>
+    window.flutterConfiguration = { renderer: 'canvaskit' };
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
