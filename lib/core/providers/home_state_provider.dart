@@ -58,11 +58,7 @@ final homeStateProvider = StreamProvider<HomeState>((ref) async* {
 });
 
 HomeState _classify(List<Map<String, dynamic>> rows) {
-  if (rows.isEmpty) {
-    // ignore: avoid_print
-    print('[BUG-039] _classify: rows empty → Idle');
-    return const HomeStateIdle();
-  }
+  if (rows.isEmpty) return const HomeStateIdle();
 
   final now = DateTime.now();
   for (final r in rows) {
@@ -78,19 +74,13 @@ HomeState _classify(List<Map<String, dynamic>> rows) {
         }
       } catch (_) { /* fall through */ }
     }
-
-    // ignore: avoid_print
-    print('[BUG-039] _classify: returning InSession sessionId=${r['id']} '
-        'status=$status');
     return HomeStateInSession(r);
   }
 
-  // BUG-039 — PostSession branch RE-ENABLED. The branch was disabled in
-  // commit 3182553 because PostSessionHomeView was rendering blank; with
-  // it disabled, the reflection prompt never surfaces and Adventure tab's
-  // children.total_xp gate stays at 0 forever. Re-enabling so the
-  // diagnostic instrumentation can capture which downstream widget /
-  // provider is the actual source of the blank render.
+  // PostSession branch re-enabled in 87a4fec. Customer who has just
+  // completed a session and hasn't reflected yet sees the Hero Recap
+  // card here — the entry point that drives children.total_xp > 0 and
+  // unlocks the Adventure tab dashboard.
   for (final r in rows) {
     final status = r['status'] as String?;
     if (status != 'completed' && status != 'auto_closed') continue;
@@ -108,15 +98,8 @@ HomeState _classify(List<Map<String, dynamic>> rows) {
       }
     } catch (_) { continue; }
 
-    // ignore: avoid_print
-    print('[BUG-039] _classify: returning PostSession sessionId=${r['id']} '
-        'status=$status reflection_status=$reflection '
-        'completed_at=$completedAt total_xp_earned=${r['total_xp_earned']} '
-        'reflection_deadline=${r['reflection_deadline']}');
     return HomeStatePostSession(r);
   }
 
-  // ignore: avoid_print
-  print('[BUG-039] _classify: no matching row → Idle');
   return const HomeStateIdle();
 }

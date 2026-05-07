@@ -39,19 +39,37 @@ class ReflectionMoment {
 /// and reopening the reflection screen shows the same 12 cards.
 final reflectionMomentsProvider = FutureProvider.family<
     List<ReflectionMoment>, String>((ref, sessionId) async {
-  final recap = await Supabase.instance.client
-      .from('hero_recaps')
-      .select('id')
-      .eq('session_id', sessionId)
-      .maybeSingle();
-  if (recap == null) return const [];
+  // ignore: avoid_print
+  print('[BUG-039a] reflectionMomentsProvider start sessionId=$sessionId');
+  try {
+    final recap = await Supabase.instance.client
+        .from('hero_recaps')
+        .select('id')
+        .eq('session_id', sessionId)
+        .maybeSingle();
+    // ignore: avoid_print
+    print('[BUG-039a] reflectionMoments: recap lookup → ${recap?['id']}');
+    if (recap == null) return const [];
 
-  final rows = await Supabase.instance.client.rpc<List<dynamic>>(
-    'reflection_moments_for_recap',
-    params: {'p_recap_id': recap['id']},
-  );
+    final rows = await Supabase.instance.client.rpc<List<dynamic>>(
+      'reflection_moments_for_recap',
+      params: {'p_recap_id': recap['id']},
+    );
+    // ignore: avoid_print
+    print('[BUG-039a] reflection_moments_for_recap returned ${rows.length} rows');
 
-  return rows
-      .map((r) => ReflectionMoment.fromJson(Map<String, dynamic>.from(r as Map)))
-      .toList();
+    final parsed = rows
+        .map((r) =>
+            ReflectionMoment.fromJson(Map<String, dynamic>.from(r as Map)))
+        .toList();
+    // ignore: avoid_print
+    print('[BUG-039a] reflectionMomentsProvider parsed ${parsed.length} moments');
+    return parsed;
+  } catch (e, st) {
+    // ignore: avoid_print
+    print('[BUG-039a] reflectionMomentsProvider threw: $e');
+    // ignore: avoid_print
+    print('[BUG-039a] stack: $st');
+    rethrow;
+  }
 });

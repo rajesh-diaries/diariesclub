@@ -62,10 +62,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: state.when(
         data: (s) {
           debugPrint('[BUG-038] HomeScreen state.data = ${s.runtimeType}');
-          if (s is HomeStatePostSession) {
-            debugPrint('[BUG-039] HomeScreen entering PostSession branch '
-                'sessionId=${s.session['id']}');
-          }
           return switch (s) {
             HomeStateIdle() => const IdleHomeView(),
             HomeStateInSession(:final session) =>

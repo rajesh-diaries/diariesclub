@@ -21,19 +21,8 @@ class PostSessionHomeView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[BUG-039] PostSessionHomeView.build entered');
     final sessionId = session['id'] as String;
-    final pendingAsync = ref.watch(pendingRecapsProvider);
-    debugPrint('[BUG-039] pendingRecapsProvider state='
-        'isLoading=${pendingAsync.isLoading} '
-        'hasError=${pendingAsync.hasError} '
-        'hasValue=${pendingAsync.hasValue}');
-    if (pendingAsync.hasError) {
-      debugPrint('[BUG-039] pendingRecapsProvider error='
-          '${pendingAsync.error}');
-    }
-    final pending = pendingAsync.valueOrNull ?? const [];
-    debugPrint('[BUG-039] pending count=${pending.length}');
+    final pending = ref.watch(pendingRecapsProvider).valueOrNull ?? const [];
 
     final primary = pending.firstWhere(
       (r) => r['session_id'] == sessionId,
@@ -44,26 +33,17 @@ class PostSessionHomeView extends ConsumerWidget {
         'children': const {'name': 'Your hero'},
       },
     );
-    debugPrint('[BUG-039] primary recap fields: '
-        'session_id=${primary['session_id']} '
-        'total_xp_pool=${primary['total_xp_pool']} '
-        'reflection_deadline=${primary['reflection_deadline']} '
-        'children=${primary['children']}');
 
     final extraRecapCount = pending
         .where((r) => r['session_id'] != primary['session_id'])
         .length;
-    debugPrint('[BUG-039] extraRecapCount=$extraRecapCount');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Builder(builder: (_) {
-            debugPrint('[BUG-039] building HeroRecapCardWidget');
-            return HeroRecapCardWidget(recap: primary);
-          }),
+          HeroRecapCardWidget(recap: primary),
           if (extraRecapCount > 0) ...[
             const SizedBox(height: 8),
             Center(
@@ -80,10 +60,7 @@ class PostSessionHomeView extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 16),
-          Builder(builder: (_) {
-            debugPrint('[BUG-039] building IdleHomeBody');
-            return const IdleHomeBody();
-          }),
+          const IdleHomeBody(),
         ],
       ),
     );
