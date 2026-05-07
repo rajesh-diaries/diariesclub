@@ -28,7 +28,15 @@ class ReflectionCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[BUG-039a] ReflectionCardWidget.build tag=${moment.tag} '
+        'trait=${moment.primaryTrait} icon=${moment.icon} '
+        'selected=$selected');
     final color = _traitColor(moment.primaryTrait);
+    debugPrint('[BUG-039a] ReflectionCardWidget tag=${moment.tag} '
+        'color resolved');
+    final iconData = _iconFor(moment.icon);
+    debugPrint('[BUG-039a] ReflectionCardWidget tag=${moment.tag} '
+        'iconData resolved');
     return GestureDetector(
       onTap: _handleTap,
       behavior: HitTestBehavior.opaque,
@@ -71,7 +79,7 @@ class ReflectionCardWidget extends StatelessWidget {
                       : color.withValues(alpha: 0.18),
                 ),
                 child: Icon(
-                  _iconFor(moment.icon),
+                  iconData,
                   color: selected ? Colors.white : color,
                   size: 20,
                 ),

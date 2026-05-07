@@ -330,13 +330,17 @@ class _Body extends StatelessWidget {
                   ),
                 ),
                 for (final trait in order)
-                  TraitSection(
-                    trait: trait,
-                    cards: (byTrait[trait] ?? const [])
-                        .cast(),
-                    selectedTags: selected,
-                    onToggle: onToggle,
-                  ),
+                  Builder(builder: (_) {
+                    debugPrint(
+                        '[BUG-039a] _Body building TraitSection trait=$trait '
+                        'cards=${(byTrait[trait] ?? const []).length}');
+                    return TraitSection(
+                      trait: trait,
+                      cards: (byTrait[trait] ?? const []).cast(),
+                      selectedTags: selected,
+                      onToggle: onToggle,
+                    );
+                  }),
                 if (errorText != null)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
