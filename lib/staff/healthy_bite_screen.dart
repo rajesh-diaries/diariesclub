@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -10,22 +11,69 @@ import 'widgets/staff_pin_sheet.dart';
 
 /// Sessions where a Healthy Bite has been earned but not yet handed to
 /// the child. Tap "Distribute" → PIN sheet → healthy_bite_distribute RPC
-/// (rolls a hero card, marks session.healthy_bite_distributed=true).
+/// (rolls a hero card, marks session.healthy_bite_distributed=true,
+/// healthy_bite_claimed_at=now(), credits +20 XP, fires unbox notif).
 class HealthyBiteScreen extends ConsumerWidget {
   const HealthyBiteScreen({super.key});
+
+  void _back(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/staff/home');
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pendingAsync = ref.watch(venuePendingHealthyBitesProvider);
 
+    // Always render the AppBar with an explicit back button — never depend
+    // on Navigator's auto-leading. Some staff routes are reached via
+    // context.go() (no back stack) and we don't want to strand the user.
     return Scaffold(
-      appBar: AppBar(title: const Text('Healthy Bite')),
+      appBar: AppBar(
+        title: const Text('Healthy Bite'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () => _back(context),
+        ),
+        automaticallyImplyLeading: false,
+      ),
       body: pendingAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text("Couldn't load pending list.\n$e"),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: AppColors.adminRed,
+                ),
+                const SizedBox(height: 12),
+                Text("Couldn't load pending Healthy Bites.",
+                    style: AppTextStyles.bodyLarge(context)),
+                const SizedBox(height: 8),
+                Text(
+                  '$e',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.lightTextSecondary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () =>
+                      ref.invalidate(venuePendingHealthyBitesProvider),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
         data: (pending) => pending.isEmpty

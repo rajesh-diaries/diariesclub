@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/auth_provider.dart';
@@ -10,22 +11,65 @@ import '../../../core/theme/app_text_styles.dart';
 /// Informational card shown on home when a session has
 /// `healthy_bite_earned=true` AND `healthy_bite_distributed=false`.
 ///
-/// Realtime via supabase stream — the moment staff confirms distribution
-/// (the unified healthy_bite_distribute RPC sets distributed=true and
-/// claimed_at=now()), this widget hides itself automatically.
+/// Three ways the card can disappear:
+///   1. Staff confirms distribution → realtime stream sees
+///      `healthy_bite_distributed=true` and the row drops out.
+///   2. Customer taps the close X → local SharedPreferences flag
+///      `hb_widget_dismissed_<sessionId>` set; widget filters out
+///      that session for this device only. (Backend state untouched
+///      so they can still claim at the counter.)
+///   3. The session is older than 24h — auto-stale, stops showing.
 ///
 /// History note: this used to have an "I got it" button that flipped
-/// distributed=true client-side. That was always RLS-blocked (customer
-/// JWT can't write that column) AND was architecturally wrong — under
-/// the v2 model (BUG-044, migration 0046), distribution is a staff RPC
-/// that mints a card and credits +20 XP. A customer self-mark would
-/// skip both. The button has been removed; the widget is purely
-/// informational.
-class HealthyBiteWidget extends ConsumerWidget {
+/// `distributed=true` client-side. That was RLS-blocked AND wrong
+/// architecturally — under v2 (BUG-044), distribution is a staff RPC
+/// that mints a card and credits +20 XP. The button is gone; tapping
+/// the close X is local-dismiss only and leaves the actual claim
+/// state intact so the customer can still walk to the counter.
+class HealthyBiteWidget extends ConsumerStatefulWidget {
   const HealthyBiteWidget({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HealthyBiteWidget> createState() => _HealthyBiteWidgetState();
+}
+
+class _HealthyBiteWidgetState extends ConsumerState<HealthyBiteWidget> {
+  Set<String> _dismissed = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDismissed();
+  }
+
+  Future<void> _loadDismissed() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys()
+        .where((k) => k.startsWith('hb_widget_dismissed_'))
+        .map((k) => k.substring('hb_widget_dismissed_'.length))
+        .toSet();
+    if (!mounted) return;
+    setState(() => _dismissed = keys);
+  }
+
+  Future<void> _dismiss(String sessionId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hb_widget_dismissed_$sessionId', true);
+    if (!mounted) return;
+    setState(() => _dismissed = {..._dismissed, sessionId});
+    // Subtle confirmation — reassures customer they can still claim.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "We'll keep your Healthy Bite ready — show staff at the counter anytime.",
+        ),
+        duration: Duration(seconds: 4),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final familyId = ref.watch(currentFamilyIdProvider);
     if (familyId == null) return const SizedBox.shrink();
 
@@ -37,13 +81,13 @@ class HealthyBiteWidget extends ConsumerWidget {
           .order('started_at', ascending: false),
       builder: (context, snap) {
         final rows = snap.data ?? const <Map<String, dynamic>>[];
-        // Newest pending bite for this family; cap at the last 24h so a
-        // forgotten session from days ago doesn't ride along indefinitely.
         final cutoff = DateTime.now().subtract(const Duration(hours: 24));
         Map<String, dynamic>? row;
         for (final r in rows) {
           if (r['healthy_bite_earned'] != true) continue;
           if (r['healthy_bite_distributed'] == true) continue;
+          final id = r['id'] as String?;
+          if (id == null || _dismissed.contains(id)) continue;
           final startedRaw = r['started_at'] as String?;
           final started = startedRaw == null
               ? null
@@ -54,16 +98,27 @@ class HealthyBiteWidget extends ConsumerWidget {
         }
         if (row == null) return const SizedBox.shrink();
 
+        final sessionId = row['id'] as String;
         final childId = row['child_id'] as String?;
-        return _Body(childId: childId);
+        return _Body(
+          sessionId: sessionId,
+          childId: childId,
+          onDismiss: () => _dismiss(sessionId),
+        );
       },
     );
   }
 }
 
 class _Body extends StatelessWidget {
+  final String sessionId;
   final String? childId;
-  const _Body({required this.childId});
+  final VoidCallback onDismiss;
+  const _Body({
+    required this.sessionId,
+    required this.childId,
+    required this.onDismiss,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -78,13 +133,14 @@ class _Body extends StatelessWidget {
       builder: (context, snap) {
         final childName = (snap.data?['name'] as String?) ?? 'Your child';
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
           decoration: BoxDecoration(
             color: AppColors.fitGreen.withValues(alpha: 0.10),
             border: Border.all(color: AppColors.fitGreen),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const Icon(
                 PhosphorIconsFill.carrot,
@@ -100,6 +156,7 @@ class _Body extends StatelessWidget {
                       '$childName earned a Healthy Bite!',
                       style: AppTextStyles.bodyLarge(context),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       'Show this at the FIT counter — staff will hand it over.',
                       style: AppTextStyles.caption(
@@ -109,6 +166,16 @@ class _Body extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                tooltip: 'Dismiss',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.close,
+                  size: 20,
+                  color: AppColors.lightTextSecondary,
+                ),
+                onPressed: onDismiss,
               ),
             ],
           ),
