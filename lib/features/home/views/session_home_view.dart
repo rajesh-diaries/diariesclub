@@ -273,19 +273,27 @@ class _GraceCtaPair extends ConsumerWidget {
           .rpc<Map<String, dynamic>>('session_complete',
               params: {'p_session_id': sessionId});
       if (!context.mounted) return;
-      // BUG-038: explicit success confirmation. Stream will re-classify the
-      // completed session into Idle (PostSession branch dropped — see
-      // home_state_provider for v1 fallback).
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Session complete! Thanks for visiting.'),
-          duration: Duration(seconds: 4),
-        ),
-      );
-    } catch (_) {
+      // BUG-038 retest fix: deferred snackbar + explicit /home navigation.
+      //   - Snackbar via post-frame callback so it doesn't race with the
+      //     SessionHomeView unmount (was triggering navigator.dart:4081
+      //     assertion when the messenger lookup happened mid-transition).
+      //   - context.go('/home') forces a clean route reload so the user
+      //     can't be trapped on a stale view if the realtime stream is
+      //     slow to re-emit.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text('Session complete! Thanks for visiting.'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      });
+      context.go('/home');
+    } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Couldn't wrap up. Please try again.")),
+        SnackBar(content: Text("Couldn't wrap up: $e")),
       );
     }
   }

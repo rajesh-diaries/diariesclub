@@ -56,21 +56,38 @@ final homeStateProvider = StreamProvider<HomeState>((ref) async* {
 HomeState _classify(List<Map<String, dynamic>> rows) {
   if (rows.isEmpty) return const HomeStateIdle();
 
-  // Open session: anything still in 'active' or 'grace' status. The visual
-  // active/grace switch happens in the view.
+  // Open session: status must be 'active' or 'grace' AND expires_at must
+  // not be hours in the past. The expires_at sanity check defends against
+  // stale realtime state (e.g. Chrome tab backgrounded while staff/server
+  // closed the session) — without it, the customer can be trapped on a
+  // phantom overrun timer that no UI gesture clears. 2 hours covers the
+  // configured grace + force-close max with margin.
+  final now = DateTime.now();
   for (final r in rows) {
     final status = r['status'] as String?;
-    if (status == 'active' || status == 'grace') {
-      return HomeStateInSession(r);
+    if (status != 'active' && status != 'grace') continue;
+
+    final expiresAtStr = r['expires_at'] as String?;
+    if (expiresAtStr != null) {
+      try {
+        final expiresAt = DateTime.parse(expiresAtStr);
+        if (now.difference(expiresAt).inHours > 2) {
+          // Session is stuck. Skip — let the customer see Idle so they're
+          // not trapped. Server reconciliation will eventually flip status.
+          continue;
+        }
+      } catch (_) {
+        // If we can't parse expires_at, fall through and trust the status.
+      }
     }
+
+    return HomeStateInSession(r);
   }
 
   // BUG-038 v1 fallback: PostSession branch disabled. PostSessionHomeView
   // was rendering blank after `session_complete` (root cause not pinpointed
   // in v1; tracked as v1.1 follow-up). For v1 the customer lands on Idle
-  // immediately after wrap-up, sees a "Session complete!" snackbar, and can
-  // reach the hero recap via the recap notification deep-link or the past-
-  // sessions list at /profile/sessions. The branch + class are kept in
-  // code so we can re-enable cleanly in v1.1 once the blank-page is fixed.
+  // immediately after wrap-up; recap reachable via notification or
+  // /profile/sessions list.
   return const HomeStateIdle();
 }
