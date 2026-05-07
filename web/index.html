@@ -31,17 +31,28 @@
 
   <title>diaries_club</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    BUG-037 / BUG-039 fix: force CanvasKit via the MODERN initializer API.
+    The previous attempt (window.flutterConfiguration = { renderer:
+    'canvaskit' }) was the deprecated form and crashed the app boot with
+    "Use engineInitializer.initializeEngine(config) only. Using the
+    (deprecated) window.flutterConfiguration and initializeEngine
+    configuration simultaneously is not supported." Modern Flutter web
+    bootstrap handles config exclusively through _flutter.loader.load({
+    config: { ... } }).
+  -->
 </head>
 <body>
-  <!--
-    BUG-037: force CanvasKit renderer on web. The auto renderer falls back
-    to HTML on some browsers, which renders Material/Phosphor icon fonts
-    as placeholder boxes (icons-as-fonts don't load reliably under HTML
-    renderer). CanvasKit has consistent font handling across browsers.
-  -->
   <script>
-    window.flutterConfiguration = { renderer: 'canvaskit' };
+    {{flutter_js}}
+    {{flutter_build_config}}
+
+    _flutter.loader.load({
+      config: {
+        renderer: 'canvaskit',
+      },
+    });
   </script>
-  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
