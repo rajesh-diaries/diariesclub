@@ -58,7 +58,10 @@ final pastWorkshopsProvider =
   try {
     final rows = await Supabase.instance.client
         .from('workshop_registrations')
-        .select('*, workshops(title, scheduled_at)')
+        .select(
+          '*, workshops(id, title, scheduled_at, cover_image_url, '
+          'duration_minutes, primary_trait)',
+        )
         .eq('family_id', familyId)
         .order('created_at', ascending: false)
         .limit(50);
