@@ -23,12 +23,14 @@ class WalletCard extends ConsumerWidget {
       data: (w) => _Card(
         compact: compact,
         balancePaise: (w?['balance_paise'] as int?) ?? 0,
+        heldPaise: (w?['held_paise'] as int?) ?? 0,
         coinsLifetime: (w?['coins_lifetime'] as int?) ?? 0,
         loaded: w != null,
       ),
       loading: () => _Card(
         compact: compact,
         balancePaise: 0,
+        heldPaise: 0,
         coinsLifetime: 0,
         loaded: false,
       ),
@@ -40,11 +42,13 @@ class WalletCard extends ConsumerWidget {
 class _Card extends StatelessWidget {
   final bool compact;
   final int balancePaise;
+  final int heldPaise;
   final int coinsLifetime;
   final bool loaded;
   const _Card({
     required this.compact,
     required this.balancePaise,
+    required this.heldPaise,
     required this.coinsLifetime,
     required this.loaded,
   });
@@ -95,6 +99,26 @@ class _Card extends StatelessWidget {
                 ? AppTextStyles.h2(context, color: Colors.white)
                 : AppTextStyles.display(context, color: Colors.white),
           ),
+          // BUG-004 hold-then-charge — surface held amount so the customer
+          // knows the difference between "what you have" and "what's
+          // available to spend right now".
+          if (loaded && heldPaise > 0) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(
+                  PhosphorIconsRegular.lockSimple,
+                  color: AppColors.gold,
+                  size: 12,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${Money.fromPaise(heldPaise)} held for active session',
+                  style: AppTextStyles.caption(context, color: AppColors.gold),
+                ),
+              ],
+            ),
+          ],
           if (!compact && coinsLifetime > 0) ...[
             const SizedBox(height: 4),
             Text(

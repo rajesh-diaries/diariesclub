@@ -65,9 +65,12 @@ class _SessionHomeViewState extends ConsumerState<SessionHomeView> {
     );
   }
 
-  void _goToQr() {
-    final id = widget.session['id'] as String;
-    context.push('/session/qr/$id');
+  // BUG-034: while a session is active, the primary action is ordering
+  // food (Coffee Diaries / FIT Diaries), not re-displaying the QR. Staff
+  // already scanned, the QR has no further purpose. Route to the Club tab
+  // which lands on Coffee by default.
+  void _goToOrderFood() {
+    context.go('/club');
   }
 
   @override
@@ -88,13 +91,13 @@ class _SessionHomeViewState extends ConsumerState<SessionHomeView> {
                 session: widget.session,
                 isGrace: isGrace,
                 onExtend: _showExtendSheet,
-                onShowQr: _goToQr,
+                onOrderFood: _goToOrderFood,
               )
             : _DominantLayout(
                 session: widget.session,
                 isGrace: isGrace,
                 onExtend: _showExtendSheet,
-                onShowQr: _goToQr,
+                onOrderFood: _goToOrderFood,
               ),
       ),
     );
@@ -108,13 +111,13 @@ class _DominantLayout extends StatelessWidget {
   final Map<String, dynamic> session;
   final bool isGrace;
   final VoidCallback onExtend;
-  final VoidCallback onShowQr;
+  final VoidCallback onOrderFood;
 
   const _DominantLayout({
     required this.session,
     required this.isGrace,
     required this.onExtend,
-    required this.onShowQr,
+    required this.onOrderFood,
   });
 
   @override
@@ -135,10 +138,15 @@ class _DominantLayout extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onShowQr,
-                  icon: const Icon(PhosphorIconsRegular.qrCode),
-                  label: const Text('Show QR'),
+                child: FilledButton.icon(
+                  onPressed: onOrderFood,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.navy,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  icon: const Icon(PhosphorIconsRegular.coffee),
+                  label: const Text('Order food'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -170,13 +178,13 @@ class _CompactLayout extends StatelessWidget {
   final Map<String, dynamic> session;
   final bool isGrace;
   final VoidCallback onExtend;
-  final VoidCallback onShowQr;
+  final VoidCallback onOrderFood;
 
   const _CompactLayout({
     required this.session,
     required this.isGrace,
     required this.onExtend,
-    required this.onShowQr,
+    required this.onOrderFood,
   });
 
   @override
@@ -201,9 +209,9 @@ class _CompactLayout extends StatelessWidget {
                 ),
               ),
               IconButton(
-                onPressed: onShowQr,
-                tooltip: 'Show QR',
-                icon: const Icon(PhosphorIconsRegular.qrCode),
+                onPressed: onOrderFood,
+                tooltip: 'Order food',
+                icon: const Icon(PhosphorIconsRegular.coffee),
               ),
             ],
           ),
