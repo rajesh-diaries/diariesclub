@@ -118,15 +118,31 @@ class _WalletSection extends ConsumerWidget {
                 style: AppTextStyles.bodyLarge(context),
               ),
               const SizedBox(width: 12),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.navy,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  visualDensity: VisualDensity.compact,
+              // Material+InkWell instead of FilledButton — FilledButton
+              // inside ListTile.trailing > Row(min) silently asserts on
+              // Flutter web (same root cause as BUG-039a).
+              Material(
+                color: AppColors.navy,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                onPressed: () => _topUp(context),
-                child: const Text('Top up'),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => _topUp(context),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      'Top up',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
