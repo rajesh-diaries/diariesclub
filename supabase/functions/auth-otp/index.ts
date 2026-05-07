@@ -1,48 +1,51 @@
 // ===========================================================================
-//  Diaries Club — auth-otp Edge Function (Session 4)
+//  Diaries Club — auth-otp Edge Function
 //
-//  Pattern B: this function owns OTP issuance + verification end-to-end.
-//
-//  Flow
-//  ----
-//    POST /auth-otp { action: "send",   phone }
-//    POST /auth-otp { action: "verify", phone, code }
+//  POST /auth-otp { action: "send",   phone }
+//  POST /auth-otp { action: "verify", phone, code }
 //
 //  Modes
 //  -----
-//    OTP_MODE=mock   — accepts only "123456"; no SMS sent.
-//                      Used in dev so devs don't burn MSG91 credit.
-//    OTP_MODE=real   — generates a random 6-digit code, hashes it, stores
-//                      it, sends via MSG91. (MSG91 fetch path is sketched
-//                      but not exercised until Session 12 plugs in keys.)
+//    OTP_MODE=mock — accepts only "123456"; no SMS sent.
+//    OTP_MODE=real — generates random code, sends via MSG91.
 //
 //  Session minting
 //  ---------------
-//  After a successful verify, we ensure the auth user exists, then call
-//  auth.admin.generateLink with type 'magiclink' against a synthetic
-//  phone-tied email. We extract the `token_hash` from the returned
-//  action_link and return it to the client. The client redeems it via
-//  supabase.auth.verifyOtp({ token_hash, type: 'magiclink' }) — that's
-//  what gives us a real session with refresh tokens. The synthetic
-//  email never leaves the server (we don't email it; we just need it
-//  to satisfy generateLink's signature).
+//  After verify, ensure the auth user exists, then call
+//  auth.admin.generateLink({ type:'magiclink' }) against a
+//  deterministic synthetic email derived from the phone, extract
+//  the token_hash from the returned action_link, and return it to
+//  the client. Client redeems via verifyOtp({ token_hash, type:
+//  'magiclink' }) — that gives a real session with refresh tokens.
+//  The synthetic email never leaves the server.
 //
-//  Existing-user resolution (BUG-042 fix, v13)
-//  -------------------------------------------
-//  Synthetic email is deterministic per phone, so we look up the user
-//  by email FIRST via GoTrue's admin REST endpoint with `?email=` filter
-//  (which GoTrue actually supports, unlike the previous `?phone=` we
-//  used in v12 — `?phone=` was silently ignored and we walked the first
-//  50 users by hand, which broke once the user table grew past one page).
-//  If found → existing user, reuse id. If not found → createUser. This
-//  reverses the previous create-first-then-look-up dance and avoids
-//  hitting the broken `?phone=` filter at all.
+//  Existing-user resolution (BUG-042, v14)
+//  ---------------------------------------
+//  v12 looked up existing users via /admin/users?phone=. v13 tried
+//  ?email=. NEITHER is honoured by GoTrue — both query params are
+//  silently ignored and the endpoint returns the first 50 users
+//  ordered by created_at desc. So once auth.users grew past one
+//  page (33 users today), older customers fell off page 1 and the
+//  client-side `find()` returned undefined → fall through to
+//  createUser → "phone already exists" → 500 user_lookup_failed
+//  (and later 400-shaped variants depending on which line tripped).
+//
+//  v14 replaces the GoTrue REST lookup with a SECURITY DEFINER SQL
+//  RPC `find_auth_user_for_otp(p_phone)` (migration 0045). The RPC
+//  queries auth.users directly. service_role-only EXECUTE; no
+//  client can call it.
+//
+//  Verbose error reporting
+//  -----------------------
+//  Every error branch now logs `console.error("step", ...)` and
+//  returns { ok:false, error, step, debug:{...} }. If something
+//  still goes wrong, the response body identifies the exact branch
+//  rather than us guessing from a status code alone.
 //
 //  Rate limiting
 //  -------------
-//    * 3 sends per phone per 15 minutes (returns 429) — REAL mode only.
-//      Mock mode skips the limit (BUG-025) so dev testing isn't blocked.
-//    * 3 verify attempts per code (after which the code row is deleted)
+//    * 3 sends per phone per 15 min — REAL mode only (mock skips).
+//    * 3 verify attempts per code (after which the row is deleted)
 // ===========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
@@ -94,35 +97,14 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-// ---------------------------------------------------------------------------
-//  Look up an existing auth user by their synthetic email (the
-//  deterministic phone-derived address). Returns null if not found.
-//  Uses GoTrue's `?email=` admin filter, which is server-side exact match.
-// ---------------------------------------------------------------------------
-async function findUserBySyntheticEmail(
-  syntheticEmail: string,
-): Promise<{ id: string; email?: string; phone?: string } | null> {
-  const lookupRes = await fetch(
-    `${SUPABASE_URL}/auth/v1/admin/users?email=${encodeURIComponent(syntheticEmail)}`,
-    {
-      headers: {
-        apikey:        SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    },
-  );
-  if (!lookupRes.ok) {
-    const txt = await lookupRes.text();
-    console.error("user_lookup_failed", lookupRes.status, txt);
-    return null;
-  }
-  const lookup = await lookupRes.json();
-  const users = (lookup.users ?? []) as Array<{
-    id: string; email?: string; phone?: string;
-  }>;
-  // Server-side filter is exact-match, but defensively re-check.
-  const existing = users.find((u) => u.email === syntheticEmail);
-  return existing ?? null;
+function errResponse(
+  step: string,
+  error: string,
+  status: number,
+  debug?: Record<string, unknown>,
+): Response {
+  console.error(`auth-otp.error step=${step} error=${error}`, debug ?? {});
+  return jsonResponse({ ok: false, error, step, debug }, status);
 }
 
 // ---------------------------------------------------------------------------
@@ -130,12 +112,11 @@ async function findUserBySyntheticEmail(
 // ---------------------------------------------------------------------------
 async function handleSend(phone: string): Promise<Response> {
   if (!E164_REGEX.test(phone)) {
-    return jsonResponse({ ok: false, error: "invalid_phone" }, 400);
+    return errResponse("send.validate", "invalid_phone", 400, { phone });
   }
 
   try { await admin.rpc("otp_codes_cleanup"); } catch (_e) { /* ignore */ }
 
-  // Rate limit: skipped in mock mode so dev testing isn't blocked.
   if (OTP_MODE !== "mock") {
     const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MIN * 60_000).toISOString();
     const { count, error: countError } = await admin
@@ -145,12 +126,15 @@ async function handleSend(phone: string): Promise<Response> {
       .gte("created_at", windowStart);
 
     if (countError) {
-      console.error("rate_limit_check_failed", countError);
-      return jsonResponse({ ok: false, error: "internal" }, 500);
+      return errResponse("send.rate_limit_check", "internal", 500, {
+        msg: countError.message,
+      });
     }
 
     if ((count ?? 0) >= RATE_LIMIT_MAX_SENDS) {
-      return jsonResponse({ ok: false, error: "rate_limited" }, 429);
+      return errResponse("send.rate_limit", "rate_limited", 429, {
+        sends_in_window: count,
+      });
     }
   }
 
@@ -163,16 +147,16 @@ async function handleSend(phone: string): Promise<Response> {
   });
 
   if (insertError) {
-    console.error("otp_insert_failed", insertError);
-    return jsonResponse({ ok: false, error: "internal" }, 500);
+    return errResponse("send.insert", "internal", 500, {
+      msg: insertError.message,
+    });
   }
 
   if (OTP_MODE === "mock") {
-    console.log(`[mock] OTP for ${phone} = ${MOCK_CODE} (expires ${expiresAt})`);
+    console.log(`auth-otp.send.mock phone=${phone} code=${MOCK_CODE} expires=${expiresAt}`);
   } else {
     if (!MSG91_AUTH_KEY || !MSG91_TEMPLATE_ID) {
-      console.error("msg91_not_configured");
-      return jsonResponse({ ok: false, error: "msg91_not_configured" }, 500);
+      return errResponse("send.msg91_config", "msg91_not_configured", 500);
     }
     try {
       const mobile = phone.replace("+", "");
@@ -188,15 +172,16 @@ async function handleSend(phone: string): Promise<Response> {
       });
       const result = await res.json();
       if (result.type !== "success") {
-        console.error("msg91_failed", result);
-        return jsonResponse({ ok: false, error: "sms_send_failed" }, 502);
+        return errResponse("send.msg91_call", "sms_send_failed", 502, { result });
       }
     } catch (e) {
-      console.error("msg91_threw", e);
-      return jsonResponse({ ok: false, error: "sms_send_failed" }, 502);
+      return errResponse("send.msg91_throw", "sms_send_failed", 502, {
+        msg: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
+  console.log(`auth-otp.send.ok phone=${phone} mode=${OTP_MODE}`);
   return jsonResponse({
     ok: true,
     expires_in: OTP_TTL_SECONDS,
@@ -209,33 +194,43 @@ async function handleSend(phone: string): Promise<Response> {
 // ---------------------------------------------------------------------------
 async function handleVerify(phone: string, code: string): Promise<Response> {
   if (!E164_REGEX.test(phone)) {
-    return jsonResponse({ ok: false, error: "invalid_phone" }, 400);
+    return errResponse("verify.validate_phone", "invalid_phone", 400, { phone });
   }
   if (!/^\d{6}$/.test(code)) {
-    return jsonResponse({ ok: false, error: "invalid_code_format" }, 400);
+    return errResponse("verify.validate_code", "invalid_code_format", 400);
   }
 
   const { data: rows, error: selectError } = await admin
     .from("otp_codes")
-    .select("id, code_hash, expires_at, attempts")
+    .select("id, code_hash, expires_at, attempts, created_at")
     .eq("phone", phone)
     .gte("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false })
     .limit(1);
 
   if (selectError) {
-    console.error("otp_select_failed", selectError);
-    return jsonResponse({ ok: false, error: "internal" }, 500);
+    return errResponse("verify.select_otp", "internal", 500, {
+      msg: selectError.message,
+    });
   }
 
   const row = rows?.[0];
   if (!row) {
-    return jsonResponse({ ok: false, error: "code_expired_or_missing" }, 400);
+    // Diagnostic: how many otp rows exist for this phone at all (any expiry)?
+    const { count: totalForPhone } = await admin
+      .from("otp_codes")
+      .select("id", { count: "exact", head: true })
+      .eq("phone", phone);
+    return errResponse("verify.no_active_code", "code_expired_or_missing", 400, {
+      phone,
+      now: new Date().toISOString(),
+      total_rows_for_phone: totalForPhone ?? 0,
+    });
   }
 
   if (row.attempts >= MAX_VERIFY_ATTEMPTS) {
     await admin.from("otp_codes").delete().eq("id", row.id);
-    return jsonResponse({ ok: false, error: "too_many_attempts" }, 429);
+    return errResponse("verify.too_many_attempts", "too_many_attempts", 429);
   }
 
   const candidateHash = await sha256Hex(code);
@@ -246,71 +241,78 @@ async function handleVerify(phone: string, code: string): Promise<Response> {
     } else {
       await admin.from("otp_codes").update({ attempts: newAttempts }).eq("id", row.id);
     }
-    return jsonResponse({
-      ok: false,
-      error: "wrong_code",
+    return errResponse("verify.wrong_code", "wrong_code", 400, {
       attempts_remaining: Math.max(0, MAX_VERIFY_ATTEMPTS - newAttempts),
-    }, 400);
+    });
   }
 
   // Code matches — burn it.
   await admin.from("otp_codes").delete().eq("id", row.id);
 
-  // Synthetic email is deterministic from phone — derive once and use as
-  // the lookup key.
+  // BUG-042 fix (v14): use SQL RPC to look up existing users.
   const syntheticEmail = `${phone.replace("+", "")}@phone.diariesclub.local`;
   let userId: string;
 
-  // BUG-042 fix: look up by email FIRST. GoTrue's `?email=` filter is
-  // server-side and reliable. The previous `?phone=` filter was silently
-  // ignored and we paginated through the first 50 users — broke once the
-  // user table grew past one page.
-  const existing = await findUserBySyntheticEmail(syntheticEmail);
+  const { data: foundRows, error: findError } = await admin.rpc(
+    "find_auth_user_for_otp",
+    { p_phone: phone },
+  );
+
+  if (findError) {
+    return errResponse("verify.find_user_rpc", "user_lookup_failed", 500, {
+      msg: findError.message,
+    });
+  }
+
+  const existing = (foundRows as Array<{ id: string }> | null)?.[0];
+
   if (existing) {
     userId = existing.id;
-    // Belt-and-braces: ensure phone + confirmations are set on the row.
-    await admin.auth.admin.updateUserById(userId, {
-      phone,
+    const upd = await admin.auth.admin.updateUserById(userId, {
+      phone: phone.replace("+", ""),
       phone_confirm: true,
       email_confirm: true,
     });
+    if (upd.error) {
+      // Non-fatal: log and continue with the existing id.
+      console.error(`auth-otp.verify.update_user_warn id=${userId} msg=${upd.error.message}`);
+    }
   } else {
-    // New user — create.
     const created = await admin.auth.admin.createUser({
-      phone,
+      phone: phone.replace("+", ""),
       email: syntheticEmail,
       phone_confirm: true,
       email_confirm: true,
     });
     if (created.error || !created.data.user) {
-      console.error("user_create_failed", created.error);
-      return jsonResponse({
-        ok: false,
-        error: "user_create_failed",
-        detail: created.error?.message,
-      }, 500);
+      return errResponse("verify.create_user", "user_create_failed", 500, {
+        msg: created.error?.message,
+      });
     }
     userId = created.data.user.id;
   }
 
-  // Mint a magic link → extract token_hash → client redeems it for a session.
+  // Mint magic link → token_hash → client redeems for a session.
   const linkRes = await admin.auth.admin.generateLink({
     type:  "magiclink",
     email: syntheticEmail,
   });
 
   if (linkRes.error || !linkRes.data?.properties) {
-    console.error("generate_link_failed", linkRes.error);
-    return jsonResponse({ ok: false, error: "session_mint_failed" }, 500);
+    return errResponse("verify.generate_link", "session_mint_failed", 500, {
+      msg: linkRes.error?.message,
+    });
   }
 
   const tokenHash = linkRes.data.properties.hashed_token as string | undefined;
 
   if (!tokenHash) {
-    console.error("token_hash_missing", linkRes.data.properties);
-    return jsonResponse({ ok: false, error: "session_mint_failed" }, 500);
+    return errResponse("verify.token_hash_missing", "session_mint_failed", 500, {
+      properties_keys: Object.keys(linkRes.data.properties ?? {}),
+    });
   }
 
+  console.log(`auth-otp.verify.ok phone=${phone} user_id=${userId}`);
   return jsonResponse({
     ok:         true,
     user_id:    userId,
@@ -329,34 +331,35 @@ Deno.serve(async (req) => {
       return new Response(null, { headers: corsHeaders });
     }
     if (req.method !== "POST") {
-      return jsonResponse({ ok: false, error: "method_not_allowed" }, 405);
+      return errResponse("entry.method", "method_not_allowed", 405);
     }
 
     let body: { action?: string; phone?: string; code?: string };
     try {
       body = await req.json();
     } catch (_e) {
-      return jsonResponse({ ok: false, error: "invalid_json" }, 400);
+      return errResponse("entry.parse_json", "invalid_json", 400);
     }
 
     const action = body.action;
     const phone  = body.phone;
 
     if (!action || !phone) {
-      return jsonResponse({ ok: false, error: "missing_fields" }, 400);
+      return errResponse("entry.missing_fields", "missing_fields", 400, {
+        has_action: !!action, has_phone: !!phone,
+      });
     }
 
     if (action === "send") {
       return await handleSend(phone);
     }
     if (action === "verify") {
-      if (!body.code) return jsonResponse({ ok: false, error: "missing_code" }, 400);
+      if (!body.code) return errResponse("entry.missing_code", "missing_code", 400);
       return await handleVerify(phone, body.code);
     }
-    return jsonResponse({ ok: false, error: "unknown_action" }, 400);
+    return errResponse("entry.unknown_action", "unknown_action", 400, { action });
   } catch (err) {
     const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-    console.error("uncaught", msg, err);
-    return jsonResponse({ ok: false, error: "uncaught", detail: msg }, 500);
+    return errResponse("entry.uncaught", "uncaught", 500, { msg });
   }
 });

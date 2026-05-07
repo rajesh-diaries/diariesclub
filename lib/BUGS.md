@@ -6,23 +6,23 @@ Running log of post-merge bugs. New entries at the top.
 
 # Phase 3: Pre-launch
 
-## BUG-042: Existing customer phone numbers cannot re-login (FIXED 2026-05-06)
+## BUG-042: Existing customer phone numbers cannot re-login (v14 deployed; verifying 2026-05-06)
 
 - **Severity:** 🔴 BLOCKER (every existing customer can't sign in; new accounts work)
-- **Symptom:** customer enters phone → OTP "sent" successfully → user enters `123456` (mock mode) → verify call returns `500 user_lookup_failed`. Brand-new phone numbers sign up fine; only previously-registered numbers regress.
-- **Root cause:** `auth-otp/index.ts handleVerify` looked up existing users via `GET /auth/v1/admin/users?phone=<digits>`. **GoTrue's admin endpoint does not honour a `?phone=` filter** — the parameter is silently ignored and the endpoint returns the first page (50 users) ordered by created_at desc. With 15+ accounts now in `auth.users` and growing, the existing user often isn't on page 1, so `users.find(u => u.phone === ...)` returns `undefined` → "user_lookup_failed" 500. Newly-created users are always on page 1 (just-created → top of desc order), which is why fresh numbers never tripped this.
-- **Why it didn't fire earlier:** BUG-025 (committed 6a40bda) only changed the rate-limit branch. The user-lookup path was unchanged from day-1. We left a flag in BUG-025's notes that the `?phone=` lookup was suspect; today's growth into multi-page territory pushed the bug from theoretical to BLOCKER.
-- **Fix (auth-otp v13, deployed 2026-05-06):**
-  - Replaced post-create fallback with a pre-create lookup. `handleVerify` now derives `syntheticEmail = <phone-no-+>@phone.diariesclub.local` (already deterministic per phone) and calls `GET /auth/v1/admin/users?email=<syntheticEmail>` first. **GoTrue does honour `?email=` server-side** — it's an exact-match filter.
-  - If found → `updateUserById` to ensure phone + confirmations are set, reuse the id.
-  - If not found → `createUser` with phone + syntheticEmail.
-  - The previous create-first / phone-lookup-on-conflict dance is gone entirely. No more pagination dependency.
-- **Touchpoints:** `supabase/functions/auth-otp/index.ts` (rewritten verify path; new `findUserBySyntheticEmail` helper).
+- **Symptom:** customer enters phone → OTP send succeeds → user enters `123456` (mock mode) → verify returns 500 `user_lookup_failed` (initially observed) or 400 (later observed; see notes).
+- **Root cause:** `auth-otp/handleVerify` looked up existing users via `GET /auth/v1/admin/users?phone=<digits>`. **Neither `?phone=` nor `?email=` are honoured by GoTrue's admin REST endpoint** — both query params are silently ignored, and the endpoint returns the first 50 users ordered by `created_at desc`. We then `users.find(u => u.phone === ...)` client-side, which only succeeds if the existing user happens to be on page 1. With 33 users now in `auth.users`, older accounts have rolled off page 1 and the find returns undefined → fall through to `createUser` → "phone already registered" error.
+- **Why it didn't fire earlier:** BUG-025 (commit 6a40bda) only changed the rate-limit branch. The user-lookup path was unchanged from day 1. New customers always land on page 1 (just-created = top of desc order), which is why fresh signups never tripped this.
+- **v13 attempt (2026-05-06, did NOT fix):** swapped `?phone=` for `?email=` thinking GoTrue honoured email filtering. **It does not** — both are silently ignored. v13 still hit the same pagination wall. Real-device test confirmed re-login still failed.
+- **v14 actual fix (deployed 2026-05-06):**
+  - New SECURITY DEFINER SQL RPC `public.find_auth_user_for_otp(p_phone)` (migration 0045) queries `auth.users` directly by `phone` OR synthetic `email`. Service-role-only EXECUTE; clients can't enumerate accounts via this. Verified directly: returns the expected user row for `+919962646570`.
+  - `handleVerify` calls `admin.rpc('find_auth_user_for_otp', {p_phone: phone})` instead of GoTrue admin REST. Reliable regardless of `auth.users` size.
+  - Verbose error reporting: every error response now includes `{ ok:false, error, step, debug }` so the next failing call self-describes (e.g., `step: "verify.no_active_code"` vs `step: "verify.find_user_rpc"`). Eliminates guessing-from-status-code.
+- **Note re. the 400 observed during v13 testing:** the user's last screenshot showed POST 400, not 500. Forensic SQL showed `otp_codes` was empty for `+919962646570` at that moment, so `verify.no_active_code` (`code_expired_or_missing`) fired. That's distinct from the 500 BUG-042 was originally about — it just means the OTP row had been consumed/expired by the time verify ran. v14's verbose response will make this kind of confusion visible immediately.
+- **Touchpoints:** `supabase/functions/auth-otp/index.ts` (verify path rewritten); `supabase/migrations/0045_find_auth_user_for_otp.sql` (new RPC).
 - **What to test post-deploy:**
-  1. Existing number (e.g., `+919962646571`) → enter `123456` → expect `{ok: true, token_hash, user_id}` and successful session redemption client-side.
-  2. Brand-new number → expect same shape, with a freshly created user.
-  3. Same number again 2 minutes later → expect existing-path (no new auth.users row).
-- **Related (deferred):** the `?phone=` filter being ignored is a GoTrue quirk worth knowing for future admin-API code. The synthetic-email pattern remains the canonical lookup key throughout the auth flow.
+  1. Existing number (e.g., `+919962646570`) → fresh send → enter `123456` immediately → expect `{ok:true, token_hash, user_id}`.
+  2. Brand-new number → same shape with fresh user_id.
+  3. If anything fails, the response body now includes `step` + `debug` — share that and we know exactly which branch tripped.
 
 ---
 
