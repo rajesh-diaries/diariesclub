@@ -10,16 +10,19 @@ import 'providers/staff_auth_provider.dart';
 import 'providers/venue_streams_provider.dart';
 import 'widgets/staff_pin_sheet.dart';
 
-/// Sessions where Healthy Bite is earned but not yet distributed. Tap
-/// "Distribute" → PIN sheet → healthy_bite_distribute RPC.
+/// Healthy Bite decision screen (BUG-049 redesign).
 ///
-/// Stripped back to the bare minimum after BUG-048: previous version
-/// had Timer.periodic firing ref.invalidate every 30s + a RefreshIndicator
-/// wrapping ListView-based loading/empty/error states, and rendered as a
-/// completely black screen on Android with no recoverable back button.
-/// This version is plain ConsumerWidget + when() + Center widgets — no
-/// timers, no refresh wrappers, no list-style loading layouts. Refresh
-/// is the AppBar action only.
+/// One row per undecided session in the last 4 hours. Two buttons:
+///   * Gave bite  → healthy_bite_distribute RPC (+25 XP, card unlock)
+///   * Didn't give → healthy_bite_decline RPC (just records the decision)
+///
+/// Both flows go through StaffPinSheet so every action is attributable.
+/// Once a session has a decision, it drops off the list automatically
+/// after the next refresh (provider invalidate).
+///
+/// Implementation deliberately uses plain ListTile rows + FilledButtons
+/// to avoid any fancy hit-test widgets after BUG-048's tap-reliability
+/// problems on Android.
 class HealthyBiteScreen extends ConsumerWidget {
   const HealthyBiteScreen({super.key});
 
@@ -60,76 +63,61 @@ class HealthyBiteScreen extends ConsumerWidget {
       ),
       body: pendingAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(
-          error: e,
-          onRetry: () => ref.invalidate(venuePendingHealthyBitesProvider),
-          onBack: () => _back(context),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline,
+                    size: 56, color: AppColors.adminRed),
+                const SizedBox(height: 12),
+                Text("Couldn't load pending list",
+                    style: AppTextStyles.bodyLarge(context)),
+                const SizedBox(height: 8),
+                Text('$e',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    )),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: () =>
+                      ref.invalidate(venuePendingHealthyBitesProvider),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => _back(context),
+                  child: const Text('Back to staff home'),
+                ),
+              ],
+            ),
+          ),
         ),
         data: (pending) => pending.isEmpty
-            ? _EmptyState(venueId: venueId, onBack: () => _back(context))
-            : _PendingList(
-                items: pending,
-                onAfterDistribute: () =>
-                    ref.invalidate(venuePendingHealthyBitesProvider),
+            ? _Empty(venueId: venueId, onBack: () => _back(context))
+            : ListView.separated(
+                padding: const EdgeInsets.all(12),
+                itemCount: pending.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (_, i) => _DecisionTile(
+                  session: pending[i],
+                  onDone: () =>
+                      ref.invalidate(venuePendingHealthyBitesProvider),
+                ),
               ),
       ),
     );
   }
 }
 
-class _ErrorView extends StatelessWidget {
-  final Object error;
-  final VoidCallback onRetry;
-  final VoidCallback onBack;
-  const _ErrorView({
-    required this.error,
-    required this.onRetry,
-    required this.onBack,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline,
-                size: 56, color: AppColors.adminRed),
-            const SizedBox(height: 12),
-            Text("Couldn't load pending Healthy Bites.",
-                textAlign: TextAlign.center,
-                style: AppTextStyles.bodyLarge(context)),
-            const SizedBox(height: 8),
-            Text('$error',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.caption(
-                  context,
-                  color: AppColors.lightTextSecondary,
-                )),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: onBack,
-              child: const Text('Back to staff home'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
+class _Empty extends StatelessWidget {
   final String? venueId;
   final VoidCallback onBack;
-  const _EmptyState({required this.venueId, required this.onBack});
+  const _Empty({required this.venueId, required this.onBack});
 
   @override
   Widget build(BuildContext context) {
@@ -142,13 +130,13 @@ class _EmptyState extends StatelessWidget {
             const Icon(PhosphorIconsRegular.carrot,
                 size: 56, color: AppColors.lightTextSecondary),
             const SizedBox(height: 12),
-            Text('No pending Healthy Bites',
+            Text('No pending Healthy Bite decisions',
                 textAlign: TextAlign.center,
                 style: AppTextStyles.bodyLarge(context)),
             const SizedBox(height: 4),
             Text(
-              'Bites become eligible 10 minutes before a session ends. '
-              'Tap refresh to check.',
+              'Sessions appear here while they are running and for 4 hours '
+              'after they end. Tap refresh to check.',
               textAlign: TextAlign.center,
               style: AppTextStyles.caption(
                 context,
@@ -178,42 +166,24 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _PendingList extends StatelessWidget {
-  final List<Map<String, dynamic>> items;
-  final VoidCallback onAfterDistribute;
-  const _PendingList({required this.items, required this.onAfterDistribute});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, i) =>
-          _ClaimTile(session: items[i], onDone: onAfterDistribute),
-    );
-  }
-}
-
-class _ClaimTile extends ConsumerStatefulWidget {
+class _DecisionTile extends ConsumerStatefulWidget {
   final Map<String, dynamic> session;
   final VoidCallback onDone;
-  const _ClaimTile({required this.session, required this.onDone});
+  const _DecisionTile({required this.session, required this.onDone});
 
   @override
-  ConsumerState<_ClaimTile> createState() => _ClaimTileState();
+  ConsumerState<_DecisionTile> createState() => _DecisionTileState();
 }
 
-class _ClaimTileState extends ConsumerState<_ClaimTile> {
+class _DecisionTileState extends ConsumerState<_DecisionTile> {
   bool _busy = false;
 
-  Future<void> _distribute() async {
+  Future<void> _gave() async {
     final staff = await StaffPinSheet.show(
       context,
-      actionLabel: 'Distribute Healthy Bite + hero card',
+      actionLabel: 'Give Healthy Bite + hero card (+25 XP)',
     );
     if (staff == null) return;
-
     setState(() => _busy = true);
     try {
       final raw = await Supabase.instance.client.rpc<dynamic>(
@@ -228,14 +198,14 @@ class _ClaimTileState extends ConsumerState<_ClaimTile> {
           raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
       final cardName = result['card_name'] as String?;
       final isRare = result['is_rare'] == true;
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          backgroundColor: AppColors.fitGreen,
           content: Text(
             cardName == null
-                ? 'Hero card given.'
-                : 'Card given: $cardName${isRare ? ' (RARE!)' : ''}',
+                ? 'Healthy Bite given. +25 XP credited.'
+                : 'Card given: $cardName${isRare ? ' (RARE!)' : ''}. +25 XP.',
           ),
         ),
       );
@@ -243,7 +213,37 @@ class _ClaimTileState extends ConsumerState<_ClaimTile> {
     } on PostgrestException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Couldn't distribute: ${e.message}")),
+        SnackBar(content: Text("Couldn't give bite: ${e.message}")),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _didnt() async {
+    final staff = await StaffPinSheet.show(
+      context,
+      actionLabel: 'Mark "did not take" — no XP, no card',
+    );
+    if (staff == null) return;
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'healthy_bite_decline',
+        params: {
+          'p_session_id': widget.session['id'],
+          'p_staff_pin_id': staff.staffId,
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Marked as not taken.')),
+      );
+      widget.onDone();
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't update: ${e.message}")),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -253,51 +253,81 @@ class _ClaimTileState extends ConsumerState<_ClaimTile> {
   @override
   Widget build(BuildContext context) {
     final s = widget.session;
+    final childName =
+        ((s['children'] as Map?)?['name'] as String?) ?? 'Child';
+    final sessionShort =
+        (s['id'] as String).substring(0, 6).toUpperCase();
+    final status = s['status'] as String? ?? '?';
+    final duration = s['duration_minutes'];
+
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.lightSurface,
         border: Border.all(color: AppColors.lightBorder),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: Column(
         children: [
-          const CircleAvatar(
-            backgroundColor: AppColors.gold,
-            child: Icon(PhosphorIconsFill.carrot, color: Colors.white),
+          ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: const CircleAvatar(
+              backgroundColor: AppColors.gold,
+              child: Icon(PhosphorIconsFill.carrot, color: Colors.white),
+            ),
+            title: Text(
+              childName,
+              style: AppTextStyles.bodyLarge(context),
+            ),
+            subtitle: Text(
+              'Session $sessionShort · $duration-min · $status · '
+              'started ${_started(s)}',
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const Divider(height: 1, color: AppColors.lightBorder),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            child: Row(
               children: [
-                Text(
-                  'Session ${(s['id'] as String).substring(0, 6).toUpperCase()}',
-                  style: AppTextStyles.bodyLarge(context),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _busy ? null : _gave,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.fitGreen,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: _busy
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
+                        : const Text('Gave bite'),
+                  ),
                 ),
-                Text(
-                  '${s['duration_minutes']}-min · started ${_started(s)} · '
-                  '${s['status']}',
-                  style: AppTextStyles.caption(
-                    context,
-                    color: AppColors.lightTextSecondary,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _busy ? null : _didnt,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.lightTextSecondary,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side:
+                          const BorderSide(color: AppColors.lightBorder),
+                    ),
+                    child: const Text("Didn't give"),
                   ),
                 ),
               ],
             ),
-          ),
-          FilledButton(
-            onPressed: _busy ? null : _distribute,
-            child: _busy
-                ? const SizedBox(
-                    height: 16,
-                    width: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Colors.white),
-                    ),
-                  )
-                : const Text('Distribute'),
           ),
         ],
       ),

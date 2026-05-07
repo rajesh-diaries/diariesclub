@@ -69,16 +69,20 @@ final venuePendingHealthyBitesProvider =
       .subtract(const Duration(hours: 4))
       .toIso8601String();
 
+  // BUG-049: list shows ANY undecided session in last 4h, not just earned
+  // ones. Staff makes the explicit yes/no call after the timer ends —
+  // eligibility window is no longer the gate.
   final rows = await Supabase.instance.client
       .from('sessions')
       .select(
         'id, child_id, venue_id, family_id, status, started_at, '
         'expires_at, duration_minutes, healthy_bite_earned, '
-        'healthy_bite_distributed',
+        'healthy_bite_distributed, healthy_bite_declined_at, '
+        'children(name)',
       )
       .eq('venue_id', venueId)
-      .eq('healthy_bite_earned', true)
       .eq('healthy_bite_distributed', false)
+      .isFilter('healthy_bite_declined_at', null)
       .inFilter('status', ['active', 'grace', 'completed', 'auto_closed'])
       .gte('started_at', since)
       .order('started_at', ascending: true);
