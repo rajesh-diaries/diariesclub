@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency.dart';
+import '../widgets/admin_buttons.dart';
 import '../widgets/admin_list_scaffold.dart';
 
 /// Workshops list with full CRUD (Module 2.2). + New button creates a
@@ -26,9 +27,9 @@ class WorkshopsListScreen extends ConsumerWidget {
       actions: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: FilledButton.icon(
-            icon: const Icon(PhosphorIconsRegular.plus, size: 16),
-            label: const Text('New workshop'),
+          child: AdminPrimaryButton(
+            icon: PhosphorIconsRegular.plus,
+            label: 'New workshop',
             onPressed: () => context.go('/admin/workshops/new'),
           ),
         ),
@@ -66,14 +67,15 @@ class _Table extends StatelessWidget {
           're-publishing later does not re-fan-out push.',
         ),
         actions: [
-          TextButton(
+          AdminSecondaryButton(
+            label: 'Cancel',
+            ghost: true,
             onPressed: () => Navigator.pop(c, false),
-            child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.adminRed),
+          const SizedBox(width: 8),
+          AdminPrimaryButton.danger(
+            label: 'Unpublish',
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Unpublish'),
           ),
         ],
       ),
@@ -148,19 +150,20 @@ class _Table extends StatelessWidget {
                   DataCell(Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
+                      AdminIconButton(
                         tooltip: 'Edit',
-                        icon: const Icon(PhosphorIconsRegular.pencilSimple,
-                            size: 18),
+                        icon: PhosphorIconsRegular.pencilSimple,
+                        size: 18,
                         onPressed: () => context.go(
                           '/admin/workshops/${r['id']}/edit',
                         ),
                       ),
                       if (r['is_published'] as bool? ?? true)
-                        IconButton(
+                        AdminIconButton(
                           tooltip: 'Unpublish',
-                          icon: const Icon(PhosphorIconsRegular.eyeSlash,
-                              size: 18, color: AppColors.adminRed),
+                          icon: PhosphorIconsRegular.eyeSlash,
+                          size: 18,
+                          color: AppColors.adminRed,
                           onPressed: () => _confirmUnpublish(
                             context,
                             r['id'] as String,
