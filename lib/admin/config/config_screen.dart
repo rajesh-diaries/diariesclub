@@ -11,6 +11,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../providers/admin_streams.dart';
 import '../widgets/admin_app_bar.dart';
+import '../widgets/admin_buttons.dart';
 
 const _venueId = '00000000-0000-0000-0000-000000000001';
 
@@ -1330,18 +1331,10 @@ class _SaveBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          FilledButton(
+          AdminPrimaryButton(
+            label: 'Save section',
+            busy: busy,
             onPressed: busy ? null : onSave,
-            child: busy
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Colors.white),
-                    ),
-                  )
-                : const Text('Save section'),
           ),
         ],
       ),
@@ -1422,8 +1415,10 @@ class _JsonbListEditorState extends State<JsonbListEditor> {
                       ),
                     ),
                   ),
-                IconButton(
-                  icon: const Icon(PhosphorIconsRegular.trash, size: 16),
+                AdminIconButton(
+                  icon: PhosphorIconsRegular.trash,
+                  size: 16,
+                  color: AppColors.adminRed,
                   tooltip: 'Remove',
                   onPressed: () => _remove(i),
                 ),
@@ -1432,9 +1427,9 @@ class _JsonbListEditorState extends State<JsonbListEditor> {
           ),
         Align(
           alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            icon: const Icon(PhosphorIconsRegular.plus, size: 14),
-            label: const Text('Add row'),
+          child: AdminSecondaryButton(
+            icon: PhosphorIconsRegular.plus,
+            label: 'Add row',
             onPressed: _addRow,
           ),
         ),

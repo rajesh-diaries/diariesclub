@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../widgets/admin_buttons.dart';
 import '../widgets/admin_list_scaffold.dart';
 
 /// Module 2.8 — hero cards admin CRUD. Card grid grouped by hero.
@@ -21,9 +22,9 @@ class HeroCardsScreen extends ConsumerWidget {
       actions: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: FilledButton.icon(
-            icon: const Icon(PhosphorIconsRegular.plus, size: 16),
-            label: const Text('New card'),
+          child: AdminPrimaryButton(
+            icon: PhosphorIconsRegular.plus,
+            label: 'New card',
             onPressed: () => _openEditor(context, ref, null),
           ),
         ),
@@ -355,19 +356,16 @@ class _HeroCardEditorState extends State<_HeroCardEditor> {
         ),
       ),
       actions: [
-        TextButton(
+        AdminSecondaryButton(
+          label: 'Cancel',
+          ghost: true,
           onPressed: _busy ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
         ),
-        FilledButton(
+        const SizedBox(width: 8),
+        AdminPrimaryButton(
+          label: isNew ? 'Create' : 'Save',
+          busy: _busy,
           onPressed: _busy ? null : _save,
-          child: _busy
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(isNew ? 'Create' : 'Save'),
         ),
       ],
     );
