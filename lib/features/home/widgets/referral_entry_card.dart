@@ -48,7 +48,7 @@ class ReferralEntryCard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Get ₹100 off after your first session.',
+                    'Get ₹100 in your wallet after your first session.',
                     style: AppTextStyles.body(
                       context,
                       color: Colors.white70,
