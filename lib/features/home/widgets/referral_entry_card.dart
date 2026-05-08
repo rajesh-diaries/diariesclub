@@ -16,55 +16,58 @@ class ReferralEntryCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final eligible =
-        ref.watch(referralRedeemEligibleProvider).valueOrNull ?? false;
+    final async = ref.watch(referralRedeemEligibleProvider);
+    // Only render once we have an explicit answer — avoids the
+    // loading->true layout shift that triggers Flutter web's
+    // mouse_tracker.dart:199 recursion assert (BUG-031 family).
+    final eligible = async.maybeWhen(data: (v) => v, orElse: () => false);
     if (!eligible) return const SizedBox.shrink();
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _showEntryDialog(context, ref),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.navy,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                PhosphorIconsFill.gift,
-                color: AppColors.gold,
-                size: 28,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Have a referral code?',
-                      style: AppTextStyles.h3(context, color: Colors.white),
+    // Plain GestureDetector + no MouseRegion. Avoids the InkWell ripple
+    // (and its MouseRegion churn) that was breaking pointer dispatch on
+    // adjacent cards (e.g. Start playing) during this card's pop-in.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _showEntryDialog(context, ref),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.navy,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              PhosphorIconsFill.gift,
+              color: AppColors.gold,
+              size: 28,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Have a referral code?',
+                    style: AppTextStyles.h3(context, color: Colors.white),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Get ₹100 off after your first session.',
+                    style: AppTextStyles.body(
+                      context,
+                      color: Colors.white70,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Get ₹100 off after your first session.',
-                      style: AppTextStyles.body(
-                        context,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.white54,
-                size: 16,
-              ),
-            ],
-          ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white54,
+              size: 16,
+            ),
+          ],
         ),
       ),
     );
