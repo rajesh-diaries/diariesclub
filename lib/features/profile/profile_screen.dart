@@ -69,6 +69,9 @@ class _Body extends ConsumerWidget {
         ProfileSectionHeader(title: 'Wallet'),
         _WalletSection(),
 
+        ProfileSectionHeader(title: 'Diaries Coins'),
+        _CoinsSection(),
+
         ProfileSectionHeader(title: 'Activity'),
         _ActivitySection(),
 
@@ -157,6 +160,147 @@ class _WalletSection extends ConsumerWidget {
           label: 'Pre-book a session',
           route: '/profile/pre-book',
           leading: PhosphorIconsRegular.calendarPlus,
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+//  Coins section
+// ---------------------------------------------------------------------------
+class _CoinsSection extends ConsumerStatefulWidget {
+  const _CoinsSection();
+
+  @override
+  ConsumerState<_CoinsSection> createState() => _CoinsSectionState();
+}
+
+class _CoinsSectionState extends ConsumerState<_CoinsSection> {
+  bool _busy = false;
+
+  Future<void> _redeem(int amount) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Redeem coins?'),
+        content: Text(
+          'Convert $amount Diaries Coins → ₹$amount in your wallet.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Redeem'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client
+          .rpc<dynamic>('coins_redeem', params: {'p_amount': amount});
+      ref.invalidate(currentWalletProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Redeemed $amount coins → ₹$amount')),
+      );
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      final msg = e.message.contains('min_redeem_100')
+          ? 'You need at least 100 coins to redeem.'
+          : e.message.contains('insufficient_coins')
+              ? "You don't have that many coins."
+              : "Couldn't redeem: ${e.message}";
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't redeem: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final wallet = ref.watch(currentWalletProvider).valueOrNull;
+    final coinsBalance = (wallet?['coins_balance'] as int?) ?? 0;
+    final coinsLifetime = (wallet?['coins_lifetime'] as int?) ?? 0;
+    final canRedeem = coinsBalance >= 100;
+
+    return ProfileSectionCard(
+      children: [
+        ListTile(
+          leading: const Icon(
+            PhosphorIconsFill.coin,
+            color: AppColors.gold,
+          ),
+          title: Text('Available coins',
+              style: AppTextStyles.body(context)),
+          subtitle: Text(
+            canRedeem
+                ? '1 coin = ₹1 · tap Redeem to add to wallet'
+                : 'Earn ${100 - coinsBalance} more to redeem (min 100)',
+            style: AppTextStyles.caption(
+              context,
+              color: AppColors.lightTextSecondary,
+            ),
+          ),
+          trailing: Text(
+            '$coinsBalance',
+            style: AppTextStyles.h3(context, color: AppColors.gold),
+          ),
+        ),
+        if (coinsLifetime > 0)
+          ListTile(
+            leading: const Icon(
+              PhosphorIconsRegular.trophy,
+              color: AppColors.lightTextSecondary,
+            ),
+            title:
+                Text('Lifetime earned', style: AppTextStyles.body(context)),
+            trailing: Text(
+              '$coinsLifetime',
+              style: AppTextStyles.body(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: (!canRedeem || _busy) ? null : () => _redeem(coinsBalance),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.navy,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: _busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      canRedeem
+                          ? 'Redeem $coinsBalance coins → ₹$coinsBalance'
+                          : 'Redeem coins (min 100)',
+                    ),
+            ),
+          ),
         ),
       ],
     );

@@ -24,14 +24,14 @@ class WalletCard extends ConsumerWidget {
         compact: compact,
         balancePaise: (w?['balance_paise'] as int?) ?? 0,
         heldPaise: (w?['held_paise'] as int?) ?? 0,
-        coinsLifetime: (w?['coins_lifetime'] as int?) ?? 0,
+        coinsBalance: (w?['coins_balance'] as int?) ?? 0,
         loaded: w != null,
       ),
       loading: () => _Card(
         compact: compact,
         balancePaise: 0,
         heldPaise: 0,
-        coinsLifetime: 0,
+        coinsBalance: 0,
         loaded: false,
       ),
       error: (_, __) => const SizedBox.shrink(),
@@ -43,13 +43,13 @@ class _Card extends StatelessWidget {
   final bool compact;
   final int balancePaise;
   final int heldPaise;
-  final int coinsLifetime;
+  final int coinsBalance;
   final bool loaded;
   const _Card({
     required this.compact,
     required this.balancePaise,
     required this.heldPaise,
-    required this.coinsLifetime,
+    required this.coinsBalance,
     required this.loaded,
   });
 
@@ -119,11 +119,22 @@ class _Card extends StatelessWidget {
               ],
             ),
           ],
-          if (!compact && coinsLifetime > 0) ...[
+          if (coinsBalance > 0) ...[
             const SizedBox(height: 4),
-            Text(
-              '$coinsLifetime Diaries Coins earned',
-              style: AppTextStyles.caption(context, color: AppColors.gold),
+            Row(
+              children: [
+                const Icon(
+                  PhosphorIconsFill.coin,
+                  color: AppColors.gold,
+                  size: 12,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '$coinsBalance Diaries Coins '
+                  '(${coinsBalance >= 100 ? "redeem in Profile" : "${100 - coinsBalance} more to redeem"})',
+                  style: AppTextStyles.caption(context, color: AppColors.gold),
+                ),
+              ],
             ),
           ],
           SizedBox(height: compact ? 12 : 20),

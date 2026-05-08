@@ -147,7 +147,12 @@ class _CartSheetState extends ConsumerState<CartSheet> {
 
     final total = cart.totalPaise;
     final subtotal = (total * 100 / (100 + gstPct)).floor();
-    final coins = (subtotal * cashbackPct / 100).floor();
+    // Coins are whole-rupee-equivalent integers. Convert paise → rupees
+    // first (subtotal / 100), then apply cashback %, then floor.
+    // Note: this is a rough preview. The server's cashback math also
+    // strips the play-session portion from combos; the cart can't easily
+    // know that here. The receipt shows the authoritative number.
+    final coins = (subtotal / 100 * cashbackPct / 100).floor();
     final payment = ref.watch(cartPaymentMethodProvider);
 
     return Container(
