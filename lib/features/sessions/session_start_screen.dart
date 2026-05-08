@@ -39,6 +39,13 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   bool _busy = false;
   String? _errorText;
 
+  // Coupon state — applied at session_create time.
+  final _couponCtrl = TextEditingController();
+  bool _validatingCoupon = false;
+  int? _couponDiscountPaise; // null = no coupon applied
+  String? _appliedCouponCode;
+  String? _couponError;
+
   late final Future<List<Map<String, dynamic>>> _childrenFuture;
 
   @override
@@ -60,6 +67,12 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         .toList();
   }
 
+  @override
+  void dispose() {
+    _couponCtrl.dispose();
+    super.dispose();
+  }
+
   int _priceFor(int? duration, Map<String, dynamic>? cfg) {
     if (duration == null || cfg == null) return 0;
     return duration == 60
@@ -67,10 +80,68 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         : (cfg['session_2hr_price_paise'] as int?) ?? 110000;
   }
 
+  Future<void> _applyCoupon() async {
+    final code = _couponCtrl.text.trim();
+    if (code.isEmpty) {
+      setState(() => _couponError = 'Enter a code.');
+      return;
+    }
+    if (_selectedDurationMinutes == null) {
+      setState(() => _couponError = 'Pick a duration first.');
+      return;
+    }
+    final cfg = ref.read(venueConfigProvider).valueOrNull;
+    final amount = _priceFor(_selectedDurationMinutes, cfg);
+    setState(() {
+      _validatingCoupon = true;
+      _couponError = null;
+    });
+    try {
+      final res = await Supabase.instance.client.rpc<Map<String, dynamic>>(
+        'coupon_validate',
+        params: {'p_code': code, 'p_amount_paise': amount},
+      );
+      if (!mounted) return;
+      if (res['valid'] == true) {
+        setState(() {
+          _validatingCoupon = false;
+          _couponDiscountPaise = res['discount_paise'] as int? ?? 0;
+          _appliedCouponCode = (res['code'] as String?) ?? code.toUpperCase();
+        });
+      } else {
+        setState(() {
+          _validatingCoupon = false;
+          _couponDiscountPaise = null;
+          _appliedCouponCode = null;
+          _couponError = (res['message'] as String?) ?? 'Invalid coupon.';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _validatingCoupon = false;
+        _couponDiscountPaise = null;
+        _appliedCouponCode = null;
+        _couponError = 'Could not check coupon. Try again.';
+      });
+      debugPrint('[COUPON_VALIDATE] error: $e');
+    }
+  }
+
+  void _clearCoupon() {
+    setState(() {
+      _couponDiscountPaise = null;
+      _appliedCouponCode = null;
+      _couponError = null;
+      _couponCtrl.clear();
+    });
+  }
+
   Future<void> _start() async {
     if (_selectedDurationMinutes == null) return;
     final cfg = ref.read(venueConfigProvider).valueOrNull;
-    final amount = _priceFor(_selectedDurationMinutes, cfg);
+    final baseAmount = _priceFor(_selectedDurationMinutes, cfg);
+    final finalAmount = baseAmount - (_couponDiscountPaise ?? 0);
 
     setState(() {
       _busy = true;
@@ -92,6 +163,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         'p_duration_minutes': _selectedDurationMinutes,
         'p_payment_method': _paymentMethod,
         'p_idempotency_key': idem,
+        if (_appliedCouponCode != null) 'p_coupon_code': _appliedCouponCode,
       });
       final sessionId = result['session_id'] as String?;
       if (sessionId == null) {
@@ -100,6 +172,29 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       if (!mounted) return;
       context.go('/session/qr/$sessionId');
     } on PostgrestException catch (e) {
+      // Coupon errors come through with specific codes — surface friendly
+      // messages so the user can retry without the bad coupon.
+      final couponErrors = {
+        'coupon_invalid_code': 'That coupon code doesn\'t exist.',
+        'coupon_inactive': 'That coupon is no longer active.',
+        'coupon_not_yet_active': 'That coupon isn\'t active yet.',
+        'coupon_expired': 'That coupon has expired.',
+        'coupon_exhausted': 'That coupon has been fully redeemed.',
+        'coupon_already_used_by_family': 'You\'ve already used that coupon.',
+        'coupon_min_order_not_met': 'Coupon needs a higher order amount.',
+      };
+      for (final entry in couponErrors.entries) {
+        if (e.message.contains(entry.key)) {
+          if (!mounted) return;
+          setState(() {
+            _busy = false;
+            _couponError = entry.value;
+            _couponDiscountPaise = null;
+            _appliedCouponCode = null;
+          });
+          return;
+        }
+      }
       if (e.message.contains('insufficient_balance')) {
         if (!mounted) return;
         setState(() => _busy = false);
@@ -108,7 +203,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
           builder: (_) => InsufficientBalanceSheet(
-            requiredPaise: amount,
+            requiredPaise: finalAmount,
             onSwitchToCash: () {
               if (!mounted) return;
               setState(() => _paymentMethod = 'cash');
@@ -137,7 +232,9 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     final price1hr = (cfg?['session_1hr_price_paise'] as int?) ?? 80000;
     final price2hr = (cfg?['session_2hr_price_paise'] as int?) ?? 110000;
     final selectedAmount = _priceFor(_selectedDurationMinutes, cfg);
-    final walletEnough = balance >= selectedAmount;
+    final discount = _couponDiscountPaise ?? 0;
+    final finalAmount = (selectedAmount - discount).clamp(0, 1 << 30);
+    final walletEnough = balance >= finalAmount;
 
     final canSubmit = !_busy &&
         _selectedDurationMinutes != null &&
@@ -231,6 +328,18 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                           ],
                         ),
                         const SizedBox(height: 24),
+                        _CouponSection(
+                          controller: _couponCtrl,
+                          appliedCode: _appliedCouponCode,
+                          discountPaise: _couponDiscountPaise,
+                          baseAmountPaise: selectedAmount,
+                          validating: _validatingCoupon,
+                          error: _couponError,
+                          enabled: _selectedDurationMinutes != null,
+                          onApply: _applyCoupon,
+                          onClear: _clearCoupon,
+                        ),
+                        const SizedBox(height: 24),
                         Text('Pay with',
                             style: AppTextStyles.bodyLarge(context)),
                         const SizedBox(height: 4),
@@ -277,7 +386,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                   label: _selectedDurationMinutes == null
                       ? 'Pick a duration'
                       : _paymentMethod == 'wallet'
-                          ? 'Pay ${Money.fromPaise(selectedAmount)} from wallet'
+                          ? 'Pay ${Money.fromPaise(finalAmount)} from wallet'
                           : 'Continue with cash',
                   onPressed: canSubmit ? _start : null,
                   loading: _busy,
@@ -437,6 +546,131 @@ class _StickyCta extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Coupon entry + applied state for the Start a session screen. Renders
+/// the input + apply button until validated, then shows a green
+/// "applied" pill with the discount and a clear (×) action.
+class _CouponSection extends StatelessWidget {
+  final TextEditingController controller;
+  final String? appliedCode;
+  final int? discountPaise;
+  final int baseAmountPaise;
+  final bool validating;
+  final String? error;
+  final bool enabled;
+  final VoidCallback onApply;
+  final VoidCallback onClear;
+
+  const _CouponSection({
+    required this.controller,
+    required this.appliedCode,
+    required this.discountPaise,
+    required this.baseAmountPaise,
+    required this.validating,
+    required this.error,
+    required this.enabled,
+    required this.onApply,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (appliedCode != null && discountPaise != null && discountPaise! > 0) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.activeGreen.withValues(alpha: 0.10),
+          border: Border.all(color: AppColors.activeGreen.withValues(alpha: 0.40)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              PhosphorIconsFill.ticket,
+              color: AppColors.activeGreen,
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$appliedCode applied',
+                    style: AppTextStyles.body(context).copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.activeGreen,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'You save ${Money.fromPaise(discountPaise!)}.',
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Remove coupon',
+              icon: const Icon(Icons.close, size: 20),
+              onPressed: onClear,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Have a coupon code?', style: AppTextStyles.bodyLarge(context)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                enabled: enabled && !validating,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  hintText: enabled ? 'e.g. WELCOME50' : 'Pick a duration first',
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                  errorText: error,
+                ),
+                onSubmitted: (_) => enabled ? onApply() : null,
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              height: 48,
+              child: FilledButton(
+                onPressed: enabled && !validating ? onApply : null,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.navy,
+                  foregroundColor: Colors.white,
+                ),
+                child: validating
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation(Colors.white),
+                        ),
+                      )
+                    : const Text('Apply'),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
