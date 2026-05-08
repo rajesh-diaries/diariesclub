@@ -9,6 +9,7 @@ import '../widgets/healthy_bite_widget.dart';
 import '../widgets/marketing_consent_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
 import '../widgets/recent_activity_list.dart';
+import '../widgets/referral_entry_card.dart';
 import '../widgets/start_session_card.dart';
 import '../widgets/wallet_card.dart';
 
@@ -51,6 +52,8 @@ class IdleHomeBody extends ConsumerWidget {
         const WalletCard(),
         const SizedBox(height: 16),
         const StartSessionCard(),
+        const SizedBox(height: 16),
+        const ReferralEntryCard(),
         const SizedBox(height: 16),
         const BirthdayCardList(),
         const SizedBox(height: 16),
