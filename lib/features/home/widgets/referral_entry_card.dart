@@ -112,7 +112,6 @@ class _ReferralEntryDialogState extends ConsumerState<_ReferralEntryDialog> {
     try {
       await Supabase.instance.client
           .rpc<dynamic>('referral_attach', params: {'p_code': code});
-      // Refresh anything that depended on family.referrer_family_id.
       widget.parentRef.invalidate(currentFamilyProvider);
       widget.parentRef.invalidate(referralRedeemEligibleProvider);
       if (!mounted) return;
@@ -124,17 +123,12 @@ class _ReferralEntryDialogState extends ConsumerState<_ReferralEntryDialog> {
           ),
         ),
       );
-    } on PostgrestException catch (e) {
+    } catch (e) {
+      debugPrint('[REFERRAL_ATTACH] error: $e (type: ${e.runtimeType})');
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = _friendly(e.message);
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _error = 'Couldn\'t apply right now. Try again in a moment.';
+        _error = _friendly(e.toString());
       });
     }
   }
