@@ -22,8 +22,18 @@ class CustomersScreen extends ConsumerStatefulWidget {
 class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   final _ctrl = TextEditingController();
   bool _busy = false;
+  bool _isDefaultList = false;
   List<Map<String, dynamic>> _results = const [];
   String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-load recent customers on first paint so the screen isn't blank.
+    // Empty p_query → admin_family_search returns recent families ordered
+    // by last_visit DESC NULLS LAST (BUG-052, migration 0052).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _runQuery(''));
+  }
 
   @override
   void dispose() {
@@ -31,15 +41,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     super.dispose();
   }
 
-  Future<void> _search() async {
-    final q = _ctrl.text.trim();
-    if (q.length < 2) {
-      setState(() {
-        _errorText = 'Enter at least 2 characters.';
-        _results = const [];
-      });
-      return;
-    }
+  Future<void> _search() => _runQuery(_ctrl.text.trim());
+
+  Future<void> _runQuery(String q) async {
     setState(() {
       _busy = true;
       _errorText = null;
@@ -50,12 +54,14 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         'p_query': q,
         'p_limit': 50,
       });
-      final results = (Map<String, dynamic>.from(raw as Map)['results'] as List)
+      final body = Map<String, dynamic>.from(raw as Map);
+      final results = (body['results'] as List)
           .map((r) => Map<String, dynamic>.from(r as Map))
           .toList();
       if (!mounted) return;
       setState(() {
         _results = results;
+        _isDefaultList = body['is_default_list'] == true;
         _busy = false;
       });
     } on PostgrestException catch (e) {
@@ -68,7 +74,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _errorText = "Couldn't search.";
+        _errorText = "Couldn't load customers.";
       });
     }
   }
@@ -112,12 +118,48 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     AppTextStyles.caption(context, color: AppColors.adminRed),
               ),
             ],
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Text(
+                    _busy
+                        ? 'Loading…'
+                        : _isDefaultList
+                            ? 'Recent customers (${_results.length})'
+                            : 'Search results (${_results.length})',
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    ).copyWith(
+                      letterSpacing: 1.0,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (!_isDefaultList && !_busy) ...[
+                    const Spacer(),
+                    AdminSecondaryButton(
+                      label: 'Clear',
+                      ghost: true,
+                      onPressed: () {
+                        _ctrl.clear();
+                        _runQuery('');
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
             Expanded(
-              child: _results.isEmpty
+              child: _busy
+                  ? const Center(child: CircularProgressIndicator())
+                  : _results.isEmpty
                   ? Center(
                       child: Text(
-                        'No results yet. Search by phone, family name, or child name.',
+                        _isDefaultList
+                            ? 'No customers yet.'
+                            : 'No matches. Try a different phone or name fragment.',
                         style: AppTextStyles.body(
                           context,
                           color: AppColors.lightTextSecondary,
