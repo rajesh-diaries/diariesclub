@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../widgets/admin_app_bar.dart';
+import '../widgets/admin_buttons.dart';
 
 /// Customers list. Search calls admin_family_search RPC (admin-gated).
 /// Click a row → /admin/customers/:id (detail screen). Impersonation
@@ -96,18 +97,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                FilledButton(
+                AdminPrimaryButton(
+                  label: 'Search',
+                  busy: _busy,
                   onPressed: _busy ? null : _search,
-                  child: _busy
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(Colors.white),
-                          ),
-                        )
-                      : const Text('Search'),
                 ),
               ],
             ),
@@ -171,12 +164,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                     color: AppColors.lightTextSecondary,
                                   ),
                                 )),
-                                DataCell(TextButton(
+                                DataCell(AdminSecondaryButton(
+                                  label: 'Open →',
+                                  ghost: true,
                                   onPressed: () => context.go(
                                     '/admin/customers/${r['id']}',
                                     extra: r,
                                   ),
-                                  child: const Text('Open →'),
                                 )),
                               ]),
                           ],
