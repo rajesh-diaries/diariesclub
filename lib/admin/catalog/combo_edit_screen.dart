@@ -11,6 +11,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../widgets/admin_app_bar.dart';
+import '../widgets/admin_buttons.dart';
 import 'combos_list_screen.dart' show combosAdminListProvider;
 
 const _kondapurVenueId = '00000000-0000-0000-0000-000000000001';
@@ -349,25 +350,18 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(
+                        AdminSecondaryButton(
+                          label: 'Cancel',
+                          ghost: true,
                           onPressed: _busy
                               ? null
                               : () => context.go('/admin/catalog/combos'),
-                          child: const Text('Cancel'),
                         ),
                         const SizedBox(width: 12),
-                        FilledButton(
+                        AdminPrimaryButton(
+                          label: _isEditing ? 'Save' : 'Create',
+                          busy: _busy,
                           onPressed: _busy ? null : _submit,
-                          child: _busy
-                              ? const SizedBox(
-                                  width: 16, height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor:
-                                        AlwaysStoppedAnimation(Colors.white),
-                                  ),
-                                )
-                              : Text(_isEditing ? 'Save' : 'Create'),
                         ),
                       ],
                     ),
@@ -559,8 +553,9 @@ class _ItemRow extends StatelessWidget {
               width: 110,
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(PhosphorIconsRegular.minus, size: 14),
+                  AdminIconButton(
+                    icon: PhosphorIconsRegular.minus,
+                    size: 14,
                     onPressed: quantity > 1 ? () => onChange(quantity - 1) : null,
                   ),
                   Expanded(
@@ -569,8 +564,9 @@ class _ItemRow extends StatelessWidget {
                           style: AppTextStyles.body(context)),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(PhosphorIconsRegular.plus, size: 14),
+                  AdminIconButton(
+                    icon: PhosphorIconsRegular.plus,
+                    size: 14,
                     onPressed: () => onChange(quantity + 1),
                   ),
                 ],

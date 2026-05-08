@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import '../widgets/admin_buttons.dart';
 import '../widgets/admin_list_scaffold.dart';
 
 /// Combos CRUD list (Module 2.6). Replaces the Module 2.1 view-only stub.
@@ -23,9 +24,9 @@ class CombosListScreen extends ConsumerWidget {
       actions: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: FilledButton.icon(
-            icon: const Icon(PhosphorIconsRegular.plus, size: 16),
-            label: const Text('New combo'),
+          child: AdminPrimaryButton(
+            icon: PhosphorIconsRegular.plus,
+            label: 'New combo',
             onPressed: () => context.go('/admin/catalog/combos/new'),
           ),
         ),
@@ -60,14 +61,15 @@ class _Table extends StatelessWidget {
         title: const Text('Deactivate combo?'),
         content: Text('Hides "$name" from customers. Re-activate via Edit.'),
         actions: [
-          TextButton(
+          AdminSecondaryButton(
+            label: 'Cancel',
+            ghost: true,
             onPressed: () => Navigator.pop(c, false),
-            child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.adminRed),
+          const SizedBox(width: 8),
+          AdminPrimaryButton.danger(
+            label: 'Deactivate',
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Deactivate'),
           ),
         ],
       ),
@@ -162,19 +164,20 @@ class _Table extends StatelessWidget {
                   DataCell(Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
+                      AdminIconButton(
                         tooltip: 'Edit',
-                        icon: const Icon(PhosphorIconsRegular.pencilSimple,
-                            size: 16),
+                        icon: PhosphorIconsRegular.pencilSimple,
+                        size: 16,
                         onPressed: () => context.go(
                           '/admin/catalog/combos/${r['id']}/edit',
                         ),
                       ),
                       if (r['is_active'] as bool? ?? true)
-                        IconButton(
+                        AdminIconButton(
                           tooltip: 'Deactivate',
-                          icon: const Icon(PhosphorIconsRegular.eyeSlash,
-                              size: 16, color: AppColors.adminRed),
+                          icon: PhosphorIconsRegular.eyeSlash,
+                          size: 16,
+                          color: AppColors.adminRed,
                           onPressed: () => _confirmHide(
                             context,
                             r['id'] as String,

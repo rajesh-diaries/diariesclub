@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../widgets/admin_app_bar.dart';
+import '../widgets/admin_buttons.dart';
 
 /// Coffee/FIT menu item create/edit. Route patterns:
 ///   /admin/catalog/coffee/new?menu_id=<uuid>     — create
@@ -316,26 +317,18 @@ class _MenuItemEditScreenState extends ConsumerState<MenuItemEditScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(
+                        AdminSecondaryButton(
+                          label: 'Cancel',
+                          ghost: true,
                           onPressed: _busy
                               ? null
                               : () => context.go('/admin/catalog/coffee'),
-                          child: const Text('Cancel'),
                         ),
                         const SizedBox(width: 12),
-                        FilledButton(
+                        AdminPrimaryButton(
+                          label: _isEditing ? 'Save' : 'Create',
+                          busy: _busy,
                           onPressed: _busy ? null : _submit,
-                          child: _busy
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor:
-                                        AlwaysStoppedAnimation(Colors.white),
-                                  ),
-                                )
-                              : Text(_isEditing ? 'Save' : 'Create'),
                         ),
                       ],
                     ),

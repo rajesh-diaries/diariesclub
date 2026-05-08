@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../widgets/admin_app_bar.dart';
+import '../widgets/admin_buttons.dart';
 
 const _kondapurVenueId = '00000000-0000-0000-0000-000000000001';
 
@@ -27,9 +28,9 @@ class FitCategoriesScreen extends ConsumerWidget {
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: FilledButton.icon(
-              icon: const Icon(PhosphorIconsRegular.plus, size: 16),
-              label: const Text('New category'),
+            child: AdminPrimaryButton(
+              icon: PhosphorIconsRegular.plus,
+              label: 'New category',
               onPressed: () => _showCategoryDialog(context, ref),
             ),
           ),
@@ -101,18 +102,20 @@ class _CategoryCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 8),
-            IconButton(
+            AdminIconButton(
               tooltip: 'Edit category',
-              icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 16),
+              icon: PhosphorIconsRegular.pencilSimple,
+              size: 16,
               onPressed: () => _showCategoryDialog(
                 context, ref,
                 existing: category,
               ),
             ),
-            IconButton(
+            AdminIconButton(
               tooltip: 'Delete category',
-              icon: const Icon(PhosphorIconsRegular.trash,
-                  size: 16, color: AppColors.adminRed),
+              icon: PhosphorIconsRegular.trash,
+              size: 16,
+              color: AppColors.adminRed,
               onPressed: () => _confirmDeleteCategory(context, ref, category),
             ),
           ],
@@ -153,9 +156,9 @@ class _CategoryCard extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      icon: const Icon(PhosphorIconsRegular.plus, size: 14),
-                      label: const Text('Add option'),
+                    child: AdminSecondaryButton(
+                      icon: PhosphorIconsRegular.plus,
+                      label: 'Add option',
                       onPressed: () => _showOptionDialog(
                         context, ref,
                         categoryId: id,
@@ -242,9 +245,10 @@ class _OptionRow extends StatelessWidget {
             value: (option['is_available'] as bool?) ?? true,
             onChanged: published ? (v) => _toggle(context, v) : null,
           ),
-          IconButton(
+          AdminIconButton(
             tooltip: 'Edit',
-            icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 16),
+            icon: PhosphorIconsRegular.pencilSimple,
+            size: 16,
             onPressed: () => _showOptionDialog(
               context, ref,
               categoryId: option['category_id'] as String,
@@ -252,10 +256,11 @@ class _OptionRow extends StatelessWidget {
             ),
           ),
           if (published)
-            IconButton(
+            AdminIconButton(
               tooltip: 'Hide',
-              icon: const Icon(PhosphorIconsRegular.eyeSlash,
-                  size: 16, color: AppColors.adminRed),
+              icon: PhosphorIconsRegular.eyeSlash,
+              size: 16,
+              color: AppColors.adminRed,
               onPressed: () => _delete(context),
             ),
         ],
@@ -346,8 +351,16 @@ Future<void> _showCategoryDialog(
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save')),
+        AdminSecondaryButton(
+          label: 'Cancel',
+          ghost: true,
+          onPressed: () => Navigator.pop(c, false),
+        ),
+        const SizedBox(width: 8),
+        AdminPrimaryButton(
+          label: 'Save',
+          onPressed: () => Navigator.pop(c, true),
+        ),
       ],
     ),
   );
@@ -445,8 +458,16 @@ Future<void> _showOptionDialog(
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save')),
+        AdminSecondaryButton(
+          label: 'Cancel',
+          ghost: true,
+          onPressed: () => Navigator.pop(c, false),
+        ),
+        const SizedBox(width: 8),
+        AdminPrimaryButton(
+          label: 'Save',
+          onPressed: () => Navigator.pop(c, true),
+        ),
       ],
     ),
   );
@@ -497,11 +518,15 @@ Future<void> _confirmDeleteCategory(
         'detach from templates first.',
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: AppColors.adminRed),
+        AdminSecondaryButton(
+          label: 'Cancel',
+          ghost: true,
+          onPressed: () => Navigator.pop(c, false),
+        ),
+        const SizedBox(width: 8),
+        AdminPrimaryButton.danger(
+          label: 'Delete',
           onPressed: () => Navigator.pop(c, true),
-          child: const Text('Delete'),
         ),
       ],
     ),

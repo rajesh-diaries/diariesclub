@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import '../widgets/admin_buttons.dart';
 import '../widgets/admin_list_scaffold.dart';
 
 /// Coffee Diaries menu CRUD (Module 2.4). Per-row quick actions:
@@ -33,9 +34,9 @@ class CoffeeListScreen extends ConsumerWidget {
       actions: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: FilledButton.icon(
-            icon: const Icon(PhosphorIconsRegular.plus, size: 16),
-            label: const Text('New item'),
+          child: AdminPrimaryButton(
+            icon: PhosphorIconsRegular.plus,
+            label: 'New item',
             onPressed: () async {
               final menuId = await coffeeMenuId();
               if (!context.mounted) return;
@@ -112,14 +113,15 @@ class _Table extends StatelessWidget {
         title: const Text('Hide item?'),
         content: Text('Hides "$name" from customers. Edit to re-publish.'),
         actions: [
-          TextButton(
+          AdminSecondaryButton(
+            label: 'Cancel',
+            ghost: true,
             onPressed: () => Navigator.pop(c, false),
-            child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.adminRed),
+          const SizedBox(width: 8),
+          AdminPrimaryButton.danger(
+            label: 'Hide',
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Hide'),
           ),
         ],
       ),
@@ -203,33 +205,34 @@ class _Table extends StatelessWidget {
                   DataCell(Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
+                      AdminIconButton(
                         tooltip: 'Move up',
-                        icon: const Icon(PhosphorIconsRegular.arrowUp,
-                            size: 16),
+                        icon: PhosphorIconsRegular.arrowUp,
+                        size: 16,
                         onPressed: () =>
                             _reorder(context, r['id'] as String, 'up'),
                       ),
-                      IconButton(
+                      AdminIconButton(
                         tooltip: 'Move down',
-                        icon: const Icon(PhosphorIconsRegular.arrowDown,
-                            size: 16),
+                        icon: PhosphorIconsRegular.arrowDown,
+                        size: 16,
                         onPressed: () =>
                             _reorder(context, r['id'] as String, 'down'),
                       ),
-                      IconButton(
+                      AdminIconButton(
                         tooltip: 'Edit',
-                        icon: const Icon(PhosphorIconsRegular.pencilSimple,
-                            size: 16),
+                        icon: PhosphorIconsRegular.pencilSimple,
+                        size: 16,
                         onPressed: () => context.go(
                           '/admin/catalog/coffee/${r['id']}/edit',
                         ),
                       ),
                       if (r['is_published'] as bool? ?? true)
-                        IconButton(
+                        AdminIconButton(
                           tooltip: 'Hide',
-                          icon: const Icon(PhosphorIconsRegular.eyeSlash,
-                              size: 16, color: AppColors.adminRed),
+                          icon: PhosphorIconsRegular.eyeSlash,
+                          size: 16,
+                          color: AppColors.adminRed,
                           onPressed: () => _hide(
                             context,
                             r['id'] as String,

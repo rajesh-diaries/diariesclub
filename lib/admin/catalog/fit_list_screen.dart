@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency.dart';
+import '../widgets/admin_buttons.dart';
 import '../widgets/admin_list_scaffold.dart';
 
 const _kondapurVenueId = '00000000-0000-0000-0000-000000000001';
@@ -27,25 +28,25 @@ class FitListScreen extends ConsumerWidget {
       actions: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: TextButton.icon(
-            icon: const Icon(PhosphorIconsRegular.list, size: 16),
-            label: const Text('Categories'),
+          child: AdminSecondaryButton(
+            icon: PhosphorIconsRegular.list,
+            label: 'Categories',
             onPressed: () => context.go('/admin/catalog/fit/categories'),
           ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: TextButton.icon(
-            icon: const Icon(PhosphorIconsRegular.envelope, size: 16),
-            label: const Text('Waitlist'),
+          child: AdminSecondaryButton(
+            icon: PhosphorIconsRegular.envelope,
+            label: 'Waitlist',
             onPressed: () => context.go('/admin/catalog/fit/waitlist'),
           ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: FilledButton.icon(
-            icon: const Icon(PhosphorIconsRegular.plus, size: 16),
-            label: const Text('New template'),
+          child: AdminPrimaryButton(
+            icon: PhosphorIconsRegular.plus,
+            label: 'New template',
             onPressed: () => context.go('/admin/catalog/fit/template/new'),
           ),
         ),
@@ -82,14 +83,15 @@ class _Table extends StatelessWidget {
         title: const Text('Unpublish template?'),
         content: Text('Hides "$name" from customers. Re-publish via Edit.'),
         actions: [
-          TextButton(
+          AdminSecondaryButton(
+            label: 'Cancel',
+            ghost: true,
             onPressed: () => Navigator.pop(c, false),
-            child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.adminRed),
+          const SizedBox(width: 8),
+          AdminPrimaryButton.danger(
+            label: 'Unpublish',
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Unpublish'),
           ),
         ],
       ),
@@ -160,19 +162,20 @@ class _Table extends StatelessWidget {
                   DataCell(Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
+                      AdminIconButton(
                         tooltip: 'Edit',
-                        icon: const Icon(PhosphorIconsRegular.pencilSimple,
-                            size: 16),
+                        icon: PhosphorIconsRegular.pencilSimple,
+                        size: 16,
                         onPressed: () => context.go(
                           '/admin/catalog/fit/template/${r['id']}/edit',
                         ),
                       ),
                       if (r['is_published'] as bool? ?? true)
-                        IconButton(
+                        AdminIconButton(
                           tooltip: 'Unpublish',
-                          icon: const Icon(PhosphorIconsRegular.eyeSlash,
-                              size: 16, color: AppColors.adminRed),
+                          icon: PhosphorIconsRegular.eyeSlash,
+                          size: 16,
+                          color: AppColors.adminRed,
                           onPressed: () => _confirmUnpublish(
                             context,
                             r['id'] as String,
