@@ -102,7 +102,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // 2) Auth gate. Signed-out + protected route → /auth/phone.
       final familyId = ref.read(currentFamilyIdProvider);
       final loc = state.matchedLocation;
+      debugPrint('[ROUTER] redirect loc=$loc familyId=$familyId');
       if (familyId == null && !_isPublic(loc)) {
+        debugPrint('[ROUTER] → redirecting to /auth/phone');
         return '/auth/phone';
       }
 
@@ -447,9 +449,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 /// refreshListenable so sign-in/sign-out re-runs the redirect.
 class _AuthListenable extends ChangeNotifier {
   _AuthListenable(this._ref) {
+    debugPrint('[AUTH-LISTEN] constructed');
     _sub = _ref.listen(
       currentFamilyIdProvider,
-      (_, __) => notifyListeners(),
+      (prev, next) {
+        debugPrint('[AUTH-LISTEN] $prev → $next');
+        notifyListeners();
+      },
       fireImmediately: false,
     );
   }

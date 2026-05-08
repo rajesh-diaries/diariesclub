@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers/app_theme_mode_provider.dart';
 import '../../core/providers/current_family_provider.dart';
+import '../../core/router/app_router.dart';
 import '../../core/providers/current_wallet_provider.dart';
 import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -328,23 +329,33 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
       ),
     );
     if (ok != true || !mounted) return;
-    // Wait for the dialog's Navigator.pop animation to finish before we
-    // touch the navigator again. Without this, context.go() fires while
-    // Navigator is mid-pop and asserts at navigator.dart:4081.
+    debugPrint('[SIGNOUT] dialog confirmed, awaiting endOfFrame');
+    // Let dialog pop animation fully settle before we trigger anything
+    // that touches the navigator.
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
-    // Navigate FIRST (while still authenticated — /auth/phone is public,
-    // redirect allows it). This avoids any race between signOut clearing
-    // auth state, dependent providers cascading errors, and the widget
-    // tree unmounting before we can route.
-    context.go('/auth/phone');
+    debugPrint('[SIGNOUT] clearing prefs + secure storage');
     try {
-      await Supabase.instance.client.auth.signOut();
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('pending_otp_phone');
       await const FlutterSecureStorage().deleteAll();
     } catch (_) {
-      debugPrint('sign-out error');
+      debugPrint('[SIGNOUT] prefs/secure-storage error');
+    }
+    debugPrint('[SIGNOUT] calling Supabase.signOut');
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (_) {
+      debugPrint('[SIGNOUT] Supabase.signOut error');
+    }
+    debugPrint('[SIGNOUT] signOut complete — listener should redirect now');
+    // Defensive fallback: if the auth listener didn't trigger redirect
+    // within 1 frame, navigate explicitly via the router provider (which
+    // bypasses BuildContext lifecycle).
+    await WidgetsBinding.instance.endOfFrame;
+    if (Supabase.instance.client.auth.currentUser == null) {
+      debugPrint('[SIGNOUT] still on profile — forcing router.go');
+      ref.read(appRouterProvider).go('/auth/phone');
     }
   }
 
