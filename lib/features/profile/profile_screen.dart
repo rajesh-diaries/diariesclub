@@ -328,6 +328,11 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
       ),
     );
     if (ok != true || !mounted) return;
+    // Wait for the dialog's Navigator.pop animation to finish before we
+    // touch the navigator again. Without this, context.go() fires while
+    // Navigator is mid-pop and asserts at navigator.dart:4081.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
     // Navigate FIRST (while still authenticated — /auth/phone is public,
     // redirect allows it). This avoids any race between signOut clearing
     // auth state, dependent providers cascading errors, and the widget
