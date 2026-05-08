@@ -44,6 +44,7 @@ import '../../features/gamification/card_unboxing_screen.dart';
 import '../../features/gamification/reflection_screen.dart';
 import '../../features/reactivation/reactivation_screen.dart';
 import '../../features/session/pre_book_screen.dart';
+import '../../features/sessions/session_detail_screen.dart';
 import '../../features/sessions/session_qr_screen.dart';
 import '../../features/sessions/session_start_screen.dart';
 import '../providers/app_version_provider.dart';
@@ -331,6 +332,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'session_qr',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => SessionQrScreen(
+          sessionId: state.pathParameters['sessionId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/session/:sessionId',
+        name: 'session_detail',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => SessionDetailScreen(
           sessionId: state.pathParameters['sessionId']!,
         ),
       ),

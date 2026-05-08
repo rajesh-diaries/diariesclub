@@ -71,9 +71,17 @@ class _ActiveSessionCardState extends ConsumerState<ActiveSessionCard> {
             ? AppColors.warningYellow
             : AppColors.activeGreen;
 
+    // Pending = QR not scanned yet; tap routes to QR for staff to scan.
+    // Active/grace = already scanned; tap routes to the detail controls
+    // (Order food / Extend / Wrap up). Going back to QR would be a
+    // dead-end at that point.
+    final route = isPending
+        ? '/session/qr/${session['id']}'
+        : '/session/${session['id']}';
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => context.push('/session/qr/${session['id']}'),
+      onTap: () => context.push(route),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
