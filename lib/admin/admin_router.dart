@@ -5,6 +5,8 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'announcements/announcement_edit_screen.dart';
 import 'announcements/announcements_list_screen.dart';
+import 'coupons/coupon_edit_screen.dart';
+import 'coupons/coupons_list_screen.dart';
 import 'audit/audit_log_screen.dart';
 import 'birthday_crm/birthday_crm_screen.dart';
 import 'catalog/catalog_index_screen.dart';
@@ -194,6 +196,19 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             path: '/admin/announcements/:id/edit',
             builder: (_, state) =>
                 AnnouncementEditScreen(id: state.pathParameters['id']),
+          ),
+          GoRoute(
+            path: '/admin/coupons',
+            builder: (_, __) => const CouponsListScreen(),
+          ),
+          GoRoute(
+            path: '/admin/coupons/new',
+            builder: (_, __) => const CouponEditScreen(),
+          ),
+          GoRoute(
+            path: '/admin/coupons/:id/edit',
+            builder: (_, state) =>
+                CouponEditScreen(id: state.pathParameters['id']),
           ),
           GoRoute(
             path: '/admin/content',

@@ -24,6 +24,7 @@ class AdminSidebar extends ConsumerWidget {
     _NavItemSpec('/admin/catalog', 'Catalog', PhosphorIconsRegular.storefront),
     _NavItemSpec('/admin/packages', 'Packages', PhosphorIconsRegular.cake),
     _NavItemSpec('/admin/announcements', 'Announcements', PhosphorIconsRegular.megaphone),
+    _NavItemSpec('/admin/coupons', 'Coupons', PhosphorIconsRegular.ticket),
     _NavItemSpec('/admin/config', 'Config', PhosphorIconsRegular.gear),
     _NavItemSpec('/admin/content', 'Content', PhosphorIconsRegular.fileText),
     _NavItemSpec('/admin/users', 'Users', PhosphorIconsRegular.key),
