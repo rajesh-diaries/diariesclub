@@ -311,18 +311,19 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
   Future<void> _confirmSignOut() async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      useRootNavigator: true,
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Sign out?'),
         content: const Text(
           "You'll need to enter your phone number again to sign back in.",
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Sign out'),
           ),
         ],
