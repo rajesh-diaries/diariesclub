@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../widgets/admin_buttons.dart';
 import '../widgets/admin_app_bar.dart';
 
 const _kondapurVenueId = '00000000-0000-0000-0000-000000000001';
@@ -360,26 +361,18 @@ class _AnnouncementEditScreenState
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(
+                        AdminSecondaryButton(
+                          label: 'Cancel',
+                          ghost: true,
                           onPressed: _busy
                               ? null
                               : () => context.go('/admin/announcements'),
-                          child: const Text('Cancel'),
                         ),
                         const SizedBox(width: 12),
-                        FilledButton(
+                        AdminPrimaryButton(
+                          label: _isEditing ? 'Save' : 'Create',
+                          busy: _busy,
                           onPressed: _busy ? null : _submit,
-                          child: _busy
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor:
-                                        AlwaysStoppedAnimation(Colors.white),
-                                  ),
-                                )
-                              : Text(_isEditing ? 'Save' : 'Create'),
                         ),
                       ],
                     ),

@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import '../widgets/admin_buttons.dart';
 import '../widgets/admin_list_scaffold.dart';
 
 /// Birthday packages CRUD list (Module 2.7). Card grid because there
@@ -25,9 +26,9 @@ class PackagesListScreen extends ConsumerWidget {
       actions: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: FilledButton.icon(
-            icon: const Icon(PhosphorIconsRegular.plus, size: 16),
-            label: const Text('New package'),
+          child: AdminPrimaryButton(
+            icon: PhosphorIconsRegular.plus,
+            label: 'New package',
             onPressed: () => context.go('/admin/packages/new'),
           ),
         ),
