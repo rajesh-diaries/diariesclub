@@ -66,8 +66,9 @@ BEGIN
     RAISE EXCEPTION 'self_referral';
   END IF;
 
+  -- families table has no updated_at column; just set the FK.
   UPDATE families
-    SET referrer_family_id = v_referrer.id, updated_at = now()
+    SET referrer_family_id = v_referrer.id
     WHERE id = v_caller_id;
 
   INSERT INTO audit_log(actor_id, actor_type, action, entity_type, entity_id, venue_id, new_value)
