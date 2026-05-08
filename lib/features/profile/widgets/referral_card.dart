@@ -35,9 +35,9 @@ class ReferralCard extends ConsumerWidget {
     int newFamilyPaise,
   ) async {
     final text = 'Hey! I love Diaries Club for the kids. '
-        'Use my code $code when you sign up — you get '
-        '${Money.fromPaise(newFamilyPaise)}, I get '
-        '${Money.fromPaise(gifterPaise)} when you play your first session.';
+        'Use my code $code when you sign up — both of us get a wallet credit '
+        '(${Money.fromPaise(newFamilyPaise)} for you, '
+        '${Money.fromPaise(gifterPaise)} for me) once you play your first session.';
     // TODO(session-12): generate Branch deep link and append.
     await Share.share(text);
   }
@@ -96,9 +96,8 @@ class ReferralCard extends ConsumerWidget {
             const SizedBox(height: 12),
             Text(
               'Friends who join with your code get '
-              '${Money.fromPaise(newFamilyPaise)}. '
-              'You get ${Money.fromPaise(gifterPaise)} when they play their '
-              'first session.',
+              '${Money.fromPaise(newFamilyPaise)} after their first session. '
+              'You get ${Money.fromPaise(gifterPaise)} when they play.',
               style: AppTextStyles.body(context, color: Colors.white70),
             ),
             const SizedBox(height: 16),
