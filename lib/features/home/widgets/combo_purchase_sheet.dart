@@ -8,7 +8,6 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/providers/active_sessions_provider.dart';
 import '../../../core/providers/auth_provider.dart';
-import '../../../core/providers/current_wallet_provider.dart';
 import '../../../core/providers/family_children_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -71,7 +70,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
     } catch (_) {/* names just won't show; not blocking */}
   }
 
-  Future<void> _confirmFoodOnly() async {
+  void _addToBag() {
     final combo = widget.combo;
     final notifier = ref.read(cartProvider.notifier);
     notifier.addCombo(ComboLine.create(
@@ -83,7 +82,6 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
       includedItemNames:
           _itemRows.map((r) => (r['name'] as String?) ?? '').toList(),
     ));
-    if (!mounted) return;
     Navigator.of(context).pop();
     context.go('/club');
     ScaffoldMessenger.of(context).showSnackBar(
@@ -91,75 +89,82 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
     );
   }
 
-  Future<void> _confirmWithSession() async {
+  /// Place the order straight from the sheet (food-only combos OR
+  /// after a session was created for with-session combos).
+  Future<void> _placeOrder({required bool withSession}) async {
     final combo = widget.combo;
-    final inclusions =
-        (combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{};
-    final sessionMinutes = inclusions['session_minutes'] as int? ?? 60;
-    final price = (combo['price_paise'] as int?) ?? 0;
     final familyId = ref.read(currentFamilyIdProvider);
-    if (familyId == null || _selectedChildId == null) return;
+    if (familyId == null) return;
+    if (withSession && _selectedChildId == null) return;
 
     setState(() {
       _busy = true;
       _errorText = null;
     });
 
-    final balance = ref.read(walletBalancePaiseProvider) ?? 0;
-    if (balance < price) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _errorText = 'Wallet balance ₹${(balance / 100).toStringAsFixed(0)} '
-            'is short. Top up to continue.';
-      });
-      return;
-    }
-
     try {
-      // 1) Create the session for the picked kid. Wallet hold = combo price.
-      //    We override with the combo price by ALSO adding a coupon-style
-      //    discount? No — simpler: deduct combo price from wallet via the
-      //    standard session_create flow at session price, then add a
-      //    wallet credit for the difference. Cleanest: just create the
-      //    session for the standard duration price (session creates its
-      //    normal hold), AND add the combo's food items to cart for staff.
-      //    The combo "savings" comes from the food being free vs. priced.
-      //    Server-side combo redemption sits in the cart's order_place flow.
-      await Supabase.instance.client
-          .rpc<Map<String, dynamic>>('session_create', params: {
+      // Step 1 — for with-session combos, create the session first so
+      // the kid has a valid pass to walk in with. The session hold goes
+      // against the wallet at the regular session price; the combo line
+      // covers the food + bundled price reconciliation at order_place.
+      if (withSession) {
+        final inclusions =
+            (combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
+                const <String, dynamic>{};
+        final sessionMinutes =
+            inclusions['session_minutes'] as int? ?? 60;
+        await Supabase.instance.client
+            .rpc<Map<String, dynamic>>('session_create', params: {
+          'p_venue_id': _venueId,
+          'p_family_id': familyId,
+          'p_child_id': _selectedChildId,
+          'p_duration_minutes': sessionMinutes,
+          'p_payment_method': 'wallet',
+          'p_idempotency_key': const Uuid().v4(),
+        });
+      }
+
+      // Step 2 — place the order for the food side of the combo.
+      final result = await Supabase.instance.client
+          .rpc<Map<String, dynamic>>('order_place', params: {
         'p_venue_id': _venueId,
         'p_family_id': familyId,
-        'p_child_id': _selectedChildId,
-        'p_duration_minutes': sessionMinutes,
+        'p_items': [
+          {
+            'type': 'combo',
+            'combo_id': combo['id'],
+            'quantity': 1,
+          }
+        ],
+        'p_fulfillment_mode': 'dine_in',
         'p_payment_method': 'wallet',
+        'p_combo_id': null,
         'p_idempotency_key': const Uuid().v4(),
       });
-
-      // 2) Drop the combo line into the cart so staff sees the food order
-      //    + price reflects combo bundling at order_place time.
-      ref.read(cartProvider.notifier).addCombo(ComboLine.create(
-            comboId: combo['id'] as String,
-            name: (combo['name'] as String?) ?? 'Combo',
-            unitPricePaise: price,
-            quantity: 1,
-            imageUrl: combo['cover_image_url'] as String?,
-            includedItemNames: _itemRows
-                .map((r) => (r['name'] as String?) ?? '')
-                .toList(),
-          ));
+      final orderId = result['order_id'] as String?;
 
       if (!mounted) return;
       Navigator.of(context).pop();
-      context.go('/home');
+      if (withSession) {
+        // Active session view shows the new pending session.
+        context.go('/home');
+      } else if (orderId != null) {
+        context.push('/club/order/$orderId');
+      } else {
+        context.go('/club');
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              "${combo['name']} purchased — session pending, food in your bag"),
+            withSession
+                ? "${combo['name']} purchased — session pending, food on the way"
+                : "Order placed — we'll prep it now",
+          ),
         ),
       );
     } on PostgrestException catch (e) {
+      debugPrint('[COMBO_PURCHASE] PostgrestException: code=${e.code} '
+          'message=${e.message} details=${e.details} hint=${e.hint}');
       if (!mounted) return;
       setState(() {
         _busy = false;
@@ -168,6 +173,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
             : "Couldn't purchase combo: ${e.message}";
       });
     } catch (e) {
+      debugPrint('[COMBO_PURCHASE] generic error: $e');
       if (!mounted) return;
       setState(() {
         _busy = false;
@@ -175,6 +181,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
       });
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -343,14 +350,16 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
               ),
             ],
             const SizedBox(height: 20),
+            // Primary: place order straight from the sheet. Bypasses the
+            // /club cart for the high-intent combo path.
             FilledButton(
               onPressed: _busy
                   ? null
                   : hasSession
                       ? (idleChildren.isEmpty || _selectedChildId == null
                           ? null
-                          : _confirmWithSession)
-                      : _confirmFoodOnly,
+                          : () => _placeOrder(withSession: true))
+                      : () => _placeOrder(withSession: false),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.navy,
                 foregroundColor: Colors.white,
@@ -366,12 +375,27 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
                       ),
                     )
                   : Text(
-                      hasSession
-                          ? 'Pay ${Money.fromPaise(price)} from wallet'
-                          : 'Add to bag · ${Money.fromPaise(price)}',
+                      'Place order · ${Money.fromPaise(price)}',
+                      style: AppTextStyles.body(context).copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
+            // Secondary: stash in cart, customer keeps shopping.
+            OutlinedButton(
+              onPressed: _busy
+                  ? null
+                  : (hasSession && idleChildren.isEmpty)
+                      ? null
+                      : _addToBag,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text('Add to bag instead'),
+            ),
+            const SizedBox(height: 4),
             TextButton(
               onPressed:
                   _busy ? null : () => Navigator.of(context).pop(),
