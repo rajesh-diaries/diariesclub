@@ -23,6 +23,17 @@ final familyChildrenProvider =
       .order('created_at', ascending: true);
 
   await for (final rows in stream) {
-    yield rows.where((r) => r['deleted_at'] == null).toList();
+    // Defensive: dedupe by id. Supabase realtime sometimes emits the
+    // same row twice (e.g. INSERT echo + ordered re-snapshot). The list
+    // backs the Profile family list; duplicates show as ghost children.
+    final seen = <String>{};
+    final out = <Map<String, dynamic>>[];
+    for (final r in rows) {
+      if (r['deleted_at'] != null) continue;
+      final id = r['id'] as String?;
+      if (id == null || !seen.add(id)) continue;
+      out.add(r);
+    }
+    yield out;
   }
 });
