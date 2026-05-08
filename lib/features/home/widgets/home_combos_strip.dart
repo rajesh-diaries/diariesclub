@@ -10,6 +10,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
 import '../../club/providers/combos_provider.dart';
+import 'combo_purchase_sheet.dart';
 
 /// Horizontal scroll of active combos on the home tab. Each card shows
 /// cover + name + bundled price + 'Save ₹X' badge + struck-through
@@ -74,6 +75,16 @@ class _ComboMiniCardState extends ConsumerState<_ComboMiniCard> {
     _computeSavings();
   }
 
+  void _openSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      useRootNavigator: true,
+      builder: (_) => ComboPurchaseSheet(combo: widget.combo),
+    );
+  }
+
   Future<void> _computeSavings() async {
     final inclusions =
         (widget.combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
@@ -125,7 +136,7 @@ class _ComboMiniCardState extends ConsumerState<_ComboMiniCard> {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => context.go('/club'),
+      onTap: () => _openSheet(context),
       child: SizedBox(
         width: 220,
         child: Container(
