@@ -47,6 +47,96 @@ without touching SQL.
 
 ---
 
+## Added 2026-05-08
+
+### BUG-031 — staff cards interactive home
+
+**Why deferred:** Flutter web hit-test family of bugs. 11 attempts
+on 2026-05-06 across 3×3 grid + ListTile fallback both failed with
+`mouse_tracker` assertions. Underlying issue is the same one we hit
+in the admin Material+InkWell sweep, but staff home has additional
+nesting (BottomNav + ConsumerWidget tree) that the surface-level
+fix didn't reach.
+
+**v1 mitigation:** URL-bar / route-list home shipped — staff lands
+on a page that lists all 9 staff routes + their paths
+(`/staff/sessions`, `/staff/kds`, etc.). Day-1 ops works via
+bookmarks. All individual screens and their RPCs are wired and
+functional.
+
+**v1.1 path:** revisit after the admin web rebuild decision (see
+"Rebuild admin web" above). If the Flutter upgrade fixes admin's
+hit-test issues, retry staff home with the same fix. If the team
+moves admin to Next.js, staff stays Flutter and we do a one-shot
+Material+InkWell+stretch rewrite of the staff home grid using the
+admin sweep's helpers as a template.
+
+**Acceptance:** staff signs in, lands on a 3×3 card grid (or
+ListTile rows, founder choice), each card taps to its route on
+web AND mobile.
+
+---
+
+### UI/UX polish phase
+
+**Why deferred:** Shipping v1 functionality first; polish second.
+Anthropic Claude design tool generated a full set of mockups on
+2026-05-08 covering customer home, profile, workshops tab, and
+admin dashboard layouts.
+
+**v1.1 path:** 5-day budget. Mockups serve as the design spec;
+implementation is straightforward Flutter widget work using the
+existing theme tokens (`AppColors`, `AppTextStyles`,
+`AdminPrimaryButton`, etc.). Trigger condition: v1 functionality
+verified end-to-end + first-week soft-launch metrics stabilised.
+
+**Acceptance:** every screen referenced in the mockup set matches
+the spec on Chrome and Android, sign-off from founder.
+
+---
+
+### 30-stage hero image upgrades
+
+**Why deferred:** Real artwork sourcing is in flight (Fiverr) and
+not on the v1 critical path. v1 ships 5 hero card stages built per
+spec with branded-circle glyph placeholders (CONVENTION-001).
+
+**v1.1 path:** receive 28 final card images (24 hero + 4 birthday)
++ workshop/menu/package photos. Admin already has photo-upload
+flows wired for each (BUG-050 storage RLS landed today). Founder
+swaps art via admin; no code changes needed beyond verifying that
+the new image dimensions render cleanly on all viewports.
+
+**Acceptance:** all 24 hero cards and 4 birthday cards display
+final art across customer home + reflection moments + birthday
+flows.
+
+---
+
+### Admin web rebuild option (Flutter upgrade vs Next.js migration)
+
+**Why deferred (and re-evaluated after today's Option C sweep):**
+Today's sweep DID resolve the immediate hit-test issues across all
+admin tabs by replacing every raw `FilledButton`/`IconButton`/
+`TextButton` with the `Material > InkWell > Padding` helpers in
+`lib/admin/widgets/admin_buttons.dart`. The "Rebuild admin web"
+section above (originally written 2026-05-06) is therefore softer
+than it was — admin web may not need a rebuild for v1.
+
+**v1.1 decision tree:**
+1. After 2 weeks of soft-launch, audit how many *new* hit-test or
+   layout bugs surface in admin web. If under 2, hold the line on
+   Flutter and skip the rebuild entirely.
+2. If 3+ new bugs surface, evaluate the Flutter upgrade path
+   (option 1 in the original section).
+3. If the Flutter upgrade doesn't hold, then commit to the Next.js
+   migration.
+
+**Acceptance:** decision recorded in this doc with date + rationale
++ which option was picked.
+
+---
+
 ## Other items already tracked
 
 These are tracked elsewhere, not duplicated here. See `lib/BUGS.md` for the
