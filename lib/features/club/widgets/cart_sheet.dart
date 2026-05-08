@@ -97,6 +97,8 @@ class _CartSheetState extends ConsumerState<CartSheet> {
       Navigator.of(context).pop();
       context.push('/club/order/$orderId');
     } on PostgrestException catch (e) {
+      debugPrint('[ORDER_PLACE] PostgrestException: code=${e.code} '
+          'message=${e.message} details=${e.details} hint=${e.hint}');
       if (!mounted) return;
       setState(() => _busy = false);
       if (e.message.contains('insufficient_balance')) {
@@ -120,13 +122,15 @@ class _CartSheetState extends ConsumerState<CartSheet> {
         setState(() =>
             _errorText = "That combo isn't available right now.");
       } else {
-        setState(() => _errorText = "Couldn't place order. Please try again.");
+        setState(() =>
+            _errorText = "Couldn't place order: ${e.message}");
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[ORDER_PLACE] generic error: $e');
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _errorText = "Couldn't place order. Please try again.";
+        _errorText = "Couldn't place order: $e";
       });
     }
   }
