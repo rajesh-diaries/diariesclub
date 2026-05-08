@@ -51,31 +51,38 @@ class MultiSessionHomeView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            familyName.isEmpty
-                ? 'Hi there 👋'
-                : 'Hi, ${familyName.split(' ').first} 👋',
-            style: AppTextStyles.h1(context),
+          // Compact wallet pill at top — small + clean. Big top-up
+          // experience moves to the idle home view.
+          const WalletCard(compact: true),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  familyName.isEmpty
+                      ? 'Hi there 👋'
+                      : 'Hi, ${familyName.split(' ').first} 👋',
+                  style: AppTextStyles.h2(context),
+                ),
+              ),
+              Text(
+                sessions.length == 1
+                    ? '1 playing'
+                    : '${sessions.length} playing',
+                style: AppTextStyles.caption(
+                  context,
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            sessions.length == 1
-                ? '${sessions.length} session in progress'
-                : '${sessions.length} sessions in progress',
-            style: AppTextStyles.body(
-              context,
-              color: AppColors.lightTextSecondary,
-            ),
-          ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           for (final s in sessions) ...[
             ActiveSessionCard(session: s),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
           ],
-          const SizedBox(height: 4),
-          const WalletCard(),
           if (showStartCta) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             const StartSessionCard(),
           ],
           if (referralEligible) ...[

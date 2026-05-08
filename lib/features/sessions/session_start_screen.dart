@@ -34,7 +34,9 @@ class SessionStartScreen extends ConsumerStatefulWidget {
 }
 
 class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
-  String? _selectedChildId;
+  // Multi-select: one pass per checked child, all same duration. The
+  // running total = selected.length × pricePerKid.
+  final Set<String> _selectedChildIds = <String>{};
   int? _selectedDurationMinutes;
   String _paymentMethod = 'wallet';
   bool _busy = false;
@@ -139,42 +141,79 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   }
 
   Future<void> _start() async {
-    if (_selectedDurationMinutes == null) return;
+    if (_selectedDurationMinutes == null || _selectedChildIds.isEmpty) return;
     final cfg = ref.read(venueConfigProvider).valueOrNull;
-    final baseAmount = _priceFor(_selectedDurationMinutes, cfg);
-    final finalAmount = baseAmount - (_couponDiscountPaise ?? 0);
+    final perKidPrice = _priceFor(_selectedDurationMinutes, cfg);
+    final coupon = _couponDiscountPaise ?? 0;
+    // Coupon applies to the first session only (per-family redemption).
+    // The remaining N-1 sessions pay full price.
+    final totalAmount =
+        (perKidPrice * _selectedChildIds.length) - coupon;
 
     setState(() {
       _busy = true;
       _errorText = null;
     });
-    final idem = const Uuid().v4();
     final familyId = ref.read(currentFamilyIdProvider);
     if (familyId == null) {
       setState(() => _busy = false);
       return;
     }
 
-    try {
-      final result = await Supabase.instance.client
-          .rpc<Map<String, dynamic>>('session_create', params: {
-        'p_venue_id': _venueId,
-        'p_family_id': familyId,
-        'p_child_id': _selectedChildId,
-        'p_duration_minutes': _selectedDurationMinutes,
-        'p_payment_method': _paymentMethod,
-        'p_idempotency_key': idem,
-        if (_appliedCouponCode != null) 'p_coupon_code': _appliedCouponCode,
-      });
-      final sessionId = result['session_id'] as String?;
-      if (sessionId == null) {
-        throw StateError('session_create did not return session_id');
+    // Pre-check wallet balance so we don't half-create the batch and
+    // leave orphaned holds.
+    if (_paymentMethod == 'wallet') {
+      final balance = ref.read(walletBalancePaiseProvider) ?? 0;
+      if (balance < totalAmount) {
+        if (!mounted) return;
+        setState(() => _busy = false);
+        showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          useRootNavigator: true,
+          builder: (_) => InsufficientBalanceSheet(
+            requiredPaise: totalAmount,
+            onSwitchToCash: () {
+              if (!mounted) return;
+              setState(() => _paymentMethod = 'cash');
+            },
+          ),
+        );
+        return;
       }
+    }
+
+    final children = _selectedChildIds.toList();
+    String? firstSessionId;
+    try {
+      for (var i = 0; i < children.length; i++) {
+        final childId = children[i];
+        final idem = const Uuid().v4();
+        // Coupon attaches to first session only; remaining run full price.
+        final couponForCall = (i == 0) ? _appliedCouponCode : null;
+        final result = await Supabase.instance.client
+            .rpc<Map<String, dynamic>>('session_create', params: {
+          'p_venue_id': _venueId,
+          'p_family_id': familyId,
+          'p_child_id': childId,
+          'p_duration_minutes': _selectedDurationMinutes,
+          'p_payment_method': _paymentMethod,
+          'p_idempotency_key': idem,
+          if (couponForCall != null) 'p_coupon_code': couponForCall,
+        });
+        firstSessionId ??= result['session_id'] as String?;
+      }
+
       if (!mounted) return;
-      context.go('/session/qr/$sessionId');
+      // Multi-session → land on home with the new session stack.
+      // Single-kid → straight to QR like before.
+      if (children.length == 1 && firstSessionId != null) {
+        context.go('/session/qr/$firstSessionId');
+      } else {
+        context.go('/home');
+      }
     } on PostgrestException catch (e) {
-      // Coupon errors come through with specific codes — surface friendly
-      // messages so the user can retry without the bad coupon.
       final couponErrors = {
         'coupon_invalid_code': 'That coupon code doesn\'t exist.',
         'coupon_inactive': 'That coupon is no longer active.',
@@ -203,8 +242,9 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
+          useRootNavigator: true,
           builder: (_) => InsufficientBalanceSheet(
-            requiredPaise: finalAmount,
+            requiredPaise: totalAmount,
             onSwitchToCash: () {
               if (!mounted) return;
               setState(() => _paymentMethod = 'cash');
@@ -213,11 +253,13 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         );
         return;
       }
+      if (!mounted) return;
       setState(() {
         _busy = false;
         _errorText = "Couldn't start session. Please try again.";
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _busy = false;
         _errorText = "Couldn't start session. Please try again.";
@@ -232,16 +274,16 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
 
     final price1hr = (cfg?['session_1hr_price_paise'] as int?) ?? 80000;
     final price2hr = (cfg?['session_2hr_price_paise'] as int?) ?? 110000;
-    final selectedAmount = _priceFor(_selectedDurationMinutes, cfg);
+    final perKidPrice = _priceFor(_selectedDurationMinutes, cfg);
     final discount = _couponDiscountPaise ?? 0;
-    final finalAmount = (selectedAmount - discount).clamp(0, 1 << 30);
+    // Sum across selected kids, then subtract the (single-redemption) coupon.
+    final subtotal = perKidPrice * _selectedChildIds.length;
+    final finalAmount = (subtotal - discount).clamp(0, 1 << 30);
     final walletEnough = balance >= finalAmount;
 
     final canSubmit = !_busy &&
         _selectedDurationMinutes != null &&
-        // child must be selected if there are multiple children — handled below
-        // by gating on the form completion, not here.
-        _selectedChildId != null;
+        _selectedChildIds.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -265,14 +307,15 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
               .where((c) => !inSession.contains(c['id'] as String))
               .toList();
 
-          // If a previously-selected child is now in a session, clear it.
-          if (_selectedChildId != null &&
-              inSession.contains(_selectedChildId)) {
-            _selectedChildId = null;
-          }
-          // Auto-select if there's only one eligible child.
-          if (children.length == 1 && _selectedChildId == null) {
-            _selectedChildId = children.first['id'] as String;
+          // Drop any selections that have since gone into session.
+          _selectedChildIds.removeWhere(inSession.contains);
+          // First time landing here: pre-select all eligible kids so a
+          // single-kid family flows the old way and a multi-kid family
+          // doesn't have to tick everyone manually.
+          if (_selectedChildIds.isEmpty && children.isNotEmpty) {
+            _selectedChildIds.addAll(
+              children.map((c) => c['id'] as String),
+            );
           }
 
           if (children.isEmpty) {
@@ -304,6 +347,14 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                         if (children.length > 1) ...[
                           Text('Who\'s playing?',
                               style: AppTextStyles.bodyLarge(context)),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Tap to include each kid. Tally adds up below.',
+                            style: AppTextStyles.caption(
+                              context,
+                              color: AppColors.lightTextSecondary,
+                            ),
+                          ),
                           const SizedBox(height: 12),
                           SizedBox(
                             height: 110,
@@ -314,15 +365,20 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                   const SizedBox(width: 12),
                               itemBuilder: (_, i) {
                                 final c = children[i];
+                                final id = c['id'] as String;
                                 final selected =
-                                    _selectedChildId == c['id'];
+                                    _selectedChildIds.contains(id);
                                 return _ChildAvatar(
                                   name: c['name'] as String? ?? '—',
                                   photoUrl: c['photo_url'] as String?,
                                   selected: selected,
-                                  onTap: () => setState(() =>
-                                      _selectedChildId =
-                                          c['id'] as String),
+                                  onTap: () => setState(() {
+                                    if (selected) {
+                                      _selectedChildIds.remove(id);
+                                    } else {
+                                      _selectedChildIds.add(id);
+                                    }
+                                  }),
                                 );
                               },
                             ),
@@ -358,11 +414,22 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                           ],
                         ),
                         const SizedBox(height: 24),
+                        if (_selectedDurationMinutes != null &&
+                            _selectedChildIds.isNotEmpty) ...[
+                          _TallyBox(
+                            kidCount: _selectedChildIds.length,
+                            perKidPaise: perKidPrice,
+                            subtotal: subtotal,
+                            discountPaise: discount,
+                            total: finalAmount,
+                          ),
+                          const SizedBox(height: 24),
+                        ],
                         _CouponSection(
                           controller: _couponCtrl,
                           appliedCode: _appliedCouponCode,
                           discountPaise: _couponDiscountPaise,
-                          baseAmountPaise: selectedAmount,
+                          baseAmountPaise: subtotal,
                           validating: _validatingCoupon,
                           error: _couponError,
                           enabled: _selectedDurationMinutes != null,
@@ -415,9 +482,12 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                 _StickyCta(
                   label: _selectedDurationMinutes == null
                       ? 'Pick a duration'
-                      : _paymentMethod == 'wallet'
-                          ? 'Pay ${Money.fromPaise(finalAmount)} from wallet'
-                          : 'Continue with cash',
+                      : _selectedChildIds.isEmpty
+                          ? 'Pick at least one kid'
+                          : _paymentMethod == 'wallet'
+                              ? 'Pay ${Money.fromPaise(finalAmount)} '
+                                  'from wallet'
+                              : 'Continue with cash',
                   onPressed: canSubmit ? _start : null,
                   loading: _busy,
                 ),
@@ -582,6 +652,91 @@ class _StickyCta extends StatelessWidget {
 
 /// Coupon entry + applied state for the Start a session screen. Renders
 /// the input + apply button until validated, then shows a green
+/// Running tally — visible once at least one kid is selected and a
+/// duration is picked. Shows per-kid line, subtotal across selected
+/// kids, optional coupon discount, and total.
+class _TallyBox extends StatelessWidget {
+  final int kidCount;
+  final int perKidPaise;
+  final int subtotal;
+  final int discountPaise;
+  final int total;
+
+  const _TallyBox({
+    required this.kidCount,
+    required this.perKidPaise,
+    required this.subtotal,
+    required this.discountPaise,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.lightSurface,
+        border: Border.all(color: AppColors.lightBorder),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _TallyRow(
+            label: '$kidCount × ${Money.fromPaise(perKidPaise)}',
+            value: Money.fromPaise(subtotal),
+          ),
+          if (discountPaise > 0) ...[
+            const SizedBox(height: 6),
+            _TallyRow(
+              label: 'Coupon',
+              value: '-${Money.fromPaise(discountPaise)}',
+              valueColor: AppColors.activeGreen,
+            ),
+          ],
+          const SizedBox(height: 8),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+          _TallyRow(
+            label: 'Total',
+            value: Money.fromPaise(total),
+            bold: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TallyRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool bold;
+  final Color? valueColor;
+  const _TallyRow({
+    required this.label,
+    required this.value,
+    this.bold = false,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final style = AppTextStyles.body(context).copyWith(
+      fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
+    );
+    return Row(
+      children: [
+        Expanded(child: Text(label, style: style)),
+        Text(
+          value,
+          style: style.copyWith(color: valueColor ?? AppColors.navy),
+        ),
+      ],
+    );
+  }
+}
+
 /// "applied" pill with the discount and a clear (×) action.
 class _CouponSection extends StatelessWidget {
   final TextEditingController controller;
