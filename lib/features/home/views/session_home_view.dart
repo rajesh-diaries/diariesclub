@@ -15,6 +15,7 @@ import '../../sessions/widgets/extend_session_sheet.dart';
 import '../widgets/birthday_card.dart';
 import '../widgets/healthy_bite_reminder_banner.dart';
 import '../widgets/healthy_bite_widget.dart';
+import '../widgets/hydration_reminder_banner.dart';
 import '../widgets/wallet_card.dart';
 
 /// "There's an open session" state. Adapts between two layouts depending
@@ -130,6 +131,9 @@ class _DominantLayout extends StatelessWidget {
         // FEATURE-002 — complimentary Healthy Bite reminder. Self-hides
         // outside the 10-min window, when claimed, or when dismissed.
         HealthyBiteReminderBanner(session: session),
+        // 20-min hydration nudge. Self-hides until session has been
+        // running 20+ min, and on dismiss.
+        HydrationReminderBanner(session: session),
         const SizedBox(height: 24),
         SessionTimerWidget(
           expiresAt: expiresAt,
@@ -199,6 +203,7 @@ class _CompactLayout extends StatelessWidget {
       children: [
         // FEATURE-002 — Healthy Bite reminder above the compact timer too.
         HealthyBiteReminderBanner(session: session),
+        HydrationReminderBanner(session: session),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
