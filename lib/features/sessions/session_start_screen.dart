@@ -580,96 +580,76 @@ class _CouponSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (appliedCode != null && discountPaise != null && discountPaise! > 0) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.activeGreen.withValues(alpha: 0.10),
           border: Border.all(color: AppColors.activeGreen.withValues(alpha: 0.40)),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
-              PhosphorIconsFill.ticket,
-              color: AppColors.activeGreen,
-              size: 22,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$appliedCode applied',
-                    style: AppTextStyles.body(context).copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.activeGreen,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'You save ${Money.fromPaise(discountPaise!)}.',
-                    style: AppTextStyles.caption(
-                      context,
-                      color: AppColors.lightTextSecondary,
-                    ),
-                  ),
-                ],
+            Text(
+              '$appliedCode applied — you save ${Money.fromPaise(discountPaise!)}',
+              style: AppTextStyles.body(context).copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppColors.activeGreen,
               ),
             ),
-            IconButton(
-              tooltip: 'Remove coupon',
-              icon: const Icon(Icons.close, size: 20),
-              onPressed: onClear,
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: onClear,
+                child: const Text('Remove'),
+              ),
             ),
           ],
         ),
       );
     }
 
+    // Vertical stack — no Row/Expanded shenanigans. The TextField gets
+    // full width from the parent stretch, the Apply button right-aligns
+    // with intrinsic width. Bulletproof against Flutter web's flex
+    // layout pitfalls.
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text('Have a coupon code?', style: AppTextStyles.bodyLarge(context)),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                enabled: enabled && !validating,
-                textCapitalization: TextCapitalization.characters,
-                decoration: InputDecoration(
-                  hintText: enabled ? 'e.g. WELCOME50' : 'Pick a duration first',
-                  border: const OutlineInputBorder(),
-                  isDense: true,
-                  errorText: error,
-                ),
-                onSubmitted: (_) => enabled ? onApply() : null,
-              ),
+        TextField(
+          controller: controller,
+          enabled: enabled && !validating,
+          textCapitalization: TextCapitalization.characters,
+          decoration: InputDecoration(
+            hintText: enabled ? 'e.g. WELCOME50' : 'Pick a duration first',
+            border: const OutlineInputBorder(),
+            isDense: true,
+            errorText: error,
+          ),
+          onSubmitted: (_) => enabled ? onApply() : null,
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton(
+            onPressed: enabled && !validating ? onApply : null,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.navy,
+              foregroundColor: Colors.white,
             ),
-            const SizedBox(width: 8),
-            FilledButton(
-              onPressed: enabled && !validating ? onApply : null,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.navy,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
-                ),
-              ),
-              child: validating
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
-                      ),
-                    )
-                  : const Text('Apply'),
-            ),
-          ],
+            child: validating
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(Colors.white),
+                    ),
+                  )
+                : const Text('Apply coupon'),
+          ),
         ),
       ],
     );
