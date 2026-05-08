@@ -3,13 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/notifications/fcm_lifecycle_provider.dart';
+import '../../core/providers/active_sessions_provider.dart';
 import '../../core/providers/home_state_provider.dart';
 import '../../core/providers/recent_activity_provider.dart';
 import '../../core/widgets/error_screen.dart';
 import 'home_app_bar.dart';
 import 'views/idle_home_view.dart';
+import 'views/multi_session_home_view.dart';
 import 'views/post_session_home_view.dart';
-import 'views/session_home_view.dart';
 
 /// Tab 1 — Home. The single source of truth for which sub-view to render
 /// is `homeStateProvider` (DB-driven). Active vs grace within an open
@@ -55,17 +56,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(homeStateProvider);
+    final activeSessions =
+        ref.watch(activeSessionsProvider).valueOrNull ?? const [];
 
-    debugPrint('[BUG-038] HomeScreen.build state=$state');
+    debugPrint('[BUG-038] HomeScreen.build state=$state '
+        'activeCount=${activeSessions.length}');
     return Scaffold(
       appBar: const HomeAppBar(),
       body: state.when(
         data: (s) {
+          // If the family has any open sessions (one or many), use the
+          // multi-session view that stacks cards + still surfaces idle
+          // features (wallet, Start playing for siblings).
+          if (activeSessions.isNotEmpty) {
+            return const MultiSessionHomeView();
+          }
           debugPrint('[BUG-038] HomeScreen state.data = ${s.runtimeType}');
           return switch (s) {
             HomeStateIdle() => const IdleHomeView(),
-            HomeStateInSession(:final session) =>
-              SessionHomeView(session: session),
+            HomeStateInSession() => const MultiSessionHomeView(),
             HomeStatePostSession(:final session) =>
               PostSessionHomeView(session: session),
           };

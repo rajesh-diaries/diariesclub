@@ -8,6 +8,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/providers/active_sessions_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/current_wallet_provider.dart';
 import '../../core/providers/venue_config_provider.dart';
@@ -256,10 +257,39 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
           if (!snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final children = snap.data!;
-          // Auto-select if there's only one.
+          final allChildren = snap.data!;
+          // Filter out children who already have an open session — they
+          // can't be picked for a parallel one.
+          final inSession = ref.watch(childrenWithActiveSessionProvider);
+          final children = allChildren
+              .where((c) => !inSession.contains(c['id'] as String))
+              .toList();
+
+          // If a previously-selected child is now in a session, clear it.
+          if (_selectedChildId != null &&
+              inSession.contains(_selectedChildId)) {
+            _selectedChildId = null;
+          }
+          // Auto-select if there's only one eligible child.
           if (children.length == 1 && _selectedChildId == null) {
             _selectedChildId = children.first['id'] as String;
+          }
+
+          if (children.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(
+                  'All your kids are already playing! Add another child '
+                  'in Profile to start a new session.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.body(
+                    context,
+                    color: AppColors.lightTextSecondary,
+                  ),
+                ),
+              ),
+            );
           }
 
           return SafeArea(
