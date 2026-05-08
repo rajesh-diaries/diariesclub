@@ -7,16 +7,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import 'providers/menu_items_provider.dart';
+import 'widgets/menu_item_card.dart';
 
-/// FIT customer tab. Two sections:
-///   1. Subscription waitlist banner (capture email for the upcoming
-///      weekly-delivery flow).
-///   2. "Build your meal" — fit_meal_templates as cards. Tap → builder.
-///
-/// Previous version embedded BrandMenuTab (a CustomScrollView) for
-/// legacy menu_items — that nested two scroll viewports and threw
-/// 'Vertical viewport was given unbounded height'. The legacy section
-/// was pre-Module-2.5 seed data; v1 uses fit_meal_templates exclusively.
+/// FIT customer tab. Three sections, all rendered inline (no nested
+/// scrollables — that previously crashed with 'Vertical viewport was
+/// given unbounded height'):
+///   1. Subscription waitlist banner.
+///   2. "Build your meal" — fit_meal_templates from admin.
+///   3. À la carte — menu_items where brand='fit', from admin.
 class FitMenuTab extends ConsumerWidget {
   const FitMenuTab({super.key});
 
@@ -26,6 +25,7 @@ class FitMenuTab extends ConsumerWidget {
       children: const [
         _SubscriptionBanner(),
         _FitTemplatesSection(),
+        _AlaCarteSection(),
         SizedBox(height: 32),
       ],
     );
@@ -310,6 +310,40 @@ class _TemplateCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// À la carte legacy menu_items where brand='fit'. Rendered inline as
+/// flat MenuItemCard widgets — never as its own scrollable — so it
+/// nests safely inside the parent ListView.
+class _AlaCarteSection extends ConsumerWidget {
+  const _AlaCarteSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(menuItemsByBrandProvider('fit'));
+    final items = async.valueOrNull ?? const [];
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('À la carte', style: AppTextStyles.h2(context)),
+          const SizedBox(height: 4),
+          Text(
+            'Quick picks from the FIT menu.',
+            style: AppTextStyles.body(
+              context,
+              color: AppColors.lightTextSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final i in items) MenuItemCard(item: i),
+        ],
       ),
     );
   }
