@@ -7,14 +7,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
-import 'widgets/brand_menu_tab.dart';
 
-/// FIT customer tab. Three sections stacked:
+/// FIT customer tab. Two sections:
 ///   1. Subscription waitlist banner (capture email for the upcoming
 ///      weekly-delivery flow).
 ///   2. "Build your meal" — fit_meal_templates as cards. Tap → builder.
-///   3. Legacy menu_items list (brand='fit') for backward compat with
-///      pre-Module-2.5 seed data.
+///
+/// Previous version embedded BrandMenuTab (a CustomScrollView) for
+/// legacy menu_items — that nested two scroll viewports and threw
+/// 'Vertical viewport was given unbounded height'. The legacy section
+/// was pre-Module-2.5 seed data; v1 uses fit_meal_templates exclusively.
 class FitMenuTab extends ConsumerWidget {
   const FitMenuTab({super.key});
 
@@ -24,8 +26,7 @@ class FitMenuTab extends ConsumerWidget {
       children: const [
         _SubscriptionBanner(),
         _FitTemplatesSection(),
-        // Legacy menu_items section.
-        _LegacyMenuSection(),
+        SizedBox(height: 32),
       ],
     );
   }
@@ -309,25 +310,6 @@ class _TemplateCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _LegacyMenuSection extends StatelessWidget {
-  const _LegacyMenuSection();
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.only(top: 16),
-      child: BrandMenuTab(
-        brand: 'fit',
-        title: 'À la carte',
-        tagline: 'Quick picks from the FIT menu.',
-        heroImage:
-            'https://placehold.co/1200x600/0D4A2E/FFFFFF.png?text=FIT+Diaries',
-        brandColor: AppColors.fitGreen,
-        brandIcon: PhosphorIconsFill.carrot,
       ),
     );
   }
