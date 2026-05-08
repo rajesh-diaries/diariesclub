@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -11,8 +12,8 @@ import '../../../core/utils/currency.dart';
 import '../../club/providers/combos_provider.dart';
 
 /// Horizontal scroll of active combos on the home tab. Each card shows
-/// cover + name + bundled price + 'Save ₹X' badge (computed from the
-/// combo's inclusions vs. à-la-carte sum). Tap → /club (combos tab).
+/// cover + name + bundled price + 'Save ₹X' badge + struck-through
+/// à-la-carte total. Tap → /club (combos tab).
 class HomeCombosStrip extends ConsumerWidget {
   const HomeCombosStrip({super.key});
 
@@ -37,12 +38,13 @@ class HomeCombosStrip extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 220,
+          height: 250,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: combos.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (_, i) => _ComboMiniCard(combo: combos[i]),
+            itemBuilder: (_, i) =>
+                _ComboMiniCard(combo: combos[i], key: ValueKey(combos[i]['id'])),
           ),
         ),
       ],
@@ -50,41 +52,76 @@ class HomeCombosStrip extends ConsumerWidget {
   }
 }
 
-class _ComboMiniCard extends ConsumerWidget {
+/// StatefulWidget so we can fetch the menu_items + venue_config once
+/// in initState and cache the savings result. Previous version watched
+/// `comboMenuItemsProvider(menuItemIds)` directly — but the family key
+/// (List<String>) doesn't have stable equality in Dart, so the family
+/// re-keyed every rebuild and the lookup never settled.
+class _ComboMiniCard extends ConsumerStatefulWidget {
   final Map<String, dynamic> combo;
-  const _ComboMiniCard({required this.combo});
+  const _ComboMiniCard({super.key, required this.combo});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final name = (combo['name'] as String?) ?? '';
-    final cover = combo['cover_image_url'] as String?;
-    final price = (combo['price_paise'] as int?) ?? 0;
-    final inclusions = (combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
-        const <String, dynamic>{};
+  ConsumerState<_ComboMiniCard> createState() => _ComboMiniCardState();
+}
+
+class _ComboMiniCardState extends ConsumerState<_ComboMiniCard> {
+  int? _alacartePaise; // null = still loading
+
+  @override
+  void initState() {
+    super.initState();
+    _computeSavings();
+  }
+
+  Future<void> _computeSavings() async {
+    final inclusions =
+        (widget.combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
     final menuItemIds = ((inclusions['menu_item_ids'] as List?) ?? const [])
         .cast<String>();
     final sessionMinutes = inclusions['session_minutes'] as int?;
 
-    final menuItemsAsync = ref.watch(comboMenuItemsProvider(menuItemIds));
-    final cfg = ref.watch(venueConfigProvider).valueOrNull;
-
-    int? alacarte;
-    menuItemsAsync.whenData((items) {
-      var sum = 0;
-      for (final mi in items) {
-        sum += (mi['price_paise'] as int?) ?? 0;
+    var sum = 0;
+    if (menuItemIds.isNotEmpty) {
+      try {
+        final rows = await Supabase.instance.client
+            .from('menu_items_with_brand')
+            .select('price_paise')
+            .inFilter('id', menuItemIds);
+        for (final r in (rows as List)) {
+          sum += ((r as Map)['price_paise'] as int?) ?? 0;
+        }
+      } catch (_) {
+        // Silent — savings just won't show.
       }
-      if (sessionMinutes != null && cfg != null) {
+    }
+
+    if (sessionMinutes != null) {
+      final cfg = ref.read(venueConfigProvider).valueOrNull;
+      if (cfg != null) {
         sum += sessionMinutes == 60
             ? (cfg['session_1hr_price_paise'] as int?) ?? 80000
             : sessionMinutes == 120
                 ? (cfg['session_2hr_price_paise'] as int?) ?? 110000
                 : 0;
       }
-      alacarte = sum;
-    });
-    final savings =
-        (alacarte != null && alacarte! > price) ? alacarte! - price : 0;
+    }
+
+    if (!mounted) return;
+    setState(() => _alacartePaise = sum);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final combo = widget.combo;
+    final name = (combo['name'] as String?) ?? '';
+    final cover = combo['cover_image_url'] as String?;
+    final price = (combo['price_paise'] as int?) ?? 0;
+
+    final showSavings =
+        _alacartePaise != null && _alacartePaise! > price;
+    final savings = showSavings ? _alacartePaise! - price : 0;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -123,7 +160,7 @@ class _ComboMiniCard extends ConsumerWidget {
                             ),
                           ),
                   ),
-                  if (savings > 0)
+                  if (showSavings)
                     Positioned(
                       top: 8,
                       left: 8,
@@ -146,8 +183,9 @@ class _ComboMiniCard extends ConsumerWidget {
                 ],
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -158,7 +196,7 @@ class _ComboMiniCard extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -169,12 +207,12 @@ class _ComboMiniCard extends ConsumerWidget {
                             color: AppColors.navy,
                           ),
                         ),
-                        if (alacarte != null && alacarte! > price) ...[
+                        if (showSavings) ...[
                           const SizedBox(width: 6),
                           Padding(
-                            padding: const EdgeInsets.only(bottom: 2),
+                            padding: const EdgeInsets.only(bottom: 3),
                             child: Text(
-                              Money.fromPaise(alacarte!),
+                              Money.fromPaise(_alacartePaise!),
                               style: AppTextStyles.caption(
                                 context,
                                 color: AppColors.lightTextSecondary,
