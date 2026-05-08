@@ -80,7 +80,13 @@ class _PreBookingScreenState extends ConsumerState<PreBookingScreen> {
         'p_idempotency_key': const Uuid().v4(),
       });
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
+      // push (not pushReplacement) so the pre-book screen stays in the
+      // stack underneath. Close/Done on the success screen pop cleanly
+      // back to pre-book → user can navigate normally from there.
+      // Previous pushReplacement orphaned this screen from GoRouter's
+      // stack, causing context.go('/profile') to trigger an infinite
+      // push/pop redirect loop.
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => _PreBookingSuccessScreen(
             scheduled: scheduled,
@@ -91,6 +97,9 @@ class _PreBookingScreenState extends ConsumerState<PreBookingScreen> {
           ),
         ),
       );
+      // After the success screen pops, return to /profile so the user
+      // doesn't land back on the booking form.
+      if (mounted) context.go('/profile');
     } on PostgrestException catch (e) {
       setState(() {
         _busy = false;
@@ -468,7 +477,7 @@ class _PreBookingSuccessScreen extends StatelessWidget {
         title: const Text('Reserved'),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => context.go('/profile'),
+          onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: SafeArea(
@@ -519,7 +528,7 @@ class _PreBookingSuccessScreen extends StatelessWidget {
               ),
               const Spacer(),
               FilledButton(
-                onPressed: () => context.go('/profile'),
+                onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Done'),
               ),
             ],
