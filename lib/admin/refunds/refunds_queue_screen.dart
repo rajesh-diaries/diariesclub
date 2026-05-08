@@ -7,6 +7,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../providers/admin_auth_provider.dart';
 import '../providers/admin_streams.dart';
+import '../widgets/admin_buttons.dart';
 import '../widgets/admin_app_bar.dart';
 
 const _venueId = '00000000-0000-0000-0000-000000000001';
@@ -234,14 +235,15 @@ class _PendingActionsState extends ConsumerState<_PendingActions> {
           ),
         ),
         actions: [
-          TextButton(
+          AdminSecondaryButton(
+            label: 'Cancel',
+            ghost: true,
             onPressed: () => Navigator.of(c).pop(false),
-            child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.adminRed),
+          const SizedBox(width: 8),
+          AdminPrimaryButton.danger(
+            label: 'Reject',
             onPressed: () => Navigator.of(c).pop(true),
-            child: const Text('Reject'),
           ),
         ],
       ),
@@ -296,15 +298,18 @@ class _PendingActionsState extends ConsumerState<_PendingActions> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        TextButton(
+        AdminSecondaryButton(
+          label: 'Approve',
+          ghost: true,
+          foreground: AppColors.activeGreen,
           onPressed: _approve,
-          style: TextButton.styleFrom(foregroundColor: AppColors.activeGreen),
-          child: const Text('Approve'),
         ),
-        TextButton(
+        const SizedBox(width: 8),
+        AdminSecondaryButton(
+          label: 'Reject',
+          ghost: true,
+          foreground: AppColors.adminRed,
           onPressed: _reject,
-          style: TextButton.styleFrom(foregroundColor: AppColors.adminRed),
-          child: const Text('Reject'),
         ),
       ],
     );

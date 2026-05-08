@@ -9,6 +9,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../providers/admin_auth_provider.dart';
 import '../widgets/admin_app_bar.dart';
+import '../widgets/admin_buttons.dart';
 
 const _venueId = '00000000-0000-0000-0000-000000000001';
 
@@ -548,11 +549,14 @@ class _ManualAdjustDialogState extends State<_ManualAdjustDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        AdminSecondaryButton(
+          label: 'Cancel',
+          ghost: true,
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
         ),
-        FilledButton(
+        const SizedBox(width: 8),
+        AdminPrimaryButton(
+          label: 'Apply',
           onPressed: () {
             final rupees = int.tryParse(_amount.text) ?? 0;
             final reason = _reason.text.trim();
@@ -560,7 +564,6 @@ class _ManualAdjustDialogState extends State<_ManualAdjustDialog> {
             final paise = (rupees * 100) * (_isCredit ? 1 : -1);
             Navigator.of(context).pop((paise: paise, reason: reason));
           },
-          child: const Text('Apply'),
         ),
       ],
     );

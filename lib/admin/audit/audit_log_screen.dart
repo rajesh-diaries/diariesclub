@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../providers/admin_streams.dart';
 import '../widgets/admin_app_bar.dart';
+import '../widgets/admin_buttons.dart';
 
 /// Audit log viewer. Realtime-streamed, capped at 500 rows. Filters
 /// applied client-side (so the server still returns the full window —
@@ -181,9 +182,9 @@ class _AuditLogScreenState extends ConsumerState<AuditLogScreen> {
           ),
         ),
         actions: [
-          TextButton(
+          AdminPrimaryButton(
+            label: 'Close',
             onPressed: () => Navigator.of(c).pop(),
-            child: const Text('Close'),
           ),
         ],
       ),

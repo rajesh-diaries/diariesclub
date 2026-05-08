@@ -9,6 +9,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../providers/admin_streams.dart';
 import '../widgets/admin_app_bar.dart';
+import '../widgets/admin_buttons.dart';
 
 const _venueId = '00000000-0000-0000-0000-000000000001';
 
@@ -106,13 +107,15 @@ class _StaffTab extends ConsumerWidget {
           'it on next login. Save this PIN somewhere safe before continuing.',
         ),
         actions: [
-          TextButton(
+          AdminSecondaryButton(
+            label: 'Cancel',
+            ghost: true,
             onPressed: () => Navigator.of(c).pop(false),
-            child: const Text('Cancel'),
           ),
-          FilledButton(
+          const SizedBox(width: 8),
+          AdminPrimaryButton(
+            label: 'Reset PIN',
             onPressed: () => Navigator.of(c).pop(true),
-            child: const Text('Reset PIN'),
           ),
         ],
       ),
@@ -144,14 +147,15 @@ class _StaffTab extends ConsumerWidget {
           'requires editing the row in Supabase Studio (no UI for it yet).',
         ),
         actions: [
-          TextButton(
+          AdminSecondaryButton(
+            label: 'Cancel',
+            ghost: true,
             onPressed: () => Navigator.of(c).pop(false),
-            child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.adminRed),
+          const SizedBox(width: 8),
+          AdminPrimaryButton.danger(
+            label: 'Deactivate',
             onPressed: () => Navigator.of(c).pop(true),
-            child: const Text('Deactivate'),
           ),
         ],
       ),
@@ -207,22 +211,22 @@ class _StaffTab extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
-            TextButton.icon(
+            AdminSecondaryButton(
+              icon: Icons.copy,
+              label: 'Copy',
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: pin));
                 ScaffoldMessenger.of(c).showSnackBar(
                   const SnackBar(content: Text('PIN copied to clipboard.')),
                 );
               },
-              icon: const Icon(Icons.copy),
-              label: const Text('Copy'),
             ),
           ],
         ),
         actions: [
-          FilledButton(
+          AdminPrimaryButton(
+            label: 'Done',
             onPressed: () => Navigator.of(c).pop(),
-            child: const Text('Done'),
           ),
         ],
       ),
@@ -242,10 +246,10 @@ class _StaffTab extends ConsumerWidget {
             children: [
               Text('${staff.length} staff', style: AppTextStyles.body(context)),
               const Spacer(),
-              FilledButton.icon(
+              AdminPrimaryButton(
+                icon: Icons.add,
+                label: 'Add staff',
                 onPressed: () => _addStaff(context),
-                icon: const Icon(Icons.add),
-                label: const Text('Add staff'),
               ),
             ],
           ),
@@ -293,17 +297,17 @@ class _StaffTab extends ConsumerWidget {
                             : const Text('No')),
                         DataCell(Row(
                           children: [
-                            TextButton(
+                            AdminSecondaryButton(
+                              label: 'Reset PIN',
+                              ghost: true,
                               onPressed: () => _resetPin(context, s),
-                              child: const Text('Reset PIN'),
                             ),
                             if (s['is_active'] == true)
-                              TextButton(
+                              AdminSecondaryButton(
+                                label: 'Deactivate',
+                                ghost: true,
+                                foreground: AppColors.adminRed,
                                 onPressed: () => _deactivate(context, s),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: AppColors.adminRed,
-                                ),
-                                child: const Text('Deactivate'),
                               ),
                           ],
                         )),
@@ -429,8 +433,8 @@ class _AddStaffDialogState extends State<_AddStaffDialog> {
                         ),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
+                    AdminIconButton(
+                      icon: Icons.refresh,
                       onPressed: () => setState(() => _pin = _generatePin()),
                     ),
                   ],
@@ -441,11 +445,14 @@ class _AddStaffDialogState extends State<_AddStaffDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        AdminSecondaryButton(
+          label: 'Cancel',
+          ghost: true,
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
         ),
-        FilledButton(
+        const SizedBox(width: 8),
+        AdminPrimaryButton(
+          label: 'Create staff',
           onPressed: () {
             final phone = _phone.text.trim();
             final fullPhone = phone.startsWith('+') ? phone : '+91$phone';
@@ -457,7 +464,6 @@ class _AddStaffDialogState extends State<_AddStaffDialog> {
               'pin': _pin,
             });
           },
-          child: const Text('Create staff'),
         ),
       ],
     );

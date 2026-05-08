@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../providers/admin_auth_provider.dart';
+import 'admin_buttons.dart';
 
 /// Persistent sidebar for the admin shell. 220px wide on desktop. The 13
 /// nav items match the Session 11 spec; stub sections show a small "soon"
@@ -121,9 +122,10 @@ class AdminSidebar extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.logout,
-                        color: Colors.white, size: 20),
+                  AdminIconButton(
+                    icon: Icons.logout,
+                    color: Colors.white,
+                    size: 20,
                     tooltip: 'Sign out',
                     onPressed: () =>
                         Supabase.instance.client.auth.signOut(),

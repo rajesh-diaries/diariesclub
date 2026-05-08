@@ -7,6 +7,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../providers/admin_streams.dart';
 import '../widgets/admin_app_bar.dart';
+import '../widgets/admin_buttons.dart';
 
 /// Birthday CRM kanban — 4 columns (interested / contacted / confirmed /
 /// completed). Click a card to open the detail drawer; transition status
@@ -324,13 +325,15 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
           'Album publish is a separate step (deferred to v1.1).',
         ),
         actions: [
-          TextButton(
+          AdminSecondaryButton(
+            label: 'Cancel',
+            ghost: true,
             onPressed: () => Navigator.of(c).pop(false),
-            child: const Text('Cancel'),
           ),
-          FilledButton(
+          const SizedBox(width: 8),
+          AdminPrimaryButton(
+            label: 'Mark completed',
             onPressed: () => Navigator.of(c).pop(true),
-            child: const Text('Mark completed'),
           ),
         ],
       ),
@@ -382,8 +385,8 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
                 Expanded(
                   child: Text('Reservation', style: AppTextStyles.h3(context)),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
+                AdminIconButton(
+                  icon: Icons.close,
                   onPressed: widget.onClose,
                 ),
               ],
@@ -434,21 +437,21 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
     }
     return switch (status) {
       'interested' => [
-          FilledButton(
+          AdminPrimaryButton(
+            label: 'Mark contacted',
             onPressed: _contact,
-            child: const Text('Mark contacted'),
           ),
         ],
       'admin_contacted' => [
-          FilledButton(
+          AdminPrimaryButton(
+            label: 'Confirm date + deposit',
             onPressed: _confirmDate,
-            child: const Text('Confirm date + deposit'),
           ),
         ],
       'confirmed' => [
-          FilledButton(
+          AdminPrimaryButton(
+            label: 'Mark completed (auto-award cards)',
             onPressed: _markCompleted,
-            child: const Text('Mark completed (auto-award cards)'),
           ),
         ],
       'completed' => [
@@ -552,11 +555,14 @@ class _ConfirmDateDialogState extends State<_ConfirmDateDialog> {
         ],
       ),
       actions: [
-        TextButton(
+        AdminSecondaryButton(
+          label: 'Cancel',
+          ghost: true,
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
         ),
-        FilledButton(
+        const SizedBox(width: 8),
+        AdminPrimaryButton(
+          label: 'Confirm',
           onPressed: _date == null
               ? null
               : () {
@@ -567,7 +573,6 @@ class _ConfirmDateDialogState extends State<_ConfirmDateDialog> {
                     depositPaise: (rupees * 100).round(),
                   ));
                 },
-          child: const Text('Confirm'),
         ),
       ],
     );
