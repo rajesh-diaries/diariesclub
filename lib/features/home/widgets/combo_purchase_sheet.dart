@@ -382,19 +382,20 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
                       ),
                     ),
             ),
-            const SizedBox(height: 10),
-            // Secondary: stash in cart, customer keeps shopping.
-            OutlinedButton(
-              onPressed: _busy
-                  ? null
-                  : (hasSession && idleChildren.isEmpty)
-                      ? null
-                      : _addToBag,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+            // 'Add to bag' is only valid for food-only combos. Session
+            // combos require a kid pick before order_place creates the
+            // session — putting them in the cart would skip that step
+            // and the customer would pay for play they never receive.
+            if (!hasSession) ...[
+              const SizedBox(height: 10),
+              OutlinedButton(
+                onPressed: _busy ? null : _addToBag,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Add to bag instead'),
               ),
-              child: const Text('Add to bag instead'),
-            ),
+            ],
             const SizedBox(height: 4),
             TextButton(
               onPressed:

@@ -7,6 +7,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
+import '../../home/widgets/combo_purchase_sheet.dart';
 import '../providers/cart_provider.dart';
 import '../providers/combos_provider.dart';
 
@@ -150,7 +151,21 @@ class ComboCard extends ConsumerWidget {
                   ),
                 ],
                 const SizedBox(height: 16),
-                if (isInCart)
+                if (sessionMinutes != null)
+                  // Session combos must go through the modal sheet so the
+                  // kid picker is unmissable. Cart-add is BLOCKED for these
+                  // — without a kid pick, no session_create fires and the
+                  // customer pays for play they never receive.
+                  FilledButton.icon(
+                    onPressed: () => _openSheet(context),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.navy,
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: const Icon(PhosphorIconsRegular.playCircle),
+                    label: const Text('Pick a kid · Place order'),
+                  )
+                else if (isInCart)
                   OutlinedButton.icon(
                     onPressed: () => ref
                         .read(cartProvider.notifier)
@@ -177,6 +192,16 @@ class ComboCard extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _openSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      useRootNavigator: true,
+      builder: (_) => ComboPurchaseSheet(combo: combo),
     );
   }
 
