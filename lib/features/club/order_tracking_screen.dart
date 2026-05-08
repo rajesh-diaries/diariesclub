@@ -10,7 +10,6 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../../core/widgets/error_screen.dart';
 import 'providers/order_stream_provider.dart';
-import 'widgets/order_status_timeline.dart';
 
 /// Realtime order tracking. Subscribes to a single `orders` row + a
 /// one-shot `order_items` fetch (line items don't mutate after insert).
@@ -68,7 +67,6 @@ class _Body extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = (order['status'] as String?) ?? 'pending';
-    final subtotal = (order['subtotal_paise'] as int?) ?? 0;
     final gst = (order['gst_paise'] as int?) ?? 0;
     final total = (order['total_paise'] as int?) ?? 0;
     final coins = (order['coins_earned'] as int?) ?? 0;
@@ -83,8 +81,6 @@ class _Body extends ConsumerWidget {
           children: [
             _StatusHero(status: status),
             const SizedBox(height: 24),
-            OrderStatusTimeline(currentStatus: status),
-            const SizedBox(height: 16),
             _Section(
               title: 'Order details',
               child: Column(
@@ -112,14 +108,23 @@ class _Body extends ConsumerWidget {
                       ),
                     ),
                   const Divider(),
-                  _kv(context, 'Subtotal', Money.fromPaise(subtotal)),
-                  _kv(context, 'GST', Money.fromPaise(gst)),
                   _kv(
                     context,
                     'Total',
                     Money.fromPaise(total),
                     bold: true,
                   ),
+                  if (gst > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Includes ${Money.fromPaise(gst)} GST',
+                        style: AppTextStyles.caption(
+                          context,
+                          color: AppColors.lightTextSecondary,
+                        ),
+                      ),
+                    ),
                   if (coins > 0) ...[
                     const SizedBox(height: 4),
                     Text(
