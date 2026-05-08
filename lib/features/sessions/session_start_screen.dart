@@ -648,25 +648,26 @@ class _CouponSection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            SizedBox(
-              height: 48,
-              child: FilledButton(
-                onPressed: enabled && !validating ? onApply : null,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.navy,
-                  foregroundColor: Colors.white,
+            FilledButton(
+              onPressed: enabled && !validating ? onApply : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.navy,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
                 ),
-                child: validating
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation(Colors.white),
-                        ),
-                      )
-                    : const Text('Apply'),
               ),
+              child: validating
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                  : const Text('Apply'),
             ),
           ],
         ),
