@@ -328,17 +328,19 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
       ),
     );
     if (ok != true || !mounted) return;
+    // Navigate FIRST (while still authenticated — /auth/phone is public,
+    // redirect allows it). This avoids any race between signOut clearing
+    // auth state, dependent providers cascading errors, and the widget
+    // tree unmounting before we can route.
+    context.go('/auth/phone');
     try {
       await Supabase.instance.client.auth.signOut();
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('pending_otp_phone');
       await const FlutterSecureStorage().deleteAll();
     } catch (_) {
-      // TODO(session-12): replace with Sentry.captureException
       debugPrint('sign-out error');
     }
-    if (!mounted) return;
-    context.go('/auth/phone');
   }
 
   @override
