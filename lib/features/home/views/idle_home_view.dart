@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/current_family_provider.dart';
+import '../../../core/providers/referral_eligibility_provider.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../widgets/announcements_feed.dart';
 import '../widgets/birthday_card.dart';
@@ -36,6 +37,13 @@ class IdleHomeBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final family = ref.watch(currentFamilyProvider).valueOrNull;
     final familyName = (family?['name'] as String?) ?? '';
+    // Only include the referral entry card when the provider has
+    // explicit data (eligible == true). Skipping inclusion entirely is
+    // safer than rendering a 0-sized widget — Flutter web's hit-test
+    // can cascade-fail over a SizedBox.shrink in the tree.
+    final referralEligible = ref
+        .watch(referralRedeemEligibleProvider)
+        .maybeWhen(data: (v) => v, orElse: () => false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -52,8 +60,10 @@ class IdleHomeBody extends ConsumerWidget {
         const WalletCard(),
         const SizedBox(height: 16),
         const StartSessionCard(),
-        const SizedBox(height: 16),
-        const ReferralEntryCard(),
+        if (referralEligible) ...[
+          const SizedBox(height: 16),
+          const ReferralEntryCard(),
+        ],
         const SizedBox(height: 16),
         const BirthdayCardList(),
         const SizedBox(height: 16),

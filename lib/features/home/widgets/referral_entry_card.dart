@@ -9,23 +9,18 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
 /// Home-tab card that lets a new family enter a friend's referral code
-/// before their first session. Hidden once a referrer is attached or
-/// the family has any completed session.
+/// before their first session.
+///
+/// IMPORTANT: This widget is unconditional — it always paints. Callers
+/// MUST gate inclusion in their child list on `referralRedeemEligibleProvider`
+/// returning true. Earlier versions toggled visibility *inside* this widget
+/// via SizedBox.shrink, but that left a 0-sized render box in the tree
+/// which Flutter web's hit-test cascaded over, blanking adjacent tabs.
 class ReferralEntryCard extends ConsumerWidget {
   const ReferralEntryCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(referralRedeemEligibleProvider);
-    // Only render once we have an explicit answer — avoids the
-    // loading->true layout shift that triggers Flutter web's
-    // mouse_tracker.dart:199 recursion assert (BUG-031 family).
-    final eligible = async.maybeWhen(data: (v) => v, orElse: () => false);
-    if (!eligible) return const SizedBox.shrink();
-
-    // Plain GestureDetector + no MouseRegion. Avoids the InkWell ripple
-    // (and its MouseRegion churn) that was breaking pointer dispatch on
-    // adjacent cards (e.g. Start playing) during this card's pop-in.
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _showEntryDialog(context, ref),
