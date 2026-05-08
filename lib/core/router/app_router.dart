@@ -82,6 +82,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     debugLogDiagnostics: true,
+    refreshListenable: _AuthListenable(ref),
     errorBuilder: (context, state) => FriendlyErrorScreen(
       code: 'E-ROUTE',
       userMessage: 'Page not found',
@@ -441,3 +442,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+/// Bridges Riverpod's currentFamilyIdProvider to GoRouter's
+/// refreshListenable so sign-in/sign-out re-runs the redirect.
+class _AuthListenable extends ChangeNotifier {
+  _AuthListenable(this._ref) {
+    _sub = _ref.listen(
+      currentFamilyIdProvider,
+      (_, __) => notifyListeners(),
+      fireImmediately: false,
+    );
+  }
+  final Ref _ref;
+  late final ProviderSubscription<dynamic> _sub;
+
+  @override
+  void dispose() {
+    _sub.close();
+    super.dispose();
+  }
+}

@@ -338,7 +338,7 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
       debugPrint('sign-out error');
     }
     if (!mounted) return;
-    context.go('/');
+    context.go('/auth/phone');
   }
 
   @override
