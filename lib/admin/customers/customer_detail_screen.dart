@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -314,6 +315,7 @@ class _ChildrenTable extends StatelessWidget {
           DataColumn(label: Text('Hero')),
           DataColumn(label: Text('Level')),
           DataColumn(label: Text('Total XP')),
+          DataColumn(label: Text('Surprise card')),
         ],
         rows: [
           for (final c in children)
@@ -323,8 +325,265 @@ class _ChildrenTable extends StatelessWidget {
               DataCell(Text((c['favourite_hero'] as String?) ?? '—')),
               DataCell(Text('${c['current_level'] ?? '—'}')),
               DataCell(Text('${c['total_xp'] ?? 0}')),
+              DataCell(_GrantCardAction(child: c)),
             ]),
         ],
+      ),
+    );
+  }
+}
+
+/// Per-child action that opens a sheet listing all surprise cards
+/// across all 4 heroes. Admin picks one + optional note → grants via
+/// admin_card_grant_surprise RPC.
+class _GrantCardAction extends StatelessWidget {
+  final Map<String, dynamic> child;
+  const _GrantCardAction({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return AdminSecondaryButton(
+      label: 'Grant',
+      icon: PhosphorIconsRegular.gift,
+      onPressed: () => showDialog<void>(
+        context: context,
+        useRootNavigator: true,
+        builder: (_) => _GrantSurpriseDialog(child: child),
+      ),
+    );
+  }
+}
+
+class _GrantSurpriseDialog extends ConsumerStatefulWidget {
+  final Map<String, dynamic> child;
+  const _GrantSurpriseDialog({required this.child});
+
+  @override
+  ConsumerState<_GrantSurpriseDialog> createState() =>
+      _GrantSurpriseDialogState();
+}
+
+class _GrantSurpriseDialogState
+    extends ConsumerState<_GrantSurpriseDialog> {
+  String? _selectedCardId;
+  final _noteCtrl = TextEditingController();
+  bool _busy = false;
+  String? _error;
+  List<Map<String, dynamic>> _surpriseCards = const [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCards();
+  }
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadCards() async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('hero_card_definitions')
+          .select('id, name, hero, image_url, description')
+          .eq('unlock_method', 'surprise')
+          .eq('is_active', true)
+          .order('hero')
+          .order('name');
+      if (!mounted) return;
+      setState(() {
+        _surpriseCards =
+            (rows as List).map((r) => Map<String, dynamic>.from(r as Map)).toList();
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Could not load cards: $e';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _grant() async {
+    if (_selectedCardId == null) {
+      setState(() => _error = 'Pick a card first.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final res = await Supabase.instance.client
+          .rpc<Map<String, dynamic>>('admin_card_grant_surprise', params: {
+        'p_child_id': widget.child['id'],
+        'p_card_id': _selectedCardId,
+        'p_note':
+            _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+      });
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      final newlyGranted = res['newly_granted'] == true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            newlyGranted
+                ? '${widget.child['name']} just received "${res['card_name']}"'
+                : '${widget.child['name']} already had that card',
+          ),
+        ),
+      );
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e.message.contains('not_a_surprise_card')
+            ? "That card isn't a surprise card."
+            : 'Grant failed: ${e.message}';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = 'Grant failed: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final childName = (widget.child['name'] as String?) ?? 'this kid';
+    return AlertDialog(
+      title: Text('Grant a surprise card to $childName'),
+      content: ConstrainedBox(
+        constraints:
+            const BoxConstraints(minWidth: 480, maxWidth: 560, maxHeight: 540),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Pick from the surprise cards admin has set up. '
+                    'Re-grants are silent (the kid already has it).',
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final c in _surpriseCards)
+                            _SurpriseCardChip(
+                              card: c,
+                              selected: _selectedCardId == c['id'],
+                              onTap: () => setState(
+                                  () => _selectedCardId = c['id'] as String),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _noteCtrl,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Why this card? (optional, audit-only)',
+                      border: OutlineInputBorder(),
+                      hintText: 'e.g. cheered up another kid in the corner',
+                    ),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(_error!,
+                        style: AppTextStyles.caption(
+                          context,
+                          color: AppColors.adminRed,
+                        )),
+                  ],
+                ],
+              ),
+      ),
+      actions: [
+        AdminSecondaryButton(
+          label: 'Cancel',
+          ghost: true,
+          onPressed:
+              _busy ? null : () => Navigator.of(context).pop(),
+        ),
+        const SizedBox(width: 8),
+        AdminPrimaryButton(
+          label: 'Grant card',
+          busy: _busy,
+          onPressed: _busy ? null : _grant,
+        ),
+      ],
+    );
+  }
+}
+
+class _SurpriseCardChip extends StatelessWidget {
+  final Map<String, dynamic> card;
+  final bool selected;
+  final VoidCallback onTap;
+  const _SurpriseCardChip({
+    required this.card,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (card['name'] as String?) ?? '—';
+    final hero = (card['hero'] as String?) ?? '—';
+    return Material(
+      color: selected
+          ? AppColors.gold.withValues(alpha: 0.20)
+          : AppColors.lightSurface,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          width: 200,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selected ? AppColors.gold : AppColors.lightBorder,
+              width: selected ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name,
+                  style: AppTextStyles.body(context).copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 2),
+              Text(hero,
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.lightTextSecondary,
+                  )),
+            ],
+          ),
+        ),
       ),
     );
   }
