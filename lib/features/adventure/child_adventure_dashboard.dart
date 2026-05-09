@@ -11,6 +11,7 @@ import 'widgets/child_header.dart';
 import 'widgets/growth_this_month_card.dart';
 import 'widgets/hero_card_collection_section.dart';
 import 'widgets/hero_within_celebration_card.dart';
+import 'widgets/kid_quests_card.dart';
 import 'widgets/no_sessions_empty_state.dart';
 import 'widgets/pending_recaps_banner.dart';
 import 'widgets/stats_summary.dart';
@@ -67,6 +68,8 @@ class ChildAdventureDashboard extends ConsumerWidget {
         GrowthThisMonthCard(childId: childId, childName: childName),
         const SizedBox(height: 12),
         _HeroProgress(child: child),
+        const SizedBox(height: 16),
+        KidQuestsCard(childId: childId),
         const SizedBox(height: 16),
         HeroCardCollectionSection(childId: childId),
         const SizedBox(height: 16),

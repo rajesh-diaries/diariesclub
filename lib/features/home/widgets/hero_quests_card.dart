@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/family_children_provider.dart';
+import '../../../core/providers/hero_quests_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
@@ -40,13 +39,13 @@ class HeroQuestsCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final week = ref.watch(_currentWeekDateProvider);
-    final weekRow = ref.watch(_questWeekProvider).valueOrNull;
+    final week = ref.watch(currentQuestWeekDateProvider);
+    final weekRow = ref.watch(questWeekProvider).valueOrNull;
     final defs =
-        ref.watch(_questDefinitionsProvider).valueOrNull ?? const [];
+        ref.watch(questDefinitionsProvider).valueOrNull ?? const [];
     final children = ref.watch(familyChildrenProvider).valueOrNull ?? const [];
     final progress =
-        ref.watch(_questProgressForFamilyProvider).valueOrNull ?? const [];
+        ref.watch(questProgressForFamilyStreamProvider).valueOrNull ?? const [];
 
     if (weekRow == null) {
       // No quests scheduled this week — hide card entirely.
@@ -254,46 +253,5 @@ class _QuestChip extends StatelessWidget {
   }
 }
 
-// ─── providers ─────────────────────────────────────────────────────────────
-
-final _currentWeekDateProvider = Provider<String>((ref) {
-  final now = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
-  final monday = DateTime.utc(now.year, now.month, now.day)
-      .subtract(Duration(days: now.weekday - 1));
-  return '${monday.year.toString().padLeft(4, '0')}-'
-      '${monday.month.toString().padLeft(2, '0')}-'
-      '${monday.day.toString().padLeft(2, '0')}';
-});
-
-final _questWeekProvider =
-    FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
-  final week = ref.watch(_currentWeekDateProvider);
-  final row = await Supabase.instance.client
-      .from('hero_quest_weeks')
-      .select()
-      .eq('week_start_date', week)
-      .maybeSingle();
-  return row;
-});
-
-final _questDefinitionsProvider =
-    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final rows = await Supabase.instance.client
-      .from('hero_quest_definitions')
-      .select('id, hero, title, description, xp_bonus')
-      .eq('is_active', true);
-  return List<Map<String, dynamic>>.from(rows);
-});
-
-final _questProgressForFamilyProvider =
-    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final familyId = ref.watch(currentFamilyIdProvider);
-  if (familyId == null) return const [];
-  final week = ref.watch(_currentWeekDateProvider);
-  final rows = await Supabase.instance.client
-      .from('hero_quest_progress')
-      .select('child_id, hero, completed_at, week_start_date')
-      .eq('family_id', familyId)
-      .eq('week_start_date', week);
-  return List<Map<String, dynamic>>.from(rows);
-});
+// Providers extracted to lib/core/providers/hero_quests_providers.dart
+// so the Adventure tab's per-kid card shares the same realtime stream.
