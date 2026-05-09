@@ -7,6 +7,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../widgets/announcements_feed.dart';
 import '../widgets/birthday_card.dart';
 import '../widgets/healthy_bite_widget.dart';
+import '../widgets/hero_quests_card.dart';
 import '../widgets/home_combos_strip.dart';
 import '../widgets/marketing_consent_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
@@ -66,6 +67,8 @@ class IdleHomeBody extends ConsumerWidget {
           const ReferralEntryCard(),
         ],
         const SizedBox(height: 20),
+        const HeroQuestsCard(),
+        const SizedBox(height: 16),
         const HomeCombosStrip(),
         const SizedBox(height: 16),
         const BirthdayCardList(),
