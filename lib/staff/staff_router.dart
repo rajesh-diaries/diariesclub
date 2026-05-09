@@ -7,6 +7,7 @@ import '../core/theme/app_text_styles.dart';
 import 'active_sessions_screen.dart';
 import 'grant_card_screen.dart';
 import 'healthy_bite_screen.dart';
+import 'redeem_perk_screen.dart';
 import 'kds_screen.dart';
 import 'manual_session_screen.dart';
 import 'menu_availability_screen.dart';
@@ -94,6 +95,10 @@ final staffRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/staff/grant-card',
         builder: (_, __) => const GrantCardScreen(),
+      ),
+      GoRoute(
+        path: '/staff/redeem-perk',
+        builder: (_, __) => const RedeemPerkScreen(),
       ),
       GoRoute(
         path: '/staff/menu',
