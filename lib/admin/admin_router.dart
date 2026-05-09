@@ -32,6 +32,7 @@ import 'packages/package_edit_screen.dart';
 import 'packages/packages_list_screen.dart';
 import 'providers/admin_auth_provider.dart';
 import 'refunds/refunds_queue_screen.dart';
+import 'reports/hall_of_heroes_screen.dart';
 import 'shell.dart';
 import 'stubs/coming_soon_screen.dart';
 import 'users/users_screen.dart';
@@ -231,6 +232,10 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/content/hero-quests',
             builder: (_, __) => const HeroQuestsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/reports/hall-of-heroes',
+            builder: (_, __) => const HallOfHeroesScreen(),
           ),
           // Stubs.
           GoRoute(

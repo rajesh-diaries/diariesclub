@@ -27,6 +27,7 @@ class AdminSidebar extends ConsumerWidget {
     _NavItemSpec('/admin/coupons', 'Coupons', PhosphorIconsRegular.ticket),
     _NavItemSpec('/admin/config', 'Config', PhosphorIconsRegular.gear),
     _NavItemSpec('/admin/content', 'Content', PhosphorIconsRegular.fileText),
+    _NavItemSpec('/admin/reports/hall-of-heroes', 'Hall of Heroes', PhosphorIconsRegular.trophy),
     _NavItemSpec('/admin/users', 'Users', PhosphorIconsRegular.key),
     _NavItemSpec('/admin/reports', 'Reports', PhosphorIconsRegular.chartBar, isStub: true),
     _NavItemSpec('/admin/reactivation', 'Reactivation', PhosphorIconsRegular.envelope, isStub: true),

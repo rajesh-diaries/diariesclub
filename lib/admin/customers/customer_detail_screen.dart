@@ -38,6 +38,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   List<Map<String, dynamic>> _sessions = const [];
   List<Map<String, dynamic>> _orders = const [];
   List<Map<String, dynamic>> _walletTxns = const [];
+  Map<String, Map<String, dynamic>> _heroWithinByChildId = const {};
   bool _loading = true;
   String? _errorText;
 
@@ -85,11 +86,19 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
           .eq('family_id', widget.familyId)
           .order('created_at', ascending: false)
           .limit(20);
+      final unlocks = await Supabase.instance.client
+          .from('hero_within_unlocks')
+          .select()
+          .eq('family_id', widget.familyId);
 
       if (!mounted) return;
       setState(() {
         _family = Map<String, dynamic>.from(family);
         _wallet = wallet == null ? null : Map<String, dynamic>.from(wallet);
+        _heroWithinByChildId = {
+          for (final u in (unlocks as List))
+            (u as Map)['child_id'] as String: Map<String, dynamic>.from(u),
+        };
         _children = (children as List)
             .map((c) => Map<String, dynamic>.from(c as Map))
             .toList();
@@ -178,7 +187,11 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       _FamilyCard(family: _family!, wallet: _wallet),
                       const SizedBox(height: 24),
                       _SectionHeader(text: 'Children (${_children.length})'),
-                      _ChildrenTable(children: _children),
+                      _ChildrenTable(
+                        children: _children,
+                        heroWithinByChildId: _heroWithinByChildId,
+                        onChanged: _load,
+                      ),
                       const SizedBox(height: 24),
                       const _SectionHeader(text: 'Wallet history'),
                       _WalletTable(rows: _walletTxns),
@@ -298,7 +311,13 @@ class _Tag extends StatelessWidget {
 
 class _ChildrenTable extends StatelessWidget {
   final List<Map<String, dynamic>> children;
-  const _ChildrenTable({required this.children});
+  final Map<String, Map<String, dynamic>> heroWithinByChildId;
+  final VoidCallback onChanged;
+  const _ChildrenTable({
+    required this.children,
+    required this.heroWithinByChildId,
+    required this.onChanged,
+  });
   @override
   Widget build(BuildContext context) {
     if (children.isEmpty) return const Text('No children registered.');
@@ -315,6 +334,7 @@ class _ChildrenTable extends StatelessWidget {
           DataColumn(label: Text('Hero')),
           DataColumn(label: Text('Level')),
           DataColumn(label: Text('Total XP')),
+          DataColumn(label: Text('Hero Within')),
           DataColumn(label: Text('Surprise card')),
         ],
         rows: [
@@ -325,10 +345,89 @@ class _ChildrenTable extends StatelessWidget {
               DataCell(Text((c['favourite_hero'] as String?) ?? '—')),
               DataCell(Text('${c['current_level'] ?? '—'}')),
               DataCell(Text('${c['total_xp'] ?? 0}')),
+              DataCell(_HeroWithinCell(
+                child: c,
+                unlock: heroWithinByChildId[c['id'] as String],
+                onChanged: onChanged,
+              )),
               DataCell(_GrantCardAction(child: c)),
             ]),
         ],
       ),
+    );
+  }
+}
+
+class _HeroWithinCell extends ConsumerStatefulWidget {
+  final Map<String, dynamic> child;
+  final Map<String, dynamic>? unlock;
+  final VoidCallback onChanged;
+  const _HeroWithinCell({
+    required this.child,
+    required this.unlock,
+    required this.onChanged,
+  });
+
+  @override
+  ConsumerState<_HeroWithinCell> createState() => _HeroWithinCellState();
+}
+
+class _HeroWithinCellState extends ConsumerState<_HeroWithinCell> {
+  bool _busy = false;
+
+  Future<void> _toggleBirthdayUpgrade() async {
+    final unlock = widget.unlock;
+    if (unlock == null) return;
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'admin_hero_within_set_birthday_upgrade',
+        params: {
+          'p_child_id': widget.child['id'],
+          'p_granted': !(unlock['granted_birthday_upgrade'] == true),
+        },
+      );
+      widget.onChanged();
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't update: ${e.message}")),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final unlock = widget.unlock;
+    if (unlock == null) {
+      return Text(
+        '—',
+        style: AppTextStyles.caption(
+          context,
+          color: AppColors.lightTextSecondary,
+        ),
+      );
+    }
+    final granted = unlock['granted_birthday_upgrade'] == true;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(PhosphorIconsFill.crown, color: AppColors.gold, size: 16),
+        const SizedBox(width: 4),
+        TextButton(
+          onPressed: _busy ? null : _toggleBirthdayUpgrade,
+          child: Text(
+            granted ? 'Birthday upgrade ✓' : 'Mark birthday upgrade',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: granted ? AppColors.activeGreen : AppColors.gold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

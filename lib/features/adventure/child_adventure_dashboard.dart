@@ -8,7 +8,9 @@ import '../../core/widgets/trait_progress_bar.dart';
 import '../gamification/widgets/stage_history_timeline.dart';
 import 'providers/child_by_id_provider.dart';
 import 'widgets/child_header.dart';
+import 'widgets/growth_this_month_card.dart';
 import 'widgets/hero_card_collection_section.dart';
+import 'widgets/hero_within_celebration_card.dart';
 import 'widgets/no_sessions_empty_state.dart';
 import 'widgets/pending_recaps_banner.dart';
 import 'widgets/stats_summary.dart';
@@ -50,15 +52,19 @@ class ChildAdventureDashboard extends ConsumerWidget {
       );
     }
 
+    final childName = (child['name'] as String?) ?? 'Hero';
     return ListView(
       padding: const EdgeInsets.only(bottom: 96),
       children: [
         ChildHeader(child: child),
         PendingRecapsBanner(childId: childId),
         const SizedBox(height: 12),
+        HeroWithinCelebrationCard(childId: childId, childName: childName),
         StatsSummary(childId: childId),
         const SizedBox(height: 12),
         StreakTrackerWidget(childId: childId),
+        const SizedBox(height: 12),
+        GrowthThisMonthCard(childId: childId, childName: childName),
         const SizedBox(height: 12),
         _HeroProgress(child: child),
         const SizedBox(height: 16),
