@@ -7,8 +7,11 @@ import '../providers/hero_cards_providers.dart';
 
 /// One tile in the hero card grid. Earned cards render in full color with
 /// a small "rare" star or a "birthday" cake corner badge. Uncollected
-/// cards get a `ColorFiltered` monochrome silhouette + lock icon overlay
-/// (not interactive).
+/// stage / random / birthday cards get a greyscale silhouette + lock
+/// icon (preserves "this exists, you'll earn it" tease). Ungranted
+/// SURPRISE cards get a fully-mystery '???' tile — admin/staff hand
+/// these out for live moments, so spoiling the art ahead would ruin
+/// the surprise.
 class CardGridItem extends StatelessWidget {
   final HeroCardRow row;
   final VoidCallback? onTap;
@@ -18,6 +21,7 @@ class CardGridItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final earned = row.isEarned;
     final isRare = row.isRare;
+    final isSurprise = row.isSurprise;
     final imageUrl = row.imageUrl ?? '';
 
     final image = imageUrl.isEmpty
@@ -60,11 +64,34 @@ class CardGridItem extends StatelessWidget {
             children: [
               if (earned)
                 image
+              else if (isSurprise)
+                // Full mystery — no art preview, no name, just a sealed
+                // gold-foil square with '???'. Granted manually by
+                // admin/staff for real-world moments.
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.gold.withValues(alpha: 0.35),
+                        _placeholderColor(row.hero).withValues(alpha: 0.35),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text(
+                    '???',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 4,
+                    ),
+                  ),
+                )
               else
                 ColorFiltered(
-                  // Greyscale + dim so the silhouette of the card art stays
-                  // visible — gives the player a "this exists, you'll earn
-                  // it" feel without spoiling the colour.
                   colorFilter: const ColorFilter.matrix([
                     0.2126, 0.7152, 0.0722, 0, -40,
                     0.2126, 0.7152, 0.0722, 0, -40,
@@ -73,7 +100,7 @@ class CardGridItem extends StatelessWidget {
                   ]),
                   child: image,
                 ),
-              if (!earned)
+              if (!earned && !isSurprise)
                 Positioned.fill(
                   child: Container(
                     color: Colors.black.withValues(alpha: 0.35),

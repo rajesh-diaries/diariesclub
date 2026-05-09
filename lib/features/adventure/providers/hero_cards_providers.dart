@@ -18,6 +18,11 @@ class HeroCardRow {
   bool get isBirthdayExclusive => definition['is_birthday_exclusive'] == true;
   String? get imageUrl => definition['image_url'] as String?;
   String? get description => definition['description'] as String?;
+  String get unlockMethod =>
+      (definition['unlock_method'] as String?) ?? 'random_drop';
+  String? get unlockStage => definition['unlock_stage'] as String?;
+  bool get isSurprise => unlockMethod == 'surprise';
+  bool get isStageCard => unlockMethod == 'stage';
 
   bool get isEarned => collection != null;
   DateTime? get earnedAt => collection == null
