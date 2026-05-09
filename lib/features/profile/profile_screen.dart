@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers/app_theme_mode_provider.dart';
+import '../../core/providers/auth_provider.dart';
 import '../../core/providers/current_family_provider.dart';
 import '../../core/router/app_router.dart';
 import '../../core/providers/current_wallet_provider.dart';
@@ -71,6 +73,9 @@ class _Body extends ConsumerWidget {
 
         ProfileSectionHeader(title: 'Diaries Coins'),
         _CoinsSection(),
+
+        ProfileSectionHeader(title: 'Hero perks'),
+        _HeroPerksSection(),
 
         ProfileSectionHeader(title: 'Activity'),
         _ActivitySection(),
@@ -306,6 +311,216 @@ class _CoinsSectionState extends ConsumerState<_CoinsSection> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+//  Hero perks section — stage transitions auto-generate redemption codes
+// ---------------------------------------------------------------------------
+class _HeroPerksSection extends ConsumerWidget {
+  const _HeroPerksSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(unredeemedHeroPerksProvider);
+    return async.when(
+      loading: () => const ProfileSectionCard(children: [
+        ListTile(
+          leading: SizedBox(
+            width: 24, height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          title: Text('Loading…'),
+        ),
+      ]),
+      error: (_, __) => ProfileSectionCard(
+        children: [
+          ListTile(
+            leading: const Icon(
+              PhosphorIconsRegular.warningCircle,
+              color: AppColors.lightTextSecondary,
+            ),
+            title: Text(
+              "Couldn't load perks. Pull to retry.",
+              style: AppTextStyles.body(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+      data: (rows) {
+        if (rows.isEmpty) {
+          return ProfileSectionCard(
+            children: [
+              ListTile(
+                leading: const Icon(
+                  PhosphorIconsRegular.gift,
+                  color: AppColors.lightTextSecondary,
+                ),
+                title: Text(
+                  'No perks waiting',
+                  style: AppTextStyles.body(context),
+                ),
+                subtitle: Text(
+                  'Reach a new stage to unlock real-world rewards.',
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.lightTextSecondary,
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+        return ProfileSectionCard(
+          children: [
+            for (final r in rows) _PerkRow(row: r),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PerkRow extends StatelessWidget {
+  final Map<String, dynamic> row;
+  const _PerkRow({required this.row});
+
+  @override
+  Widget build(BuildContext context) {
+    final code = (row['code'] as String?) ?? '';
+    final label = (row['perk_label'] as String?) ?? 'Perk';
+    final stage = (row['stage'] as String?) ?? '';
+    final childName = (row['child_name'] as String?) ?? '';
+    final expiresAt =
+        DateTime.tryParse((row['expires_at'] as String?) ?? '');
+    final daysLeft = expiresAt == null
+        ? null
+        : expiresAt.difference(DateTime.now()).inDays;
+
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.gold.withValues(alpha: 0.20),
+        ),
+        child: const Icon(
+          PhosphorIconsFill.gift,
+          color: AppColors.gold,
+          size: 20,
+        ),
+      ),
+      title: Text(
+        label,
+        style: AppTextStyles.body(context).copyWith(fontWeight: FontWeight.w800),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${childName.isEmpty ? 'Hero' : childName} · ${_stageTitle(stage)}',
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.navy.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    PhosphorIconsRegular.ticket,
+                    color: AppColors.navy,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    code,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.5,
+                      color: AppColors.navy,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (daysLeft != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                daysLeft <= 0
+                    ? 'Expires today'
+                    : 'Show at counter · $daysLeft day${daysLeft == 1 ? '' : 's'} left',
+                style: AppTextStyles.caption(
+                  context,
+                  color: daysLeft <= 3
+                      ? AppColors.adminRed
+                      : AppColors.lightTextSecondary,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      trailing: IconButton(
+        icon: const Icon(Icons.copy_outlined),
+        tooltip: 'Copy code',
+        onPressed: () async {
+          await Clipboard.setData(ClipboardData(text: code));
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Copied $code to clipboard')),
+          );
+        },
+      ),
+    );
+  }
+
+  String _stageTitle(String s) =>
+      s.isEmpty ? '?' : '${s[0].toUpperCase()}${s.substring(1)}';
+}
+
+/// Stream of unredeemed, unexpired hero perk grants for the family,
+/// joined with the perk definition + child name. RLS scopes by family.
+final unredeemedHeroPerksProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final familyId = ref.watch(currentFamilyIdProvider);
+  if (familyId == null) return const [];
+  final rows = await Supabase.instance.client
+      .from('stage_perk_grants')
+      .select(
+        'id, code, stage, trait, granted_at, expires_at, '
+        'children!inner(name), '
+        'stage_perks!inner(perk_label, perk_description)',
+      )
+      .eq('family_id', familyId)
+      .isFilter('redeemed_at', null)
+      .gte('expires_at', DateTime.now().toUtc().toIso8601String())
+      .order('granted_at', ascending: false);
+  return (rows as List).map((r) {
+    final m = Map<String, dynamic>.from(r as Map);
+    final children = m['children'] as Map?;
+    final perk = m['stage_perks'] as Map?;
+    return {
+      ...m,
+      'child_name': children?['name'],
+      'perk_label': perk?['perk_label'],
+      'perk_description': perk?['perk_description'],
+    };
+  }).toList();
+});
 
 // ---------------------------------------------------------------------------
 //  Activity section
