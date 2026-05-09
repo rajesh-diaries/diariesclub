@@ -82,8 +82,9 @@ class _HeroCardTile extends StatelessWidget {
     final image = row['image_url'] as String?;
     final hero = (row['hero'] as String?) ?? '—';
     final isActive = (row['is_active'] as bool?) ?? true;
-    final isRare = (row['is_rare'] as bool?) ?? false;
-    final isBday = (row['is_birthday_exclusive'] as bool?) ?? false;
+    final unlockMethod =
+        (row['unlock_method'] as String?) ?? 'random_drop';
+    final unlockStage = row['unlock_stage'] as String?;
 
     return SizedBox(
       width: 240,
@@ -153,16 +154,21 @@ class _HeroCardTile extends StatelessWidget {
                         spacing: 4,
                         runSpacing: 4,
                         children: [
-                          if (isRare)
-                            const _MiniChip(
-                              label: 'Rare',
-                              color: Color(0xFFA66BFF),
-                            ),
-                          if (isBday)
-                            const _MiniChip(
-                              label: 'Birthday',
-                              color: AppColors.gold,
-                            ),
+                          _MiniChip(
+                            label: switch (unlockMethod) {
+                              'stage' =>
+                                'Stage · ${(unlockStage ?? '?').replaceFirst(unlockStage?[0] ?? '', (unlockStage?[0] ?? '').toUpperCase())}',
+                              'surprise' => 'Surprise',
+                              'birthday' => 'Birthday',
+                              _ => 'Random drop',
+                            },
+                            color: switch (unlockMethod) {
+                              'stage' => AppColors.activeGreen,
+                              'surprise' => AppColors.gold,
+                              'birthday' => const Color(0xFFE8524A),
+                              _ => AppColors.lightTextSecondary,
+                            },
+                          ),
                           if (!isActive)
                             const _MiniChip(
                               label: 'Hidden',
@@ -229,6 +235,10 @@ class _HeroCardEditorState extends State<_HeroCardEditor> {
   late bool _isRare = (widget.row?['is_rare'] as bool?) ?? false;
   late bool _isBday = (widget.row?['is_birthday_exclusive'] as bool?) ?? false;
   late bool _isActive = (widget.row?['is_active'] as bool?) ?? true;
+  late String _unlockMethod =
+      (widget.row?['unlock_method'] as String?) ?? 'random_drop';
+  late String? _unlockStage =
+      widget.row?['unlock_stage'] as String?;
 
   bool _busy = false;
   String? _error;
@@ -242,6 +252,10 @@ class _HeroCardEditorState extends State<_HeroCardEditor> {
   }
 
   Future<void> _save() async {
+    if (_unlockMethod == 'stage' && _unlockStage == null) {
+      setState(() => _error = 'Pick which stage unlocks this card.');
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -259,6 +273,9 @@ class _HeroCardEditorState extends State<_HeroCardEditor> {
           'p_is_rare': _isRare,
           'p_is_birthday_exclusive': _isBday,
           'p_is_active': _isActive,
+          'p_unlock_method': _unlockMethod,
+          'p_unlock_stage':
+              _unlockMethod == 'stage' ? _unlockStage : null,
         },
       );
       if (!mounted) return;
@@ -324,16 +341,68 @@ class _HeroCardEditorState extends State<_HeroCardEditor> {
                   border: OutlineInputBorder(),
                 ),
               ),
+              const SizedBox(height: 16),
+              const Text('How is this card earned?',
+                  style: TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _unlockMethod,
+                decoration: const InputDecoration(
+                  labelText: 'Unlock method',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'stage',
+                    child: Text('Stage card · auto-unlock by XP'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'surprise',
+                    child: Text('Surprise · admin/staff manual grant'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'birthday',
+                    child: Text('Birthday · earned at hosted birthday'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'random_drop',
+                    child: Text('Random drop · Healthy Bite roll'),
+                  ),
+                ],
+                onChanged: (v) => setState(() {
+                  _unlockMethod = v ?? 'random_drop';
+                  if (_unlockMethod != 'stage') _unlockStage = null;
+                }),
+              ),
+              if (_unlockMethod == 'stage') ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _unlockStage,
+                  decoration: const InputDecoration(
+                    labelText: 'Unlocks at stage',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'welcome',     child: Text('Welcome (signup)')),
+                    DropdownMenuItem(value: 'seedling',    child: Text('Seedling (1 XP)')),
+                    DropdownMenuItem(value: 'explorer',    child: Text('Explorer (50 XP)')),
+                    DropdownMenuItem(value: 'adventurer',  child: Text('Adventurer (150 XP)')),
+                    DropdownMenuItem(value: 'champion',    child: Text('Champion (350 XP)')),
+                    DropdownMenuItem(value: 'legend',      child: Text('Legend (700 XP)')),
+                  ],
+                  onChanged: (v) => setState(() => _unlockStage = v),
+                ),
+              ],
               const SizedBox(height: 12),
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Rare'),
+                title: const Text('Rare flag (legacy — only affects random_drop)'),
                 value: _isRare,
                 onChanged: (v) => setState(() => _isRare = v),
               ),
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Birthday exclusive'),
+                title: const Text('Birthday exclusive flag (legacy)'),
                 value: _isBday,
                 onChanged: (v) => setState(() => _isBday = v),
               ),
