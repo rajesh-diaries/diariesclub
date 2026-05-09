@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../providers/child_by_id_provider.dart';
 
 const _heroOrder = ['rafi', 'ellie', 'gerry', 'zena'];
 
@@ -251,6 +252,12 @@ class _TraitDelta extends StatelessWidget {
 
 final _recentXpEventsProvider = FutureProvider.autoDispose
     .family<List<Map<String, dynamic>>, String>((ref, childId) async {
+  // Re-run whenever the child row updates (every xp_credit_with_split
+  // bumps total_xp). Without this watch, the provider caches its first
+  // fetch and never reflects later XP earned during the same screen
+  // visit — the parent sees stale "Growth this month" totals while
+  // hero progress bars race ahead.
+  ref.watch(childByIdProvider(childId));
   final since = DateTime.now().toUtc().subtract(const Duration(days: 30));
   final rows = await Supabase.instance.client
       .from('xp_events')
