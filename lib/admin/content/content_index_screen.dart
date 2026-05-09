@@ -48,6 +48,13 @@ class ContentIndexScreen extends StatelessWidget {
                       'Card definitions awarded for hero moments. Per-hero, rare/birthday-exclusive flags, descriptions.',
                   onTap: () => context.go('/admin/content/hero-cards'),
                 ),
+                _ContentCard(
+                  icon: PhosphorIconsRegular.gift,
+                  title: 'Stage perks',
+                  description:
+                      'Real-world rewards a kid unlocks each time a trait crosses a stage. Codes auto-generate; staff redeems at counter.',
+                  onTap: () => context.go('/admin/content/stage-perks'),
+                ),
                 const _ContentCard(
                   icon: PhosphorIconsRegular.fileText,
                   title: 'FAQ',

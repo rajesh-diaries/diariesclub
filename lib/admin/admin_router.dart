@@ -21,6 +21,7 @@ import 'catalog/menu_item_edit_screen.dart';
 import 'config/config_screen.dart';
 import 'content/content_index_screen.dart';
 import 'content/hero_cards_screen.dart';
+import 'content/stage_perks_screen.dart';
 import 'content/reflection_moments_screen.dart';
 import 'customers/customer_detail_screen.dart';
 import 'customers/customers_screen.dart';
@@ -221,6 +222,10 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/content/hero-cards',
             builder: (_, __) => const HeroCardsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/content/stage-perks',
+            builder: (_, __) => const StagePerksScreen(),
           ),
           // Stubs.
           GoRoute(
