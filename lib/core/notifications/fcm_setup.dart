@@ -16,10 +16,22 @@ import 'notification_channels.dart';
 /// FcmSetup.initialize and refreshed via onTokenRefresh.
 String? currentFcmToken;
 
-/// Pending deep link captured when the app cold-starts via a notification
-/// tap (FirebaseMessaging.instance.getInitialMessage). Customer router
-/// reads + clears this on the first frame after sign-in.
-String? pendingFcmDeepLink;
+/// Pending deep link from a notification tap. Reactive so resumed-from-
+/// background and foreground-tap events route correctly without waiting
+/// for home_screen.initState to fire again.
+///
+///   * Cold start (app killed)  → set in initialize() from getInitialMessage
+///   * Background resume tap    → set in _onMessageOpenedApp
+///   * Foreground tap on banner → set in _onLocalTap
+///
+/// Home screen attaches a listener and pushes whenever this changes.
+final ValueNotifier<String?> pendingFcmDeepLinkNotifier =
+    ValueNotifier<String?>(null);
+
+/// Backwards-compat shim used by the FCM debug screen and any callers
+/// that just want a one-shot read.
+String? get pendingFcmDeepLink => pendingFcmDeepLinkNotifier.value;
+set pendingFcmDeepLink(String? v) => pendingFcmDeepLinkNotifier.value = v;
 
 /// Background message handler must be a top-level / static function
 /// annotated with @pragma so the Dart entry-point survives AOT tree-shaking.

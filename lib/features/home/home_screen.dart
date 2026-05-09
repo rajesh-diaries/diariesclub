@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/notifications/fcm_lifecycle_provider.dart';
+import '../../core/notifications/fcm_setup.dart';
 import '../../core/providers/active_sessions_provider.dart';
 import '../../core/providers/home_state_provider.dart';
 import '../../core/providers/recent_activity_provider.dart';
@@ -40,15 +41,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Cold-start FCM tap → consume the deep link saved by FcmSetup once
     // we've reached Home (the safe, signed-in landing point).
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final deepLink = consumePendingFcmDeepLink();
-      if (deepLink != null && mounted) {
-        context.push(deepLink);
-      }
+      _consumeIfPending();
     });
+
+    // Reactive subscription — fires whenever a notification tap pushes a
+    // new deep link AFTER home_screen has already mounted (background
+    // resume taps, foreground banner taps, second-notification taps).
+    pendingFcmDeepLinkNotifier.addListener(_onPendingDeepLinkChanged);
+  }
+
+  void _onPendingDeepLinkChanged() => _consumeIfPending();
+
+  void _consumeIfPending() {
+    final link = consumePendingFcmDeepLink();
+    if (link != null && mounted) {
+      context.push(link);
+    }
   }
 
   @override
   void dispose() {
+    pendingFcmDeepLinkNotifier.removeListener(_onPendingDeepLinkChanged);
     _sub?.close();
     super.dispose();
   }
