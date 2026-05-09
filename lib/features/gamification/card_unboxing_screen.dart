@@ -150,7 +150,13 @@ class _Body extends StatelessWidget {
     final hero = (card['hero'] as String?) ?? 'rafi';
     final heroColor = _heroColor(hero);
 
-    return Column(
+    // Bounded-height column wouldn't fit the card + reveal container on
+    // shorter phones (caused a 200+px overflow). Make the whole layout
+    // scrollable as a fallback, and replace the two flexible Spacers
+    // with fixed gaps since SingleChildScrollView gives an unbounded
+    // vertical extent (Spacer needs bounded constraints).
+    return SingleChildScrollView(
+      child: Column(
       children: [
         const SizedBox(height: 32),
         Text(
@@ -163,7 +169,7 @@ class _Body extends StatelessWidget {
           revealed ? 'Tap below for details' : 'Tap to reveal',
           style: AppTextStyles.body(context, color: Colors.white70),
         ),
-        const Spacer(),
+        const SizedBox(height: 32),
         Center(
           child: GestureDetector(
             onTap: revealed ? null : onReveal,
@@ -200,7 +206,7 @@ class _Body extends StatelessWidget {
             ),
           ),
         ),
-        const Spacer(),
+        const SizedBox(height: 32),
         if (revealed) ...[
           const SizedBox(height: 8),
           Container(
@@ -304,7 +310,7 @@ class _Body extends StatelessWidget {
         ],
         const SizedBox(height: 32),
       ],
-    );
+    ));
   }
 
   static Color _heroColor(String t) => switch (t) {
