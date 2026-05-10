@@ -358,11 +358,13 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kids = reservation['num_kids'] as int? ?? 0;
-    final adults = reservation['num_adults'] as int? ?? 0;
+    final guestCount = reservation['num_kids'] as int? ?? 0;
+    final slotDate = reservation['slot_date'] as String?;
+    final slot = reservation['slot'] as String?;
+    final special = reservation['special_requests'] as String?;
+    // Backwards-compat for older rows that still have preferred_month/window.
     final preferredMonth = reservation['preferred_month'] as String?;
     final preferredWindow = reservation['preferred_window'] as String?;
-    final special = reservation['special_requests'] as String?;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -377,11 +379,15 @@ class _SummaryCard extends StatelessWidget {
         children: [
           if (packageName != null)
             _Row(label: 'Package', value: packageName!),
-          if (preferredMonth != null)
+          if (slotDate != null && slotDate.isNotEmpty)
+            _Row(label: 'Date', value: slotDate),
+          if (slot != null && slot.isNotEmpty)
+            _Row(label: 'Slot', value: slot[0].toUpperCase() + slot.substring(1)),
+          if (slotDate == null && preferredMonth != null)
             _Row(label: 'Preferred month', value: preferredMonth),
-          if (preferredWindow != null)
+          if (slotDate == null && preferredWindow != null)
             _Row(label: 'Preferred time', value: _humanizeWindow(preferredWindow)),
-          _Row(label: 'Guests', value: '$kids kids · $adults adults'),
+          _Row(label: 'Guests', value: '$guestCount approx.'),
           if (special != null && special.isNotEmpty)
             _Row(label: 'Special requests', value: special),
         ],

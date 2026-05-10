@@ -40,20 +40,16 @@ class PackageDetailScreen extends ConsumerStatefulWidget {
 
 class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
   String? _selectedChildId;
-  String? _preferredMonth;
-  String? _preferredWindow;
-  int _numKids = 15;
-  int _numAdults = 10;
+  DateTime? _slotDate;
+  // 'morning' | 'evening'
+  String _slot = 'morning';
+  int _guestCount = 30;
+  // Tracks whether the parent manually picked a date — if not, we
+  // re-prefill when the child selection changes.
+  bool _dateManuallyEdited = false;
   final _specialRequests = TextEditingController();
   bool _busy = false;
   String? _errorText;
-
-  static const _windowOptions = <(String, String)>[
-    ('weekend_morning', 'Weekend morning'),
-    ('weekend_afternoon', 'Weekend afternoon'),
-    ('weekend_evening', 'Weekend evening'),
-    ('weekday_evening', 'Weekday evening'),
-  ];
 
   @override
   void dispose() {
@@ -61,15 +57,34 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
     super.dispose();
   }
 
-  List<String> _monthOptions() {
-    final now = DateTime.now();
-    return List.generate(12, (i) {
-      final d = DateTime(now.year, now.month + i, 1);
-      const months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December',
-      ];
-      return '${months[d.month - 1]} ${d.year}';
+  /// Compute the next occurrence of the kid's birthday (today or later).
+  DateTime _defaultDateForChild(Map<String, dynamic> child) {
+    final dobStr = child['date_of_birth'] as String?;
+    final today = DateUtils.dateOnly(DateTime.now());
+    if (dobStr == null || dobStr.isEmpty) {
+      return today.add(const Duration(days: 30));
+    }
+    final dob = DateTime.tryParse(dobStr);
+    if (dob == null) return today.add(const Duration(days: 30));
+    var candidate = DateTime(today.year, dob.month, dob.day);
+    if (candidate.isBefore(today)) {
+      candidate = DateTime(today.year + 1, dob.month, dob.day);
+    }
+    return candidate;
+  }
+
+  void _selectChild(String? id, List<Map<String, dynamic>> children) {
+    setState(() {
+      _selectedChildId = id;
+      if (id != null && !_dateManuallyEdited) {
+        final child = children.firstWhere(
+          (c) => c['id'] == id,
+          orElse: () => const <String, dynamic>{},
+        );
+        if (child.isNotEmpty) {
+          _slotDate = _defaultDateForChild(child);
+        }
+      }
     });
   }
 
@@ -77,15 +92,15 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
     required Map<String, dynamic> package,
   }) async {
     if (_selectedChildId == null) {
-      setState(() => _errorText = 'Pick a child for this birthday.');
+      setState(() => _errorText = 'Pick the birthday kid.');
       return;
     }
-    if (_preferredMonth == null) {
-      setState(() => _errorText = 'Pick a rough month.');
+    if (_slotDate == null) {
+      setState(() => _errorText = 'Pick a date.');
       return;
     }
-    if (_preferredWindow == null) {
-      setState(() => _errorText = 'Pick a rough time of day.');
+    if (_guestCount <= 0) {
+      setState(() => _errorText = 'Add an approximate guest count.');
       return;
     }
 
@@ -98,18 +113,21 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
     });
 
     final idem = const Uuid().v4();
+    final dateOnly =
+        '${_slotDate!.year.toString().padLeft(4, '0')}-'
+        '${_slotDate!.month.toString().padLeft(2, '0')}-'
+        '${_slotDate!.day.toString().padLeft(2, '0')}';
 
     try {
       final result = await Supabase.instance.client
-          .rpc<Map<String, dynamic>>('birthday_reservation_create', params: {
+          .rpc<Map<String, dynamic>>('birthday_inquiry_submit', params: {
         'p_venue_id': _venueId,
         'p_family_id': familyId,
         'p_child_id': _selectedChildId,
         'p_package_id': widget.packageId,
-        'p_preferred_month': _preferredMonth,
-        'p_preferred_window': _preferredWindow,
-        'p_num_kids': _numKids,
-        'p_num_adults': _numAdults,
+        'p_slot_date': dateOnly,
+        'p_slot': _slot,
+        'p_guest_count': _guestCount,
         'p_special_requests':
             _specialRequests.text.trim().isEmpty
                 ? null
@@ -120,7 +138,7 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
 
       final reservationId = result['reservation_id'] as String?;
       if (reservationId == null) {
-        throw StateError('birthday_reservation_create returned no id');
+        throw StateError('birthday_inquiry_submit returned no id');
       }
       if (!mounted) return;
       context.go('/birthday/status/$reservationId');
@@ -129,12 +147,15 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
       setState(() => _busy = false);
       if (e.message.contains('reservation_exists')) {
         _showExistingReservationSheet();
-      } else if (e.message.contains('invalid_kids')) {
-        setState(() => _errorText =
-            'Too many kids for this package (max ${package['max_kids']}).');
-      } else if (e.message.contains('invalid_adults')) {
-        setState(() => _errorText =
-            'Too many adults for this package (max ${package['max_adults']}).');
+      } else if (e.message.contains('invalid_guest_count')) {
+        final maxG = package['max_guests'];
+        setState(() => _errorText = maxG != null
+            ? 'This package fits up to $maxG guests. Reduce the count or pick a bigger package.'
+            : 'Guest count looks off. Please check.');
+      } else if (e.message.contains('invalid_slot')) {
+        setState(() => _errorText = 'Pick Morning or Evening.');
+      } else if (e.message.contains('invalid_slot_date')) {
+        setState(() => _errorText = 'Pick a valid date.');
       } else if (e.message.contains('invalid_package')) {
         setState(() => _errorText = "This package isn't available right now.");
       } else {
@@ -227,9 +248,11 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
     Map<String, dynamic> package,
     List<Map<String, dynamic>> children,
   ) {
-    final price = (package['price_paise'] as int?) ?? 0;
-    final maxKids = (package['max_kids'] as int?) ?? 30;
-    final maxAdults = (package['max_adults'] as int?) ?? 30;
+    final priceVeg = (package['price_per_pax_veg_paise'] as int?) ?? 0;
+    final priceNonVeg = (package['price_per_pax_non_veg_paise'] as int?) ?? 0;
+    final hallName = (package['hall_name'] as String?) ?? '';
+    final minGuests = (package['min_guests'] as int?) ?? 0;
+    final maxGuests = (package['max_guests'] as int?) ?? 200;
 
     final gallery = <String>[
       ...((package['gallery_image_urls'] as List?) ?? const [])
@@ -240,6 +263,14 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
       gallery.add(cover);
     }
 
+    // First-time landing — auto-pick first kid + prefill date.
+    if (_selectedChildId == null && children.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _selectChild(children.first['id'] as String?, children);
+      });
+    }
+
     return Stack(
       children: [
         ListView(
@@ -247,9 +278,11 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
           children: [
             _Carousel(images: gallery),
             _PriceBar(
-              pricePaise: price,
-              maxKids: maxKids,
-              maxAdults: maxAdults,
+              priceVegPaise: priceVeg,
+              priceNonVegPaise: priceNonVeg,
+              hallName: hallName,
+              minGuests: minGuests,
+              maxGuests: maxGuests,
             ),
             const SizedBox(height: 16),
             const _SectionHeader(text: "What's included"),
@@ -280,19 +313,29 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
             _PreferencesForm(
               children: children,
               selectedChildId: _selectedChildId,
-              onChildChanged: (v) => setState(() => _selectedChildId = v),
-              preferredMonth: _preferredMonth,
-              monthOptions: _monthOptions(),
-              onMonthChanged: (v) => setState(() => _preferredMonth = v),
-              preferredWindow: _preferredWindow,
-              windowOptions: _windowOptions,
-              onWindowChanged: (v) => setState(() => _preferredWindow = v),
-              numKids: _numKids,
-              maxKids: maxKids,
-              onKidsChanged: (v) => setState(() => _numKids = v),
-              numAdults: _numAdults,
-              maxAdults: maxAdults,
-              onAdultsChanged: (v) => setState(() => _numAdults = v),
+              onChildChanged: (v) => _selectChild(v, children),
+              slotDate: _slotDate,
+              onPickDate: () async {
+                final today = DateUtils.dateOnly(DateTime.now());
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _slotDate ?? today.add(const Duration(days: 30)),
+                  firstDate: today,
+                  lastDate: today.add(const Duration(days: 365 * 2)),
+                );
+                if (picked != null) {
+                  setState(() {
+                    _slotDate = picked;
+                    _dateManuallyEdited = true;
+                  });
+                }
+              },
+              slot: _slot,
+              onSlotChanged: (v) => setState(() => _slot = v),
+              guestCount: _guestCount,
+              minGuests: minGuests,
+              maxGuests: maxGuests,
+              onGuestCountChanged: (v) => setState(() => _guestCount = v),
               specialRequests: _specialRequests,
             ),
             if (_errorText != null) ...[
@@ -403,13 +446,17 @@ class _CarouselState extends State<_Carousel> {
 }
 
 class _PriceBar extends StatelessWidget {
-  final int pricePaise;
-  final int maxKids;
-  final int maxAdults;
+  final int priceVegPaise;
+  final int priceNonVegPaise;
+  final String hallName;
+  final int minGuests;
+  final int maxGuests;
   const _PriceBar({
-    required this.pricePaise,
-    required this.maxKids,
-    required this.maxAdults,
+    required this.priceVegPaise,
+    required this.priceNonVegPaise,
+    required this.hallName,
+    required this.minGuests,
+    required this.maxGuests,
   });
 
   @override
@@ -417,40 +464,53 @@ class _PriceBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       color: AppColors.lightSurface,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                Money.fromPaise(pricePaise),
-                style: AppTextStyles.h1(context, color: AppColors.gold),
-              ),
-              Text(
-                'All-inclusive · No surprises',
-                style: AppTextStyles.caption(
-                  context,
-                  color: AppColors.lightTextSecondary,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Veg ${Money.fromPaise(priceVegPaise)} · '
+                      'Non-Veg ${Money.fromPaise(priceNonVegPaise)}',
+                      style: AppTextStyles.h3(context, color: AppColors.gold),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Per pax · 18% GST extra',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-          const Spacer(),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                'Up to $maxKids kids',
-                style: AppTextStyles.body(context),
-              ),
-              Text(
-                '$maxAdults adults',
-                style: AppTextStyles.caption(
-                  context,
-                  color: AppColors.lightTextSecondary,
+              if (hallName.isNotEmpty) ...[
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      hallName,
+                      style: AppTextStyles.body(context).copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      '$minGuests–$maxGuests guests',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+              ],
             ],
           ),
         ],
@@ -636,21 +696,16 @@ class _PreferencesForm extends StatelessWidget {
   final String? selectedChildId;
   final ValueChanged<String?> onChildChanged;
 
-  final String? preferredMonth;
-  final List<String> monthOptions;
-  final ValueChanged<String?> onMonthChanged;
+  final DateTime? slotDate;
+  final VoidCallback onPickDate;
 
-  final String? preferredWindow;
-  final List<(String, String)> windowOptions;
-  final ValueChanged<String?> onWindowChanged;
+  final String slot;
+  final ValueChanged<String> onSlotChanged;
 
-  final int numKids;
-  final int maxKids;
-  final ValueChanged<int> onKidsChanged;
-
-  final int numAdults;
-  final int maxAdults;
-  final ValueChanged<int> onAdultsChanged;
+  final int guestCount;
+  final int minGuests;
+  final int maxGuests;
+  final ValueChanged<int> onGuestCountChanged;
 
   final TextEditingController specialRequests;
 
@@ -658,20 +713,23 @@ class _PreferencesForm extends StatelessWidget {
     required this.children,
     required this.selectedChildId,
     required this.onChildChanged,
-    required this.preferredMonth,
-    required this.monthOptions,
-    required this.onMonthChanged,
-    required this.preferredWindow,
-    required this.windowOptions,
-    required this.onWindowChanged,
-    required this.numKids,
-    required this.maxKids,
-    required this.onKidsChanged,
-    required this.numAdults,
-    required this.maxAdults,
-    required this.onAdultsChanged,
+    required this.slotDate,
+    required this.onPickDate,
+    required this.slot,
+    required this.onSlotChanged,
+    required this.guestCount,
+    required this.minGuests,
+    required this.maxGuests,
+    required this.onGuestCountChanged,
     required this.specialRequests,
   });
+
+  static const _months = [
+    'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
+  ];
+
+  String _formatDate(DateTime d) =>
+      '${d.day} ${_months[d.month - 1]} ${d.year}';
 
   @override
   Widget build(BuildContext context) {
@@ -680,71 +738,67 @@ class _PreferencesForm extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (children.length > 1) ...[
-            Text(
-              'For which child?',
-              style: AppTextStyles.bodyLarge(context),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final c in children)
-                  ChoiceChip(
-                    label: Text((c['name'] as String?) ?? '—'),
-                    selected: selectedChildId == c['id'],
-                    onSelected: (_) => onChildChanged(c['id'] as String?),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-          ],
-          Text('Roughly when?', style: AppTextStyles.bodyLarge(context)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: preferredMonth,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            hint: const Text('Pick a month'),
-            items: [
-              for (final m in monthOptions)
-                DropdownMenuItem(value: m, child: Text(m)),
-            ],
-            onChanged: onMonthChanged,
+          Text(
+            'Whose birthday?',
+            style: AppTextStyles.bodyLarge(context),
           ),
-          const SizedBox(height: 16),
-          Text('Time of day?', style: AppTextStyles.bodyLarge(context)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final w in windowOptions)
+              for (final c in children)
                 ChoiceChip(
-                  label: Text(w.$2),
-                  selected: preferredWindow == w.$1,
-                  onSelected: (_) => onWindowChanged(w.$1),
+                  label: Text((c['name'] as String?) ?? '—'),
+                  selected: selectedChildId == c['id'],
+                  onSelected: (_) => onChildChanged(c['id'] as String?),
                 ),
             ],
           ),
           const SizedBox(height: 16),
-          _Stepper(
-            label: 'Number of kids',
-            value: numKids,
-            min: 1,
-            max: maxKids,
-            onChanged: onKidsChanged,
+          Text('Date', style: AppTextStyles.bodyLarge(context)),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: onPickDate,
+            icon: const Icon(PhosphorIconsRegular.calendar),
+            label: Text(
+              slotDate == null ? 'Pick a date' : _formatDate(slotDate!),
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          Text('Slot', style: AppTextStyles.bodyLarge(context)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ChoiceChip(
+                label: const Text('Morning'),
+                selected: slot == 'morning',
+                onSelected: (_) => onSlotChanged('morning'),
+              ),
+              ChoiceChip(
+                label: const Text('Evening'),
+                selected: slot == 'evening',
+                onSelected: (_) => onSlotChanged('evening'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           _Stepper(
-            label: 'Number of adults',
-            value: numAdults,
-            min: 0,
-            max: maxAdults,
-            onChanged: onAdultsChanged,
+            label: 'Approximate guest count',
+            value: guestCount,
+            min: 1,
+            max: maxGuests,
+            onChanged: onGuestCountChanged,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'This package fits $minGuests–$maxGuests guests',
+            style: AppTextStyles.caption(
+              context,
+              color: AppColors.lightTextSecondary,
+            ),
           ),
           const SizedBox(height: 16),
           Text(
@@ -754,12 +808,30 @@ class _PreferencesForm extends StatelessWidget {
           const SizedBox(height: 8),
           TextField(
             controller: specialRequests,
-            maxLength: 200,
-            maxLines: 3,
-            inputFormatters: [LengthLimitingTextInputFormatter(200)],
+            maxLength: 300,
+            maxLines: 4,
+            inputFormatters: [LengthLimitingTextInputFormatter(300)],
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
-              hintText: 'Allergies, themes, surprises…',
+              hintText:
+                  'Themes, dietary needs, decoration ideas, photographer…',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.lightBackground,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.lightBorder),
+            ),
+            child: Text(
+              'These packages are starting points. For better customization, '
+              'our team will reach out within 4 hours to plan the details.',
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
             ),
           ),
         ],
@@ -837,14 +909,14 @@ class _StickyCta extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: PrimaryButton(
-              label: 'Reserve interest',
+              label: 'Submit inquiry',
               loading: busy,
               onPressed: busy ? null : onPressed,
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            "No payment yet — we'll WhatsApp you within 24 hours.",
+            "No payment in app — we'll reach out within 4 hours.",
             style: AppTextStyles.caption(
               context,
               color: AppColors.lightTextSecondary,

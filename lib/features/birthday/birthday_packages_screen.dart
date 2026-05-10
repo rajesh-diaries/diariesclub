@@ -83,16 +83,20 @@ class _PackageCard extends StatelessWidget {
     final description = (package['description'] as String?) ?? '';
     final tier = package['tier'] as String?;
     final cover = package['cover_image_url'] as String?;
-    final price = (package['price_paise'] as int?) ?? 0;
-    final maxKids = (package['max_kids'] as int?) ?? 0;
-    final maxAdults = (package['max_adults'] as int?) ?? 0;
-    final inclusions = (package['inclusions'] as Map?)?.cast<String, dynamic>() ??
-        const <String, dynamic>{};
+    final priceVeg = (package['price_per_pax_veg_paise'] as int?) ?? 0;
+    final priceNonVeg = (package['price_per_pax_non_veg_paise'] as int?) ?? 0;
+    final hallName = (package['hall_name'] as String?) ?? '';
+    final minGuests = (package['min_guests'] as int?) ?? 0;
+    final maxGuests = (package['max_guests'] as int?) ?? 0;
+    // inclusions seeded as a JSON array of strings ("Min 20 guests", "1 Welcome Drink", …).
+    final inclusionLines = ((package['inclusions'] as List?) ?? const [])
+        .whereType<String>()
+        .toList();
 
-    final badge = tier == 'hero_adventure'
-        ? const _Badge(text: 'Most Booked', color: AppColors.gold)
-        : tier == 'legendary'
-            ? const _Badge(text: 'Premium', color: AppColors.navy)
+    final badge = tier == 'magical'
+        ? const _Badge(text: 'Premium', color: AppColors.navy)
+        : tier == 'happy_tales'
+            ? const _Badge(text: 'Most Booked', color: AppColors.gold)
             : null;
 
     return Container(
@@ -137,32 +141,41 @@ class _PackageCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(name, style: AppTextStyles.h3(context)),
+                Text(name, style: AppTextStyles.h3(context)),
+                if (hallName.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '$hallName · $minGuests–$maxGuests guests',
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.lightTextSecondary,
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'from',
-                          style: AppTextStyles.caption(
-                            context,
-                            color: AppColors.lightTextSecondary,
-                          ),
-                        ),
-                        Text(
-                          Money.fromPaise(price),
-                          style: AppTextStyles.h2(context, color: AppColors.gold),
-                        ),
-                      ],
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    _PriceChip(
+                      label: 'Veg',
+                      pricePaise: priceVeg,
+                    ),
+                    _PriceChip(
+                      label: 'Non-Veg',
+                      pricePaise: priceNonVeg,
+                    ),
+                    Text(
+                      'per pax · 18% GST extra',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
                     ),
                   ],
                 ),
                 if (description.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Text(
                     description,
                     style: AppTextStyles.body(
@@ -172,33 +185,23 @@ class _PackageCard extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 14),
-                ..._extractInclusions(inclusions)
-                    .take(4)
-                    .map((line) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.check,
-                                size: 16,
-                                color: AppColors.activeGreen,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(line,
-                                    style: AppTextStyles.body(context)),
-                              ),
-                            ],
+                ...inclusionLines.take(6).map((line) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.check,
+                            size: 16,
+                            color: AppColors.activeGreen,
                           ),
-                        )),
-                const SizedBox(height: 12),
-                Text(
-                  'Up to $maxKids kids · $maxAdults adults',
-                  style: AppTextStyles.caption(
-                    context,
-                    color: AppColors.lightTextSecondary,
-                  ),
-                ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(line,
+                                style: AppTextStyles.body(context)),
+                          ),
+                        ],
+                      ),
+                    )),
                 const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
@@ -209,7 +212,7 @@ class _PackageCard extends StatelessWidget {
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: const Text('See details'),
+                    child: const Text('Inquire about this package'),
                   ),
                 ),
               ],
@@ -220,21 +223,29 @@ class _PackageCard extends StatelessWidget {
     );
   }
 
-  /// Pulls a set of human-readable lines out of the JSONB `inclusions`
-  /// blob. Currently the seed uses simple key→value pairs (e.g.
-  /// `play_session: "2hr"`); we humanise the keys for display.
-  List<String> _extractInclusions(Map<String, dynamic> json) {
-    final out = <String>[];
-    json.forEach((key, value) {
-      if (value == null) return;
-      final humanKey = key
-          .replaceAll('_', ' ')
-          .split(' ')
-          .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
-          .join(' ');
-      out.add('$humanKey: $value');
-    });
-    return out;
+}
+
+class _PriceChip extends StatelessWidget {
+  final String label;
+  final int pricePaise;
+  const _PriceChip({required this.label, required this.pricePaise});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.gold.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        '$label ${Money.fromPaise(pricePaise)}',
+        style: AppTextStyles.caption(context).copyWith(
+          fontWeight: FontWeight.w800,
+          color: AppColors.navy,
+        ),
+      ),
+    );
   }
 }
 
