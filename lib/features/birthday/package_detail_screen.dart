@@ -293,10 +293,7 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
             ),
             const SizedBox(height: 16),
             const _SectionHeader(text: "What's included"),
-            _Inclusions(
-              json: (package['inclusions'] as Map?)?.cast<String, dynamic>() ??
-                  const {},
-            ),
+            _Inclusions(raw: package['inclusions']),
             const SizedBox(height: 16),
             const _SectionHeader(text: 'Not included'),
             const _NotIncluded(),
@@ -542,21 +539,32 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _Inclusions extends StatelessWidget {
-  final Map<String, dynamic> json;
-  const _Inclusions({required this.json});
+  // Accepts either:
+  //   * List<String> — the new shape ([1 Welcome Drink, 2 Starters, ...])
+  //   * Map<String, dynamic> — legacy shape (key:value pairs we humanise)
+  final dynamic raw;
+  const _Inclusions({required this.raw});
 
   @override
   Widget build(BuildContext context) {
     final lines = <String>[];
-    json.forEach((key, value) {
-      if (value == null) return;
-      final label = key
-          .replaceAll('_', ' ')
-          .split(' ')
-          .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
-          .join(' ');
-      lines.add('$label: $value');
-    });
+    if (raw is List) {
+      for (final item in raw as List) {
+        if (item == null) continue;
+        final s = item.toString().trim();
+        if (s.isNotEmpty) lines.add(s);
+      }
+    } else if (raw is Map) {
+      (raw as Map).forEach((key, value) {
+        if (value == null) return;
+        final label = key.toString()
+            .replaceAll('_', ' ')
+            .split(' ')
+            .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
+            .join(' ');
+        lines.add('$label: $value');
+      });
+    }
     if (lines.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
