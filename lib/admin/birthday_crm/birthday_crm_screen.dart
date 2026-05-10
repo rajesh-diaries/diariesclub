@@ -198,27 +198,26 @@ class _Card extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Reservation ${(reservation['id'] as String).substring(0, 6).toUpperCase()}',
+                  'Inquiry ${(reservation['id'] as String).substring(0, 6).toUpperCase()}',
                   style: AppTextStyles.bodyLarge(context),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  Money.fromPaise(
-                      (reservation['package_price_paise'] as int?) ?? 0),
-                  style: AppTextStyles.body(
-                    context,
-                    color: AppColors.gold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${reservation['num_kids'] ?? 0} kids · ${reservation['num_adults'] ?? 0} adults',
+                  '${reservation['num_kids'] ?? 0} guests',
                   style: AppTextStyles.caption(
                     context,
                     color: AppColors.lightTextSecondary,
                   ),
                 ),
-                if (reservation['preferred_month'] != null)
+                if (reservation['slot_date'] != null)
+                  Text(
+                    '${reservation['slot_date']} · ${(reservation['slot'] as String? ?? '').toUpperCase()}',
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    ),
+                  )
+                else if (reservation['preferred_month'] != null)
                   Text(
                     'Pref: ${reservation['preferred_month']}',
                     style: AppTextStyles.caption(
@@ -315,6 +314,57 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
     }
   }
 
+  Future<void> _edit() async {
+    final result = await showDialog<_EditInquiryResult>(
+      context: context,
+      builder: (_) => _EditInquiryDialog(reservation: widget.reservation),
+    );
+    if (result == null) return;
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'admin_birthday_reservation_edit',
+        params: {
+          'p_reservation_id': widget.reservation['id'],
+          if (result.slotDate != null)
+            'p_slot_date':
+                '${result.slotDate!.year}-${result.slotDate!.month.toString().padLeft(2, '0')}-${result.slotDate!.day.toString().padLeft(2, '0')}',
+          if (result.slot != null) 'p_slot': result.slot,
+          if (result.guestCount != null) 'p_guest_count': result.guestCount,
+          if (result.adminNotes != null) 'p_admin_notes': result.adminNotes,
+        },
+      );
+      widget.onAction();
+    } on PostgrestException catch (e) {
+      _showError(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _cancel() async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (_) => const _CancelInquiryDialog(),
+    );
+    if (reason == null || reason.trim().isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'admin_birthday_reservation_cancel',
+        params: {
+          'p_reservation_id': widget.reservation['id'],
+          'p_reason': reason.trim(),
+        },
+      );
+      widget.onAction();
+    } on PostgrestException catch (e) {
+      _showError(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _markCompleted() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -399,25 +449,26 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _row(context, 'Status', status),
-                  _row(context, 'Reservation ID',
+                  _row(context, 'Inquiry ID',
                       (r['id'] as String).substring(0, 12)),
-                  _row(context, 'Package price',
-                      Money.fromPaise((r['package_price_paise'] as int?) ?? 0)),
-                  _row(context, 'Deposit paid',
-                      Money.fromPaise((r['deposit_paid_paise'] as int?) ?? 0)),
-                  _row(context, 'Balance',
-                      Money.fromPaise((r['balance_paise'] as int?) ?? 0)),
-                  _row(context, 'Kids', '${r['num_kids'] ?? 0}'),
-                  _row(context, 'Adults', '${r['num_adults'] ?? 0}'),
-                  _row(context, 'Preferred month',
-                      (r['preferred_month'] as String?) ?? '—'),
-                  _row(context, 'Preferred window',
-                      (r['preferred_window'] as String?) ?? '—'),
+                  if (r['slot_date'] != null)
+                    _row(context, 'Date', '${r['slot_date']}'),
+                  if (r['slot'] != null)
+                    _row(context, 'Slot',
+                        '${(r['slot'] as String)[0].toUpperCase()}${(r['slot'] as String).substring(1)}'),
+                  _row(context, 'Guests', '${r['num_kids'] ?? 0}'),
+                  if (r['package_price_paise'] != null)
+                    _row(context, 'Per-pax (snapshot)',
+                        Money.fromPaise((r['package_price_paise'] as int?) ?? 0)),
+                  if (r['preferred_month'] != null)
+                    _row(context, 'Preferred month (legacy)',
+                        r['preferred_month'] as String),
                   if (r['special_requests'] != null)
                     _row(context, 'Special requests',
                         r['special_requests'] as String),
-                  if (r['slot_date'] != null)
-                    _row(context, 'Slot', '${r['slot_date']} ${r['slot_start_time'] ?? ''}'),
+                  if (r['admin_notes'] != null)
+                    _row(context, 'Admin notes',
+                        r['admin_notes'] as String),
                   const SizedBox(height: 24),
                   const Divider(),
                   const SizedBox(height: 16),
@@ -435,36 +486,57 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
     if (_busy) {
       return [const Center(child: CircularProgressIndicator())];
     }
-    return switch (status) {
-      'interested' => [
-          AdminPrimaryButton(
-            label: 'Mark contacted',
-            onPressed: _contact,
+    final cancellable = status == 'interested' ||
+        status == 'admin_contacted' ||
+        status == 'confirmed';
+    final editable = status != 'completed' && status != 'cancelled';
+    final primary = switch (status) {
+      'interested' => AdminPrimaryButton(
+          label: 'Mark contacted',
+          onPressed: _contact,
+        ),
+      'admin_contacted' => AdminPrimaryButton(
+          label: 'Confirm date + deposit',
+          onPressed: _confirmDate,
+        ),
+      'confirmed' => AdminPrimaryButton(
+          label: 'Mark completed (auto-award cards)',
+          onPressed: _markCompleted,
+        ),
+      'completed' => Text(
+          'Album publish ships in v1.1. Photos upload + birthday_album_publish RPC chain stays as a follow-up.',
+          style: AppTextStyles.body(
+            context,
+            color: AppColors.lightTextSecondary,
           ),
-        ],
-      'admin_contacted' => [
-          AdminPrimaryButton(
-            label: 'Confirm date + deposit',
-            onPressed: _confirmDate,
+        ),
+      'cancelled' => Text(
+          'Cancelled.${(widget.reservation['cancelled_reason'] as String?) != null ? ' Reason: ${widget.reservation['cancelled_reason']}' : ''}',
+          style: AppTextStyles.body(
+            context,
+            color: AppColors.adminRed,
           ),
-        ],
-      'confirmed' => [
-          AdminPrimaryButton(
-            label: 'Mark completed (auto-award cards)',
-            onPressed: _markCompleted,
-          ),
-        ],
-      'completed' => [
-          Text(
-            'Album publish ships in v1.1. Photos upload + birthday_album_publish RPC chain stays as a follow-up.',
-            style: AppTextStyles.body(
-              context,
-              color: AppColors.lightTextSecondary,
-            ),
-          ),
-        ],
-      _ => [Text('Status "$status" has no admin actions here.')],
+        ),
+      _ => Text('Status "$status" has no admin actions here.'),
     };
+    return [
+      primary,
+      if (editable) ...[
+        const SizedBox(height: 12),
+        AdminSecondaryButton(
+          label: 'Edit inquiry',
+          onPressed: _edit,
+        ),
+      ],
+      if (cancellable) ...[
+        const SizedBox(height: 8),
+        AdminSecondaryButton(
+          label: 'Cancel inquiry',
+          ghost: true,
+          onPressed: _cancel,
+        ),
+      ],
+    ];
   }
 
   Widget _row(BuildContext c, String label, String value) {
@@ -573,6 +645,182 @@ class _ConfirmDateDialogState extends State<_ConfirmDateDialog> {
                     depositPaise: (rupees * 100).round(),
                   ));
                 },
+        ),
+      ],
+    );
+  }
+}
+
+
+class _EditInquiryResult {
+  final DateTime? slotDate;
+  final String? slot;
+  final int? guestCount;
+  final String? adminNotes;
+  const _EditInquiryResult({
+    this.slotDate, this.slot, this.guestCount, this.adminNotes,
+  });
+}
+
+class _EditInquiryDialog extends StatefulWidget {
+  final Map<String, dynamic> reservation;
+  const _EditInquiryDialog({required this.reservation});
+
+  @override
+  State<_EditInquiryDialog> createState() => _EditInquiryDialogState();
+}
+
+class _EditInquiryDialogState extends State<_EditInquiryDialog> {
+  DateTime? _date;
+  String? _slot;
+  late final TextEditingController _guests;
+  late final TextEditingController _notes;
+
+  @override
+  void initState() {
+    super.initState();
+    final r = widget.reservation;
+    final ds = r['slot_date'] as String?;
+    if (ds != null) _date = DateTime.tryParse(ds);
+    _slot = r['slot'] as String?;
+    _guests = TextEditingController(text: '${r['num_kids'] ?? ''}');
+    _notes = TextEditingController(text: (r['admin_notes'] as String?) ?? '');
+  }
+
+  @override
+  void dispose() {
+    _guests.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final today = DateTime.now();
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _date ?? today.add(const Duration(days: 14)),
+      firstDate: today.subtract(const Duration(days: 30)),
+      lastDate: today.add(const Duration(days: 365 * 2)),
+    );
+    if (d != null) setState(() => _date = d);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit inquiry'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(_date == null
+                  ? 'Pick date'
+                  : '${_date!.year}-${_date!.month.toString().padLeft(2, '0')}-${_date!.day.toString().padLeft(2, '0')}'),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: _pickDate,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('Morning'),
+                  selected: _slot == 'morning',
+                  onSelected: (_) => setState(() => _slot = 'morning'),
+                ),
+                ChoiceChip(
+                  label: const Text('Evening'),
+                  selected: _slot == 'evening',
+                  onSelected: (_) => setState(() => _slot = 'evening'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _guests,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Guest count',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _notes,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Admin notes (internal)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        AdminSecondaryButton(
+          label: 'Cancel',
+          ghost: true,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        const SizedBox(width: 8),
+        AdminPrimaryButton(
+          label: 'Save',
+          onPressed: () {
+            Navigator.of(context).pop(_EditInquiryResult(
+              slotDate: _date,
+              slot: _slot,
+              guestCount: int.tryParse(_guests.text.trim()),
+              adminNotes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+            ));
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _CancelInquiryDialog extends StatefulWidget {
+  const _CancelInquiryDialog();
+
+  @override
+  State<_CancelInquiryDialog> createState() => _CancelInquiryDialogState();
+}
+
+class _CancelInquiryDialogState extends State<_CancelInquiryDialog> {
+  final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Cancel inquiry?'),
+      content: TextField(
+        controller: _reason,
+        autofocus: true,
+        decoration: const InputDecoration(
+          labelText: 'Reason (visible in audit log)',
+          border: OutlineInputBorder(),
+        ),
+      ),
+      actions: [
+        AdminSecondaryButton(
+          label: 'Keep',
+          ghost: true,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        const SizedBox(width: 8),
+        AdminPrimaryButton(
+          label: 'Cancel inquiry',
+          onPressed: () => Navigator.of(context).pop(_reason.text),
         ),
       ],
     );

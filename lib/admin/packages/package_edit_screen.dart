@@ -30,14 +30,17 @@ class PackageEditScreen extends ConsumerStatefulWidget {
       _PackageEditScreenState();
 }
 
+// JSON array of strings — these render as bullet points on the customer
+// discover screen. Keep entries punchy ("1 Welcome Drink", "Min 20 guests").
 const _placeholderInclusions = '''
-{
-  "session_minutes": 120,
-  "venue_setup": "Themed decor + party host",
-  "food_for_kids": "Pizza, fries, juice",
-  "food_for_adults": "Tea/coffee + snacks",
-  "cake": "1kg, theme-based"
-}''';
+[
+  "Hall: Pearl",
+  "Min 20 guests",
+  "1 Welcome Drink",
+  "2 Starters",
+  "2 Main Course",
+  "1 Dessert"
+]''';
 
 const _placeholderMenuOptions = '''
 [
@@ -78,17 +81,24 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
   final _descCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
   final _depositCtrl = TextEditingController(text: '0');
-  final _durationCtrl = TextEditingController(text: '2');
-  final _maxKidsCtrl = TextEditingController(text: '15');
-  final _maxAdultsCtrl = TextEditingController(text: '10');
+  final _durationCtrl = TextEditingController(text: '3');
+  final _maxKidsCtrl = TextEditingController();
+  final _maxAdultsCtrl = TextEditingController();
   final _galleryCtrl = TextEditingController();
   final _inclusionsCtrl = TextEditingController(text: _placeholderInclusions);
   final _menuOptsCtrl = TextEditingController(text: _placeholderMenuOptions);
   final _nonFoodCtrl = TextEditingController(text: _placeholderNonFood);
   final _availableCtrl = TextEditingController(text: _placeholderAvailableDays);
   final _sortCtrl = TextEditingController(text: '0');
+  // New birthday-package fields (Slice 2 — admin tooling).
+  final _hallNameCtrl = TextEditingController();
+  final _minGuestsCtrl = TextEditingController();
+  final _maxGuestsCtrl = TextEditingController();
+  final _priceVegCtrl = TextEditingController();
+  final _priceNonVegCtrl = TextEditingController();
+  final _pdfUrlCtrl = TextEditingController();
 
-  String _tier = 'basic';
+  String _tier = 'little_joy';
   String? _heroTheme;
   Uint8List? _photoBytes;
   String? _existingCoverUrl;
@@ -124,6 +134,12 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
     _nonFoodCtrl.dispose();
     _availableCtrl.dispose();
     _sortCtrl.dispose();
+    _hallNameCtrl.dispose();
+    _minGuestsCtrl.dispose();
+    _maxGuestsCtrl.dispose();
+    _priceVegCtrl.dispose();
+    _priceNonVegCtrl.dispose();
+    _pdfUrlCtrl.dispose();
     super.dispose();
   }
 
@@ -145,15 +161,17 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
       setState(() {
         _nameCtrl.text = (row['name'] as String?) ?? '';
         _descCtrl.text = (row['description'] as String?) ?? '';
-        _priceCtrl.text =
-            (((row['price_paise'] as int?) ?? 0) ~/ 100).toString();
-        _depositCtrl.text =
-            (((row['deposit_paise'] as int?) ?? 0) ~/ 100).toString();
-        _durationCtrl.text = (row['duration_hours'] as int?)?.toString() ?? '2';
-        _maxKidsCtrl.text = (row['max_kids'] as int?)?.toString() ?? '15';
-        _maxAdultsCtrl.text = (row['max_adults'] as int?)?.toString() ?? '10';
+        // Legacy flat price + deposit. Optional going forward — admin
+        // can leave blank if using per-pax pricing only.
+        final price = row['price_paise'] as int?;
+        _priceCtrl.text = price == null ? '' : (price ~/ 100).toString();
+        final deposit = row['deposit_paise'] as int?;
+        _depositCtrl.text = deposit == null ? '' : (deposit ~/ 100).toString();
+        _durationCtrl.text = (row['duration_hours'] as int?)?.toString() ?? '3';
+        _maxKidsCtrl.text = (row['max_kids'] as int?)?.toString() ?? '';
+        _maxAdultsCtrl.text = (row['max_adults'] as int?)?.toString() ?? '';
         _sortCtrl.text = (row['sort_order'] as int?)?.toString() ?? '0';
-        _tier = (row['tier'] as String?) ?? 'basic';
+        _tier = (row['tier'] as String?) ?? 'little_joy';
         _heroTheme = row['hero_theme'] as String?;
         _existingCoverUrl = row['cover_image_url'] as String?;
         _isActive = (row['is_active'] as bool?) ?? true;
@@ -163,6 +181,15 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
         _menuOptsCtrl.text = _pretty(row['menu_options']);
         _nonFoodCtrl.text = _pretty(row['non_food_offerings']);
         _availableCtrl.text = _pretty(row['available_days']);
+        // Slice 2 fields.
+        _hallNameCtrl.text = (row['hall_name'] as String?) ?? '';
+        _minGuestsCtrl.text = (row['min_guests'] as int?)?.toString() ?? '';
+        _maxGuestsCtrl.text = (row['max_guests'] as int?)?.toString() ?? '';
+        final pVeg = row['price_per_pax_veg_paise'] as int?;
+        _priceVegCtrl.text = pVeg == null ? '' : (pVeg ~/ 100).toString();
+        final pNon = row['price_per_pax_non_veg_paise'] as int?;
+        _priceNonVegCtrl.text = pNon == null ? '' : (pNon ~/ 100).toString();
+        _pdfUrlCtrl.text = (row['pdf_url'] as String?) ?? '';
         _loading = false;
       });
     } catch (e) {
@@ -217,9 +244,32 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
       setState(() => _errorText = 'Name is required.');
       return;
     }
-    final price = int.tryParse(_priceCtrl.text.trim());
-    if (price == null || price <= 0) {
-      setState(() => _errorText = 'Price must be a positive number.');
+    // Per-pax pricing is the new model. Legacy flat price is optional.
+    final priceVeg = int.tryParse(_priceVegCtrl.text.trim());
+    final priceNonVeg = int.tryParse(_priceNonVegCtrl.text.trim());
+    if (priceVeg == null || priceVeg <= 0 ||
+        priceNonVeg == null || priceNonVeg <= 0) {
+      setState(() => _errorText =
+          'Per-pax veg + non-veg prices are required.');
+      return;
+    }
+    final minG = int.tryParse(_minGuestsCtrl.text.trim());
+    final maxG = int.tryParse(_maxGuestsCtrl.text.trim());
+    if (minG == null || maxG == null || minG <= 0 || maxG < minG) {
+      setState(() => _errorText =
+          'Min/max guests are required, and max must be ≥ min.');
+      return;
+    }
+    if (_hallNameCtrl.text.trim().isEmpty) {
+      setState(() => _errorText = 'Hall name is required.');
+      return;
+    }
+    // Legacy flat price stays optional but if present must be a positive int.
+    final priceLegacy = _priceCtrl.text.trim().isEmpty
+        ? null
+        : int.tryParse(_priceCtrl.text.trim());
+    if (priceLegacy != null && priceLegacy <= 0) {
+      setState(() => _errorText = 'Legacy price (₹) must be positive.');
       return;
     }
 
@@ -229,7 +279,7 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
     dynamic availableJson;
     try {
       inclusionsJson = _inclusionsCtrl.text.trim().isEmpty
-          ? <String, dynamic>{} : jsonDecode(_inclusionsCtrl.text);
+          ? <dynamic>[] : jsonDecode(_inclusionsCtrl.text);
       menuOptionsJson = _menuOptsCtrl.text.trim().isEmpty
           ? <dynamic>[] : jsonDecode(_menuOptsCtrl.text);
       nonFoodJson = _nonFoodCtrl.text.trim().isEmpty
@@ -258,11 +308,14 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
         'p_name': _nameCtrl.text.trim(),
         'p_tier': _tier,
         'p_description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-        'p_price_paise': price * 100,
-        'p_deposit_paise': (int.tryParse(_depositCtrl.text.trim()) ?? 0) * 100,
-        'p_duration_hours': int.tryParse(_durationCtrl.text.trim()) ?? 2,
-        'p_max_kids': int.tryParse(_maxKidsCtrl.text.trim()) ?? 15,
-        'p_max_adults': int.tryParse(_maxAdultsCtrl.text.trim()) ?? 10,
+        'p_price_paise': priceLegacy == null ? null : priceLegacy * 100,
+        'p_deposit_paise':
+            _depositCtrl.text.trim().isEmpty
+                ? null
+                : (int.tryParse(_depositCtrl.text.trim()) ?? 0) * 100,
+        'p_duration_hours': int.tryParse(_durationCtrl.text.trim()) ?? 3,
+        'p_max_kids': int.tryParse(_maxKidsCtrl.text.trim()),
+        'p_max_adults': int.tryParse(_maxAdultsCtrl.text.trim()),
         'p_cover_image_url': coverUrl,
         'p_gallery_image_urls': gallery,
         'p_inclusions': inclusionsJson,
@@ -271,6 +324,17 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
         'p_available_days': availableJson,
         'p_hero_theme': _heroTheme,
         'p_sort_order': int.tryParse(_sortCtrl.text.trim()) ?? 0,
+        // Slice 2 fields.
+        'p_hall_name': _hallNameCtrl.text.trim().isEmpty
+            ? null
+            : _hallNameCtrl.text.trim(),
+        'p_min_guests': minG,
+        'p_max_guests': maxG,
+        'p_price_per_pax_veg_paise': priceVeg * 100,
+        'p_price_per_pax_non_veg_paise': priceNonVeg * 100,
+        'p_pdf_url': _pdfUrlCtrl.text.trim().isEmpty
+            ? null
+            : _pdfUrlCtrl.text.trim(),
       };
 
       String? id = widget.packageId;
@@ -365,28 +429,109 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
                               labelText: 'Tier', border: OutlineInputBorder(),
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'basic', child: Text('Basic')),
-                              DropdownMenuItem(value: 'hero_adventure', child: Text('Hero Adventure')),
-                              DropdownMenuItem(value: 'legendary', child: Text('Legendary')),
+                              DropdownMenuItem(value: 'little_joy', child: Text('Little Joy')),
+                              DropdownMenuItem(value: 'happy_tales', child: Text('Happy Tales')),
+                              DropdownMenuItem(value: 'grand', child: Text('Grand')),
+                              DropdownMenuItem(value: 'magical', child: Text('Magical')),
                               DropdownMenuItem(value: 'custom', child: Text('Custom')),
                             ],
-                            onChanged: (v) => setState(() => _tier = v ?? 'basic'),
+                            onChanged: (v) => setState(() => _tier = v ?? 'little_joy'),
                           ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _hallNameCtrl.text.isEmpty
+                                ? null
+                                : _hallNameCtrl.text,
+                            decoration: const InputDecoration(
+                              labelText: 'Hall', border: OutlineInputBorder(),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'Pearl', child: Text('Pearl')),
+                              DropdownMenuItem(value: 'The Grand', child: Text('The Grand')),
+                            ],
+                            onChanged: (v) => setState(() => _hallNameCtrl.text = v ?? ''),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _numField('Per-pax Veg (₹)', _priceVegCtrl),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _numField('Per-pax Non-Veg (₹)', _priceNonVegCtrl),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _numField('Duration (hr)', _durationCtrl),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Per-pax · 18% GST extra. Prices customers see on the inquiry form.',
+                      style: AppTextStyles.caption(
+                        context, color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: _numField('Min guests', _minGuestsCtrl)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _numField('Max guests', _maxGuestsCtrl)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _numField('Sort order', _sortCtrl)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _pdfUrlCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Menu PDF URL (optional)',
+                        hintText: 'https://...packages-poster.pdf',
+                        helperText:
+                            'Upload the PDF to Supabase Storage (or any '
+                            'public URL) and paste it here. Customer sees a '
+                            '"View full menu (PDF)" link if filled.',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'Legacy / advanced',
+                        style: AppTextStyles.caption(
+                          context, color: AppColors.lightTextSecondary,
+                        ).copyWith(letterSpacing: 0.6, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _numField('Flat price (₹) — optional', _priceCtrl),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _numField('Deposit (₹) — optional', _depositCtrl),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String?>(
                             initialValue: _heroTheme,
                             decoration: const InputDecoration(
-                              labelText: 'Hero theme (optional)',
+                              labelText: 'Hero theme (legacy)',
                               border: OutlineInputBorder(),
                             ),
                             items: const [
                               DropdownMenuItem(value: null, child: Text('— None —')),
-                              DropdownMenuItem(value: 'rafi', child: Text('Rafi')),
-                              DropdownMenuItem(value: 'ellie', child: Text('Ellie')),
-                              DropdownMenuItem(value: 'gerry', child: Text('Gerry')),
-                              DropdownMenuItem(value: 'zena', child: Text('Zena')),
                               DropdownMenuItem(value: 'mixed', child: Text('Mixed')),
                             ],
                             onChanged: (v) => setState(() => _heroTheme = v),
@@ -397,27 +542,9 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Expanded(
-                          child: _numField('Price (₹)', _priceCtrl),
-                        ),
+                        Expanded(child: _numField('Max kids (legacy)', _maxKidsCtrl)),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: _numField('Deposit (₹)', _depositCtrl),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _numField('Duration (hr)', _durationCtrl),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(child: _numField('Max kids', _maxKidsCtrl)),
-                        const SizedBox(width: 12),
-                        Expanded(child: _numField('Max adults', _maxAdultsCtrl)),
-                        const SizedBox(width: 12),
-                        Expanded(child: _numField('Sort order', _sortCtrl)),
+                        Expanded(child: _numField('Max adults (legacy)', _maxAdultsCtrl)),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -432,7 +559,10 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
                     ),
                     const SizedBox(height: 24),
                     _jsonField('Inclusions', _inclusionsCtrl,
-                        helper: 'JSON object: e.g. {"session_minutes":120,"cake":"1kg theme-based"}'),
+                        helper:
+                            'JSON array of strings — one bullet per line. '
+                            'e.g. ["Hall: Pearl", "Min 20 guests", '
+                            '"1 Welcome Drink"]'),
                     const SizedBox(height: 12),
                     _jsonField('Menu options', _menuOptsCtrl,
                         helper: 'JSON array of {category, options:[{id,name,upcharge_paise}]}'),
