@@ -182,7 +182,7 @@ class _MainCta extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '3 packages, every detail handled.',
+            'Pick a package as a starting point — our team customises everything with you.',
             style: AppTextStyles.body(
               context,
               color: AppColors.lightTextSecondary,
@@ -205,11 +205,16 @@ class _MainCta extends StatelessWidget {
 class _PackagesTeaser extends StatelessWidget {
   const _PackagesTeaser();
 
+  static const _tiers = <(String, String)>[
+    ('Pearl Hall', 'Little Joy · Happy Tales'),
+    ('The Grand', 'Grand · Magical'),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        for (final tier in const ['Basics', 'Hero Adventure', 'Legendary']) ...[
+        for (var i = 0; i < _tiers.length; i++) ...[
           Expanded(
             child: Container(
               padding:
@@ -228,15 +233,26 @@ class _PackagesTeaser extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    tier,
+                    _tiers[i].$1,
                     textAlign: TextAlign.center,
-                    style: AppTextStyles.caption(context),
+                    style: AppTextStyles.body(context).copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _tiers[i].$2,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
-          if (tier != 'Legendary') const SizedBox(width: 8),
+          if (i < _tiers.length - 1) const SizedBox(width: 8),
         ],
       ],
     );
