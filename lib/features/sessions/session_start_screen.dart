@@ -309,14 +309,10 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
 
           // Drop any selections that have since gone into session.
           _selectedChildIds.removeWhere(inSession.contains);
-          // First time landing here: pre-select all eligible kids so a
-          // single-kid family flows the old way and a multi-kid family
-          // doesn't have to tick everyone manually.
-          if (_selectedChildIds.isEmpty && children.isNotEmpty) {
-            _selectedChildIds.addAll(
-              children.map((c) => c['id'] as String),
-            );
-          }
+          // No default selection — parent taps to opt each kid in. Copy
+          // 'Tap to include each kid. Tally adds up below.' implies an
+          // empty start; pre-selecting contradicted it and risked
+          // accidental over-charges in multi-kid families.
 
           if (children.isEmpty) {
             return Center(
