@@ -147,11 +147,18 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
       setState(() => _busy = false);
       if (e.message.contains('reservation_exists')) {
         _showExistingReservationSheet();
-      } else if (e.message.contains('invalid_guest_count')) {
+      } else if (e.message.contains('guest_count_below_min')) {
+        final minG = package['min_guests'];
+        setState(() => _errorText = minG != null
+            ? 'This package needs at least $minG guests. Add more guests or pick a smaller package.'
+            : 'Guest count is below the minimum.');
+      } else if (e.message.contains('guest_count_above_max')) {
         final maxG = package['max_guests'];
         setState(() => _errorText = maxG != null
             ? 'This package fits up to $maxG guests. Reduce the count or pick a bigger package.'
-            : 'Guest count looks off. Please check.');
+            : 'Guest count exceeds the maximum.');
+      } else if (e.message.contains('invalid_guest_count')) {
+        setState(() => _errorText = 'Add an approximate guest count.');
       } else if (e.message.contains('invalid_slot')) {
         setState(() => _errorText = 'Pick Morning or Evening.');
       } else if (e.message.contains('invalid_slot_date')) {

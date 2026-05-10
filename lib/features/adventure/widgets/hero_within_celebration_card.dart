@@ -123,7 +123,7 @@ class HeroWithinCelebrationCard extends ConsumerWidget {
                   child: Row(
                     children: [
                       const Icon(
-                        PhosphorIconsFill.cake,
+                        PhosphorIconsFill.gift,
                         color: Colors.white,
                         size: 22,
                       ),
@@ -133,14 +133,14 @@ class HeroWithinCelebrationCard extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Lifetime free birthday upgrade',
+                              'Birthday gifts for the next 5 years',
                               style: AppTextStyles.body(context).copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
                             Text(
-                              'Show this card at the venue when booking ${childName.split(' ').first}\'s next party.',
+                              "We'll deliver a special gift to ${childName.split(' ').first} on every birthday for the next 5 years.",
                               style: AppTextStyles.caption(context).copyWith(
                                 color: Colors.white.withValues(alpha: 0.92),
                               ),
