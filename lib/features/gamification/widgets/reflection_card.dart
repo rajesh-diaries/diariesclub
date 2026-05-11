@@ -58,8 +58,12 @@ class ReflectionCardWidget extends StatelessWidget {
                   ]
                 : null,
           ),
+          // Column fills the full height of the parent Expanded (set up
+          // by IntrinsicHeight in TraitSection) so every card in a row
+          // matches the tallest text. Content stays vertically centered
+          // even when the text is short.
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 width: 36,
