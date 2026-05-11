@@ -54,7 +54,42 @@ class BirthdayPackagesScreen extends ConsumerWidget {
                 for (final p in packages) _PackageCard(package: p),
                 const SizedBox(height: 16),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.gold.withValues(alpha: 0.08),
+                      border: Border.all(
+                        color: AppColors.gold.withValues(alpha: 0.30),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          PhosphorIconsRegular.info,
+                          size: 18,
+                          color: AppColors.navy,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Hosting more than 45 guests? Little Joy and '
+                            'Happy Tales packages can also be booked in '
+                            'Hall - The Grand (45-guest minimum).',
+                            style: AppTextStyles.caption(
+                              context,
+                              color: AppColors.lightTextSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
                   child: Text(
                     'Not sure? Reach our team via WhatsApp from the help screen.',
                     style: AppTextStyles.caption(
