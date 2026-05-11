@@ -204,30 +204,38 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                     style: AppTextStyles.body(context),
                   ),
                 const SizedBox(height: 16),
-                if (data.linkedCategories.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.adminRed.withValues(alpha: 0.10),
-                      border: Border.all(color: AppColors.adminRed),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'DEBUG: linkedCategories is empty',
-                          style: AppTextStyles.bodyLarge(
-                            context, color: AppColors.adminRed,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text('template keys: ${data.template.keys.toList()}'),
-                        Text('template id: ${data.template['id']}'),
-                        Text('template name: ${data.template['name']}'),
-                      ],
-                    ),
+                // Build-marker — if you see "BUILD v3" the new code is
+                // running. If you don't see this banner at all, hot-restart
+                // didn't pick up the change; do a full cold restart.
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withValues(alpha: 0.15),
+                    border: Border.all(color: Colors.purple, width: 2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '🔧 BUILD v3 — sections debug',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: Colors.purple,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text('Sections received: ${data.linkedCategories.length}'),
+                      Text('Template name: ${data.template['name']}'),
+                      if (data.linkedCategories.isEmpty)
+                        const Text(
+                          '↪ EMPTY — RPC parser returned no sections',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                    ],
+                  ),
+                ),
                 for (final lc in data.linkedCategories)
                   _CategorySection(
                     category: lc.category,
