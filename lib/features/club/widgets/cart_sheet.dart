@@ -538,14 +538,14 @@ class _FulfillmentSelector extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 4),
-        for (final m in FulfillmentMode.values)
+        // Customers see only Dine in / Takeaway. The tableService enum
+        // value still exists for staff/admin flows and legacy orders, but
+        // we don't surface it as a customer-facing pick.
+        for (final m in const [FulfillmentMode.dineIn, FulfillmentMode.takeaway])
           RadioListTile<FulfillmentMode>(
             value: m,
             groupValue: selected,
             title: Text(m.label),
-            subtitle: m == FulfillmentMode.tableService
-                ? const Text("We'll bring it to your table")
-                : null,
             onChanged: (v) =>
                 ref.read(cartFulfillmentProvider.notifier).state = v ?? m,
           ),

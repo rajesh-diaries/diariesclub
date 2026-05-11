@@ -72,9 +72,8 @@ class WhileYouWaitCard extends ConsumerWidget {
             children: [
               FilledButton.icon(
                 onPressed: () {
-                  // Default the upcoming order to table-service.
                   ref.read(cartFulfillmentProvider.notifier).state =
-                      FulfillmentMode.tableService;
+                      FulfillmentMode.dineIn;
                   context.go('/club');
                 },
                 style: FilledButton.styleFrom(
