@@ -96,6 +96,10 @@ class _PackageCard extends StatelessWidget {
         ((package['experience_inclusions'] as List?) ?? const [])
             .whereType<String>()
             .toList();
+    final nonFoodOfferings =
+        ((package['non_food_offerings'] as List?) ?? const [])
+            .whereType<String>()
+            .toList();
 
     final badge = tier == 'magical'
         ? const _Badge(text: 'Premium', color: AppColors.navy)
@@ -192,6 +196,21 @@ class _PackageCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 _InclusionsGrid(lines: inclusionLines),
+                if (nonFoodOfferings.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    'DECOR & EXTRAS',
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    ).copyWith(
+                      letterSpacing: 0.8,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _InclusionsGrid(lines: nonFoodOfferings),
+                ],
                 if (experienceLines.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   _ExperienceBlock(lines: experienceLines),
