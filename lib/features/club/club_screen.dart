@@ -101,7 +101,7 @@ class _ClubScreenState extends ConsumerState<ClubScreen>
         bottom: TabBar(
           controller: _tab,
           tabs: const [
-            Tab(text: 'Coffee'),
+            Tab(text: 'Cafe'),
             Tab(text: 'FIT'),
             Tab(text: 'Combos'),
             Tab(text: 'Workshops'),

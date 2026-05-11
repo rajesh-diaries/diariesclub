@@ -640,7 +640,7 @@ class _EmptyBag extends StatelessWidget {
           Text('Your bag is empty', style: AppTextStyles.h3(context)),
           const SizedBox(height: 4),
           Text(
-            'Browse Coffee, FIT, or Combos to add something.',
+            'Browse Cafe, FIT, or Combos to add something.',
             style: AppTextStyles.body(
               context,
               color: AppColors.lightTextSecondary,
