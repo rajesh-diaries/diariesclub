@@ -207,12 +207,55 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                     children: [
                       if ((tpl['description'] as String?)?.isNotEmpty ?? false)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.only(bottom: 12),
                           child: Text(
                             tpl['description'] as String,
                             style: AppTextStyles.body(context),
                           ),
                         ),
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 20),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.fitGreen.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.fitGreen.withValues(alpha: 0.30),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.check_circle,
+                              size: 18,
+                              color: AppColors.fitGreen,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Included with every meal',
+                                    style: AppTextStyles.caption(
+                                      context, color: AppColors.fitGreen,
+                                    ).copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Sauteed veggies · Garden salad',
+                                    style: AppTextStyles.body(context),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       for (final lc in data.linkedCategories)
                         _CategorySection(
                           category: lc.category,
@@ -325,7 +368,15 @@ class _CategorySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = (category['name'] as String?) ?? '—';
+    final rawName = (category['name'] as String?) ?? '—';
+    final slug = (category['slug'] as String?) ?? '';
+    // Customer-facing display label: strip the parenthetical
+    // disambiguator (e.g. '(Balanced)') and rename protein categories
+    // to a friendlier 'Choose Your Protein'.
+    final name = slug.startsWith('protein_')
+        ? 'Choose Your Protein'
+        : rawName.replaceAll(RegExp(r'\s*\([^)]*\)\s*$'), '').trim();
+    final subtitle = (category['description'] as String?) ?? '';
     final required = (linker['is_required'] as bool?) ?? true;
     final selType = (linker['selection_type_override'] as String?)
         ?? (category['selection_type'] as String?) ?? 'single';
@@ -336,8 +387,9 @@ class _CategorySection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(name, style: AppTextStyles.h3(context)),
+              Expanded(child: Text(name, style: AppTextStyles.h3(context))),
               const SizedBox(width: 8),
               if (required)
                 Container(
@@ -373,6 +425,15 @@ class _CategorySection extends StatelessWidget {
                 ),
             ],
           ),
+          if (subtitle.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: AppTextStyles.caption(
+                context, color: AppColors.lightTextSecondary,
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           if (selType == 'single')
             _SingleSelect(
