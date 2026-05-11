@@ -43,7 +43,11 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
   DateTime? _slotDate;
   // 'morning' | 'evening'
   String _slot = 'morning';
-  int _guestCount = 30;
+  // Default is overwritten by the package's min_guests on first build so
+  // each package starts the stepper at its own minimum (e.g. 45 for Grand
+  // & Magical, 25 for Little Joy & Happy Tales). Sentinel of -1 means
+  // "not initialized yet".
+  int _guestCount = -1;
   // Tracks whether the parent manually picked a date — if not, we
   // re-prefill when the child selection changes.
   bool _dateManuallyEdited = false;
@@ -261,6 +265,9 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
     final minGuests = (package['min_guests'] as int?) ?? 0;
     final maxGuests = (package['max_guests'] as int?) ?? 200;
 
+    // Seed the stepper to this package's minimum on first build.
+    if (_guestCount < 0) _guestCount = minGuests > 0 ? minGuests : 25;
+
     final gallery = <String>[
       ...((package['gallery_image_urls'] as List?) ?? const [])
           .whereType<String>(),
@@ -306,9 +313,6 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: 16),
-            const _SectionHeader(text: 'Not included'),
-            const _NotIncluded(),
             const SizedBox(height: 16),
             // Module 2.7: customer can download admin-generated PDF if cached.
             if ((package['pdf_url'] as String?)?.isNotEmpty ?? false)
@@ -483,53 +487,60 @@ class _PriceBar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // Hall + guest count as a small header so the price below
+          // has the whole width to breathe.
+          if (hallName.isNotEmpty) ...[
+            Text(
+              '$hallName · $minGuests–$maxGuests guests',
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ).copyWith(letterSpacing: 0.4, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+          ],
+          // Prices as Wrap so they break to a new line on narrow widths
+          // instead of getting cramped.
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Veg ${Money.fromPaise(priceVegPaise)} · '
-                      'Non-Veg ${Money.fromPaise(priceNonVegPaise)}',
-                      style: AppTextStyles.h3(context, color: AppColors.gold),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Per pax · 18% GST extra',
-                      style: AppTextStyles.caption(
-                        context,
-                        color: AppColors.lightTextSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (hallName.isNotEmpty) ...[
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      hallName,
-                      style: AppTextStyles.body(context).copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      '$minGuests–$maxGuests guests',
-                      style: AppTextStyles.caption(
-                        context,
-                        color: AppColors.lightTextSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              _PriceChip(label: 'Veg', pricePaise: priceVegPaise),
+              _PriceChip(label: 'Non-Veg', pricePaise: priceNonVegPaise),
             ],
           ),
+          const SizedBox(height: 6),
+          Text(
+            'Per pax · 18% GST extra',
+            style: AppTextStyles.caption(
+              context,
+              color: AppColors.lightTextSecondary,
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _PriceChip extends StatelessWidget {
+  final String label;
+  final int pricePaise;
+  const _PriceChip({required this.label, required this.pricePaise});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.gold.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        '$label  ${Money.fromPaise(pricePaise)}',
+        style: AppTextStyles.bodyLarge(context, color: AppColors.navy)
+            .copyWith(fontWeight: FontWeight.w800),
       ),
     );
   }
@@ -670,48 +681,6 @@ class _ExperienceBlockDetail extends StatelessWidget {
                 ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NotIncluded extends StatelessWidget {
-  const _NotIncluded();
-
-  @override
-  Widget build(BuildContext context) {
-    const lines = [
-      'Return gifts',
-      'Custom photographer',
-      'Outside food',
-    ];
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final l in lines)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: [
-                  const Icon(
-                    PhosphorIconsRegular.minusCircle,
-                    size: 18,
-                    color: AppColors.lightTextSecondary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    l,
-                    style: AppTextStyles.body(
-                      context,
-                      color: AppColors.lightTextSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
@@ -884,8 +853,17 @@ class _PreferencesForm extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Anything special? (optional)',
+            'Additional requirements (optional)',
             style: AppTextStyles.bodyLarge(context),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Dietary preferences · add-on activities · custom decor · '
+            'photography · return gifts · anything else',
+            style: AppTextStyles.caption(
+              context,
+              color: AppColors.lightTextSecondary,
+            ),
           ),
           const SizedBox(height: 8),
           TextField(
@@ -896,7 +874,7 @@ class _PreferencesForm extends StatelessWidget {
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               hintText:
-                  'Themes, dietary needs, decoration ideas, photographer…',
+                  'e.g. Jain food for 10 guests, magician add-on, custom backdrop',
             ),
           ),
           const SizedBox(height: 12),
