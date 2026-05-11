@@ -66,22 +66,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       return;
     }
 
+    // Welcome manifesto: shown ONCE per device-install to every signed-in
+    // user — new signups and existing families alike — so the brand
+    // promise lands before they see anything else. On CTA the welcome
+    // screen marks the flag and routes back to splash; the next pass
+    // skips this branch and continues normally.
+    final seenWelcome =
+        await ref.read(hasSeenWelcomeManifestoProvider.future);
+    if (!mounted) return;
+    if (!seenWelcome) {
+      context.go('/onboarding/welcome');
+      return;
+    }
+
     // Signed in. Decide route based on family row + saved onboarding step.
     final family = await ref.read(currentFamilyProvider.future);
     if (!mounted) return;
 
     if (family == null) {
-      // Auth user exists but family_create hasn't run — fresh OTP. First
-      // show the "Brave. Kind. Curious. Creative." welcome manifesto (only
-      // once per family, gated by a SharedPreferences flag), then resume
-      // at family-name or whichever onboarding step they were last on.
-      final seenWelcome =
-          await ref.read(hasSeenWelcomeManifestoProvider.future);
-      if (!mounted) return;
-      if (!seenWelcome) {
-        context.go('/onboarding/welcome');
-        return;
-      }
+      // Auth user exists but family_create hasn't run — fresh OTP, resume
+      // at family-name (or a later step if the user got further before kill).
       final step = await ref.read(onboardingStepProvider.future);
       if (!mounted) return;
       context.go(step.route);

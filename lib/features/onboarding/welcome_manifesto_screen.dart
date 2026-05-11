@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/providers/onboarding_state_provider.dart';
+import '../../core/providers/onboarding_state_provider.dart'
+    show hasSeenWelcomeManifestoProvider;
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 
@@ -47,7 +48,10 @@ class _WelcomeManifestoScreenState
     }
     await ref.read(hasSeenWelcomeManifestoProvider.notifier).markSeen();
     if (!mounted) return;
-    context.go(OnboardingStep.familyName.route);
+    // Back to splash — it figures out the right destination now that the
+    // welcome flag is set (home for an existing family, family-name for a
+    // brand-new OTP signup, etc.).
+    context.go('/');
   }
 
   @override
