@@ -32,6 +32,12 @@ class CoffeeListScreen extends ConsumerWidget {
       subtitle:
           'Edit, sold-out toggle, reorder. Customer app reflects changes via Realtime.',
       actions: [
+        AdminSecondaryButton(
+          icon: PhosphorIconsRegular.tag,
+          label: 'Categories',
+          onPressed: () => _openCategoriesDialog(context, ref, brand: 'coffee'),
+        ),
+        const SizedBox(width: 8),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: AdminPrimaryButton(
@@ -69,10 +75,120 @@ class CoffeeListScreen extends ConsumerWidget {
   }
 }
 
-class _Table extends StatelessWidget {
+class _Table extends StatefulWidget {
   final List<Map<String, dynamic>> rows;
   final WidgetRef ref;
   const _Table({required this.rows, required this.ref});
+
+  @override
+  State<_Table> createState() => _TableState();
+}
+
+class _TableState extends State<_Table> {
+  final Set<String> _selected = <String>{};
+
+  List<Map<String, dynamic>> get rows => widget.rows;
+  WidgetRef get ref => widget.ref;
+
+  void _toggleSelected(String id, bool? on) {
+    setState(() {
+      if (on == true) {
+        _selected.add(id);
+      } else {
+        _selected.remove(id);
+      }
+    });
+  }
+
+  void _toggleAll(bool? on) {
+    setState(() {
+      _selected.clear();
+      if (on == true) {
+        for (final r in rows) {
+          final id = r['id'] as String?;
+          if (id != null) _selected.add(id);
+        }
+      }
+    });
+  }
+
+  Future<void> _bulkSet(BuildContext context, {
+    bool? available, bool? published,
+  }) async {
+    if (_selected.isEmpty) return;
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'admin_menu_items_bulk_set',
+        params: {
+          'p_ids': _selected.toList(),
+          if (available != null) 'p_is_available': available,
+          if (published != null) 'p_is_published': published,
+        },
+      );
+      if (!context.mounted) return;
+      setState(() => _selected.clear());
+      ref.invalidate(coffeeMenuItemsProvider);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Bulk update failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _editPrice(BuildContext context, Map<String, dynamic> r) async {
+    final currentRupees = ((r['price_paise'] as int?) ?? 0) ~/ 100;
+    final ctrl = TextEditingController(text: '$currentRupees');
+    final newRupees = await showDialog<int>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Edit price · ${r['name']}'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            prefixText: '₹ ',
+            labelText: 'Price',
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (_) =>
+              Navigator.of(c).pop(int.tryParse(ctrl.text.trim())),
+        ),
+        actions: [
+          AdminSecondaryButton(
+            label: 'Cancel',
+            ghost: true,
+            onPressed: () => Navigator.pop(c),
+          ),
+          const SizedBox(width: 8),
+          AdminPrimaryButton(
+            label: 'Save',
+            onPressed: () =>
+                Navigator.pop(c, int.tryParse(ctrl.text.trim())),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (newRupees == null || newRupees < 0) return;
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'admin_menu_item_set_price',
+        params: {
+          'p_id': r['id'],
+          'p_price_paise': newRupees * 100,
+        },
+      );
+      if (!context.mounted) return;
+      ref.invalidate(coffeeMenuItemsProvider);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update price: $e')),
+      );
+    }
+  }
 
   Future<void> _toggle(BuildContext context, String id, bool to) async {
     try {
@@ -147,51 +263,98 @@ class _Table extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.lightSurface,
-        border: Border.all(color: AppColors.lightBorder),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.vertical,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columns: const [
-              DataColumn(label: Text('')),
-              DataColumn(label: Text('Name')),
-              DataColumn(label: Text('Category')),
-              DataColumn(label: Text('Price'), numeric: true),
-              DataColumn(label: Text('Available')),
-              DataColumn(label: Text('Status')),
-              DataColumn(label: Text('Actions')),
-            ],
-            rows: [
-              for (final r in rows)
-                DataRow(cells: [
-                  DataCell(_thumb(r['image_url'] as String?)),
-                  DataCell(Text(
-                    (r['name'] as String?) ?? '—',
-                    style: TextStyle(
-                      decoration: (r['is_published'] as bool? ?? true)
-                          ? null
-                          : TextDecoration.lineThrough,
-                      color: (r['is_published'] as bool? ?? true)
-                          ? null
-                          : AppColors.lightTextSecondary,
+    final allSelected = rows.isNotEmpty &&
+        _selected.length == rows.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_selected.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _BulkBar(
+              count: _selected.length,
+              onClear: () => setState(_selected.clear),
+              onPublish: () =>
+                  _bulkSet(context, published: true, available: true),
+              onHide: () => _bulkSet(context, published: false),
+              onMarkSoldOut: () => _bulkSet(context, available: false),
+              onMarkAvailable: () => _bulkSet(context, available: true),
+            ),
+          ),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.lightSurface,
+            border: Border.all(color: AppColors.lightBorder),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                showCheckboxColumn: false,
+                columns: [
+                  DataColumn(
+                    label: Checkbox(
+                      value: allSelected,
+                      tristate: true,
+                      onChanged: _toggleAll,
                     ),
-                  )),
-                  DataCell(Text(
-                    (r['category'] as String?) ?? '—',
-                    style: AppTextStyles.caption(
-                      context,
-                      color: AppColors.lightTextSecondary,
-                    ),
-                  )),
-                  DataCell(Text(
-                    Money.fromPaise((r['price_paise'] as int?) ?? 0),
-                  )),
+                  ),
+                  const DataColumn(label: Text('')),
+                  const DataColumn(label: Text('Name')),
+                  const DataColumn(label: Text('Category')),
+                  const DataColumn(label: Text('Price'), numeric: true),
+                  const DataColumn(label: Text('Available')),
+                  const DataColumn(label: Text('Status')),
+                  const DataColumn(label: Text('Actions')),
+                ],
+                rows: [
+                  for (final r in rows)
+                    DataRow(cells: [
+                      DataCell(Checkbox(
+                        value: _selected.contains(r['id']),
+                        onChanged: (v) =>
+                            _toggleSelected(r['id'] as String, v),
+                      )),
+                      DataCell(_thumb(r['image_url'] as String?)),
+                      DataCell(Text(
+                        (r['name'] as String?) ?? '—',
+                        style: TextStyle(
+                          decoration: (r['is_published'] as bool? ?? true)
+                              ? null
+                              : TextDecoration.lineThrough,
+                          color: (r['is_published'] as bool? ?? true)
+                              ? null
+                              : AppColors.lightTextSecondary,
+                        ),
+                      )),
+                      DataCell(Text(
+                        (r['category'] as String?) ?? '—',
+                        style: AppTextStyles.caption(
+                          context,
+                          color: AppColors.lightTextSecondary,
+                        ),
+                      )),
+                      DataCell(
+                        InkWell(
+                          onTap: () => _editPrice(context, r),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                Money.fromPaise((r['price_paise'] as int?) ?? 0),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                PhosphorIconsRegular.pencilSimple,
+                                size: 12,
+                                color: AppColors.lightTextSecondary,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                   DataCell(Switch(
                     value: (r['is_available'] as bool?) ?? true,
                     onChanged: (r['is_published'] as bool? ?? true)
@@ -242,10 +405,12 @@ class _Table extends StatelessWidget {
                     ],
                   )),
                 ]),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -331,4 +496,267 @@ Future<String?> coffeeMenuId() async {
       .limit(1);
   if (rows.isEmpty) return null;
   return rows.first['id'] as String?;
+}
+
+/// Bulk-action bar shown above the table when 1+ rows are checked.
+class _BulkBar extends StatelessWidget {
+  final int count;
+  final VoidCallback onClear;
+  final VoidCallback onPublish;
+  final VoidCallback onHide;
+  final VoidCallback onMarkSoldOut;
+  final VoidCallback onMarkAvailable;
+  const _BulkBar({
+    required this.count,
+    required this.onClear,
+    required this.onPublish,
+    required this.onHide,
+    required this.onMarkSoldOut,
+    required this.onMarkAvailable,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.navy.withValues(alpha: 0.08),
+        border: Border.all(color: AppColors.navy.withValues(alpha: 0.30)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Text(
+            '$count selected',
+            style: AppTextStyles.body(context).copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.navy,
+            ),
+          ),
+          const SizedBox(width: 16),
+          AdminSecondaryButton(
+            icon: PhosphorIconsRegular.eye,
+            label: 'Publish',
+            onPressed: onPublish,
+          ),
+          const SizedBox(width: 8),
+          AdminSecondaryButton(
+            icon: PhosphorIconsRegular.checkCircle,
+            label: 'Mark available',
+            onPressed: onMarkAvailable,
+          ),
+          const SizedBox(width: 8),
+          AdminSecondaryButton(
+            icon: PhosphorIconsRegular.xCircle,
+            label: 'Mark sold-out',
+            onPressed: onMarkSoldOut,
+          ),
+          const SizedBox(width: 8),
+          AdminSecondaryButton(
+            icon: PhosphorIconsRegular.eyeSlash,
+            label: 'Hide',
+            onPressed: onHide,
+          ),
+          const Spacer(),
+          AdminIconButton(
+            tooltip: 'Clear selection',
+            icon: PhosphorIconsRegular.x,
+            size: 16,
+            onPressed: onClear,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Category management dialog — rename / merge categories for a brand.
+/// Pulls the live category set from items, lets admin pick one and
+/// type a new name. If the new name matches an existing category, items
+/// get merged into it.
+Future<void> _openCategoriesDialog(
+  BuildContext context,
+  WidgetRef ref, {
+  required String brand,
+}) async {
+  final rows = brand == 'coffee'
+      ? await ref.read(coffeeMenuItemsProvider.future)
+      : <Map<String, dynamic>>[];
+  final categories = <String>{};
+  for (final r in rows) {
+    final c = r['category'] as String?;
+    if (c != null && c.isNotEmpty) categories.add(c);
+  }
+  if (!context.mounted) return;
+  await showDialog<void>(
+    context: context,
+    builder: (_) => _CategoriesDialog(
+      brand: brand,
+      categories: categories.toList()..sort(),
+      onChanged: () => ref.invalidate(coffeeMenuItemsProvider),
+    ),
+  );
+}
+
+class _CategoriesDialog extends StatefulWidget {
+  final String brand;
+  final List<String> categories;
+  final VoidCallback onChanged;
+  const _CategoriesDialog({
+    required this.brand,
+    required this.categories,
+    required this.onChanged,
+  });
+
+  @override
+  State<_CategoriesDialog> createState() => _CategoriesDialogState();
+}
+
+class _CategoriesDialogState extends State<_CategoriesDialog> {
+  String? _editing;
+  final _newNameCtrl = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _newNameCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _rename() async {
+    final from = _editing;
+    final to = _newNameCtrl.text.trim();
+    if (from == null || to.isEmpty) return;
+    if (from == to) {
+      setState(() => _editing = null);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'admin_menu_category_rename',
+        params: {'p_brand': widget.brand, 'p_from': from, 'p_to': to},
+      );
+      widget.onChanged();
+      if (!mounted) return;
+      setState(() {
+        _editing = null;
+        _newNameCtrl.clear();
+        _busy = false;
+        // Update local list to reflect change so dialog can stay open.
+        widget.categories.remove(from);
+        if (!widget.categories.contains(to)) widget.categories.add(to);
+        widget.categories.sort();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = 'Rename failed: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Manage categories'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Renaming a category updates every item in that category. '
+              'If the new name already exists, items merge into it.',
+              style: AppTextStyles.caption(
+                context, color: AppColors.lightTextSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (widget.categories.isEmpty)
+              Text(
+                'No categories yet.',
+                style: AppTextStyles.body(
+                  context, color: AppColors.lightTextSecondary,
+                ),
+              )
+            else
+              for (final c in widget.categories)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: _editing == c
+                      ? Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _newNameCtrl,
+                                autofocus: true,
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                onSubmitted: (_) => _rename(),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            AdminPrimaryButton(
+                              label: 'Save',
+                              busy: _busy,
+                              onPressed: _busy ? null : _rename,
+                            ),
+                            AdminIconButton(
+                              tooltip: 'Cancel',
+                              icon: PhosphorIconsRegular.x,
+                              size: 16,
+                              onPressed: () => setState(() {
+                                _editing = null;
+                                _newNameCtrl.clear();
+                                _error = null;
+                              }),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(
+                              child: Text(c, style: AppTextStyles.body(context)),
+                            ),
+                            AdminIconButton(
+                              tooltip: 'Rename',
+                              icon: PhosphorIconsRegular.pencilSimple,
+                              size: 16,
+                              onPressed: () => setState(() {
+                                _editing = c;
+                                _newNameCtrl.text = c;
+                              }),
+                            ),
+                          ],
+                        ),
+                ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: AppTextStyles.caption(
+                  context, color: AppColors.adminRed,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        AdminPrimaryButton(
+          label: 'Done',
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
+    );
+  }
 }
