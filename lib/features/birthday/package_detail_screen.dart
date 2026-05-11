@@ -887,7 +887,7 @@ class _PreferencesForm extends StatelessWidget {
             ),
             child: Text(
               'These packages are starting points. For better customization, '
-              'our team will reach out within 4 hours to plan the details.',
+              'our team will reach out within 24 hours to plan the details.',
               style: AppTextStyles.caption(
                 context,
                 color: AppColors.lightTextSecondary,
@@ -976,7 +976,7 @@ class _StickyCta extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            "No payment in app — we'll reach out within 4 hours.",
+            "No payment in app — we'll reach out within 24 hours.",
             style: AppTextStyles.caption(
               context,
               color: AppColors.lightTextSecondary,
