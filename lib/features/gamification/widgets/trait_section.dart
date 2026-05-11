@@ -6,10 +6,11 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import 'reflection_card.dart';
 
-/// Trait header + 3-card row used inside the reflection screen. The cards
-/// always come in trios (3 per trait, RPC-enforced) so a fixed `Row` is
-/// safe; if the seed ever drops below 3 the row gracefully fills with
-/// SizedBox spacers.
+/// Trait header + N-card grid used inside the reflection screen. The card
+/// count per trait was originally pinned at 3 (RPC-enforced); migration
+/// 0105 dropped that cap so trait_section now chunks the list into rows
+/// of 3 — 6 cards render as two rows, etc. Short tails fill with
+/// SizedBox spacers so the last row keeps its 3-column rhythm.
 class TraitSection extends StatelessWidget {
   final String trait;
   final List<ReflectionMoment> cards;
@@ -63,39 +64,41 @@ class TraitSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          // IntrinsicHeight bounds the row's vertical extent to the tallest
-          // card's intrinsic height before crossAxisAlignment.stretch fires.
-          // Without it, stretch demands a tight infinite vertical constraint
-          // (parent is a Column inside SingleChildScrollView → unbounded
-          // height) which trips box.dart:251 on web and blanks the screen.
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: List<Widget>.generate(3, (i) {
-                final spacer = i > 0
-                    ? const SizedBox(width: 10)
-                    : const SizedBox.shrink();
-                if (i >= cards.length) {
+          // Chunk into rows of 3. IntrinsicHeight bounds each row's
+          // vertical extent to the tallest card so stretch doesn't trip
+          // box.dart:251 inside the parent ScrollView.
+          for (int start = 0; start < cards.length; start += 3) ...[
+            if (start > 0) const SizedBox(height: 10),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: List<Widget>.generate(3, (i) {
+                  final cardIndex = start + i;
+                  final spacer = i > 0
+                      ? const SizedBox(width: 10)
+                      : const SizedBox.shrink();
+                  if (cardIndex >= cards.length) {
+                    return Expanded(
+                      child: Row(children: [spacer, const Spacer()]),
+                    );
+                  }
+                  final card = cards[cardIndex];
                   return Expanded(
-                    child: Row(children: [spacer, const Spacer()]),
-                  );
-                }
-                final card = cards[i];
-                return Expanded(
-                  child: Row(children: [
-                    spacer,
-                    Expanded(
-                      child: ReflectionCardWidget(
-                        moment: card,
-                        selected: selectedTags.contains(card.tag),
-                        onTap: () => onToggle(card.tag),
+                    child: Row(children: [
+                      spacer,
+                      Expanded(
+                        child: ReflectionCardWidget(
+                          moment: card,
+                          selected: selectedTags.contains(card.tag),
+                          onTap: () => onToggle(card.tag),
+                        ),
                       ),
-                    ),
-                  ]),
-                );
-              }),
+                    ]),
+                  );
+                }),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
