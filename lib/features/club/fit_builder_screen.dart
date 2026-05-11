@@ -466,41 +466,42 @@ class _BuilderData {
 final fitTemplateDetailProvider =
     FutureProvider.autoDispose.family<_BuilderData, String>(
   (ref, templateId) async {
-    final tpl = await Supabase.instance.client
-        .from('fit_meal_templates')
-        .select()
-        .eq('id', templateId)
-        .single();
+    // Switched from 4 chained PostgREST queries to a single SECURITY
+    // DEFINER RPC (fit_template_detail). The chained version returned
+    // empty sections for the customer despite RLS appearing correct —
+    // the SECURITY DEFINER bypass guarantees a clean read.
+    final raw = await Supabase.instance.client
+        .rpc<Map<String, dynamic>>('fit_template_detail', params: {
+      'p_template_id': templateId,
+    });
 
-    final linkers = await Supabase.instance.client
-        .from('fit_meal_template_categories')
-        .select()
-        .eq('template_id', templateId)
-        .order('display_order', ascending: true);
+    final tpl = Map<String, dynamic>.from(
+      (raw['template'] as Map?) ?? const <String, dynamic>{},
+    );
+
+    final sections = ((raw['sections'] as List?) ?? const [])
+        .map((s) => Map<String, dynamic>.from(s as Map))
+        .toList();
 
     final List<_LinkedCategory> linked = [];
-    for (final l in linkers) {
-      final catId = l['category_id'] as String;
-      final cat = await Supabase.instance.client
-          .from('fit_meal_categories')
-          .select()
-          .eq('id', catId)
-          .maybeSingle();
-      if (cat == null) continue;
-      final opts = await Supabase.instance.client
-          .from('fit_meal_options')
-          .select()
-          .eq('category_id', catId)
-          .order('display_order', ascending: true);
+    for (final s in sections) {
+      final cat = (s['category'] as Map?)?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
+      if (cat.isEmpty) continue;
+      final linker = (s['linker'] as Map?)?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
+      final opts = ((s['options'] as List?) ?? const [])
+          .map((o) => Map<String, dynamic>.from(o as Map))
+          .toList();
       linked.add(_LinkedCategory(
-        category: Map<String, dynamic>.from(cat),
-        linker: Map<String, dynamic>.from(l),
-        options: List<Map<String, dynamic>>.from(opts),
+        category: cat,
+        linker: linker,
+        options: opts,
       ));
     }
 
     return _BuilderData(
-      template: Map<String, dynamic>.from(tpl),
+      template: tpl,
       linkedCategories: linked,
     );
   },
