@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -38,6 +39,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   List<Map<String, dynamic>> _sessions = const [];
   List<Map<String, dynamic>> _orders = const [];
   List<Map<String, dynamic>> _walletTxns = const [];
+  // Referral chain for the family card.
+  String? _referredByName;
+  int _referralsCount = 0;
   bool _loading = true;
   String? _errorText;
 
@@ -84,12 +88,37 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
           .select()
           .eq('family_id', widget.familyId)
           .order('created_at', ascending: false)
-          .limit(20);
+          .limit(50);
+
+      // Referral chain — who referred this family + how many they've
+      // brought in. Two cheap lookups; both fail-soft.
+      String? referredByName;
+      final referrerId = (family as Map)['referrer_family_id'] as String?;
+      if (referrerId != null) {
+        try {
+          final ref = await Supabase.instance.client
+              .from('families')
+              .select('name')
+              .eq('id', referrerId)
+              .maybeSingle();
+          referredByName = (ref?['name'] as String?);
+        } catch (_) {}
+      }
+      int referralsCount = 0;
+      try {
+        final refs = await Supabase.instance.client
+            .from('families')
+            .select('id')
+            .eq('referrer_family_id', widget.familyId);
+        referralsCount = (refs as List).length;
+      } catch (_) {}
 
       if (!mounted) return;
       setState(() {
         _family = Map<String, dynamic>.from(family);
         _wallet = wallet == null ? null : Map<String, dynamic>.from(wallet);
+        _referredByName = referredByName;
+        _referralsCount = referralsCount;
         _children = (children as List)
             .map((c) => Map<String, dynamic>.from(c as Map))
             .toList();
@@ -150,6 +179,22 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     }
   }
 
+  Future<void> _openWhatsApp() async {
+    final phone = (_family?['phone'] as String?) ?? '';
+    if (phone.isEmpty) return;
+    // wa.me wants digits-only, no '+' prefix.
+    final clean = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    final uri = Uri.parse('https://wa.me/$clean');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't open WhatsApp.")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -159,11 +204,19 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
             ? 'Customer'
             : (_family!['name'] as String? ?? 'Customer'),
         actions: [
+          if (_family != null)
+            OutlinedButton.icon(
+              onPressed: _openWhatsApp,
+              icon: const Icon(PhosphorIconsRegular.whatsappLogo),
+              label: const Text('WhatsApp'),
+            ),
+          const SizedBox(width: 8),
           OutlinedButton.icon(
             onPressed: _family == null ? null : _manualAdjust,
             icon: const Icon(Icons.payments),
             label: const Text('Manual wallet adjust'),
           ),
+          const SizedBox(width: 12),
         ],
       ),
       body: _loading
@@ -175,10 +228,23 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _FamilyCard(family: _family!, wallet: _wallet),
+                      _FamilyCard(
+                        family: _family!,
+                        wallet: _wallet,
+                        referredByName: _referredByName,
+                        referralsCount: _referralsCount,
+                      ),
                       const SizedBox(height: 24),
                       _SectionHeader(text: 'Children (${_children.length})'),
-                      _ChildrenTable(children: _children),
+                      _ChildrenTable(
+                        children: _children,
+                        activeSessions: _sessions
+                            .where((s) =>
+                                s['status'] == 'active' ||
+                                s['status'] == 'pending' ||
+                                s['status'] == 'grace')
+                            .toList(),
+                      ),
                       const SizedBox(height: 24),
                       const _SectionHeader(text: 'Wallet history'),
                       _WalletTable(rows: _walletTxns),
@@ -208,10 +274,19 @@ class _SectionHeader extends StatelessWidget {
 class _FamilyCard extends StatelessWidget {
   final Map<String, dynamic> family;
   final Map<String, dynamic>? wallet;
-  const _FamilyCard({required this.family, required this.wallet});
+  final String? referredByName;
+  final int referralsCount;
+  const _FamilyCard({
+    required this.family,
+    required this.wallet,
+    required this.referredByName,
+    required this.referralsCount,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final createdAt = _shortDate(family['created_at'] as String?);
+    final lastVisit = _shortDate(family['last_active_at'] as String?);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -250,6 +325,24 @@ class _FamilyCard extends StatelessWidget {
                           label: 'marketing OK', color: AppColors.activeGreen),
                   ],
                 ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 18,
+                  runSpacing: 4,
+                  children: [
+                    if (createdAt != null)
+                      _MetaItem(label: 'Customer since', value: createdAt),
+                    if (lastVisit != null)
+                      _MetaItem(label: 'Last visit', value: lastVisit),
+                    if (referredByName != null)
+                      _MetaItem(label: 'Referred by', value: referredByName!),
+                    if (referralsCount > 0)
+                      _MetaItem(
+                        label: 'Referrals brought',
+                        value: '$referralsCount',
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -276,6 +369,40 @@ class _FamilyCard extends StatelessWidget {
   }
 }
 
+class _MetaItem extends StatelessWidget {
+  final String label;
+  final String value;
+  const _MetaItem({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: AppTextStyles.caption(
+            context, color: AppColors.lightTextSecondary,
+          ).copyWith(letterSpacing: 0.6, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 2),
+        Text(value, style: AppTextStyles.body(context)),
+      ],
+    );
+  }
+}
+
+String? _shortDate(String? iso) {
+  if (iso == null || iso.isEmpty) return null;
+  final dt = DateTime.tryParse(iso);
+  if (dt == null) return null;
+  const months = [
+    'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
+  ];
+  return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+}
+
 class _Tag extends StatelessWidget {
   final String label;
   final Color color;
@@ -298,10 +425,20 @@ class _Tag extends StatelessWidget {
 
 class _ChildrenTable extends StatelessWidget {
   final List<Map<String, dynamic>> children;
-  const _ChildrenTable({required this.children});
+  final List<Map<String, dynamic>> activeSessions;
+  const _ChildrenTable({
+    required this.children,
+    required this.activeSessions,
+  });
   @override
   Widget build(BuildContext context) {
     if (children.isEmpty) return const Text('No children registered.');
+    // Map child_id -> their currently-open session, if any.
+    final byChild = <String, Map<String, dynamic>>{};
+    for (final s in activeSessions) {
+      final cid = s['child_id'] as String?;
+      if (cid != null) byChild[cid] = s;
+    }
     return Container(
       decoration: BoxDecoration(
         color: AppColors.lightSurface,
@@ -311,6 +448,7 @@ class _ChildrenTable extends StatelessWidget {
       child: DataTable(
         columns: const [
           DataColumn(label: Text('Name')),
+          DataColumn(label: Text('Status')),
           DataColumn(label: Text('Date of birth')),
           DataColumn(label: Text('Hero')),
           DataColumn(label: Text('Level')),
@@ -321,6 +459,7 @@ class _ChildrenTable extends StatelessWidget {
           for (final c in children)
             DataRow(cells: [
               DataCell(Text((c['name'] as String?) ?? '—')),
+              DataCell(_SessionBadge(session: byChild[c['id'] as String?])),
               DataCell(Text((c['date_of_birth'] as String?) ?? '—')),
               DataCell(Text((c['favourite_hero'] as String?) ?? '—')),
               DataCell(Text('${c['current_level'] ?? '—'}')),
@@ -328,6 +467,63 @@ class _ChildrenTable extends StatelessWidget {
               DataCell(_GrantCardAction(child: c)),
             ]),
         ],
+      ),
+    );
+  }
+}
+
+class _SessionBadge extends StatelessWidget {
+  final Map<String, dynamic>? session;
+  const _SessionBadge({required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = session;
+    if (s == null) {
+      return Text(
+        '—',
+        style: AppTextStyles.caption(
+          context, color: AppColors.lightTextSecondary,
+        ),
+      );
+    }
+    final status = (s['status'] as String?) ?? '';
+    final expiresIso = s['expires_at'] as String?;
+    final expires = expiresIso == null ? null : DateTime.tryParse(expiresIso);
+    String label;
+    Color color;
+    switch (status) {
+      case 'pending':
+        label = 'Awaiting scan';
+        color = AppColors.gold;
+        break;
+      case 'active':
+        if (expires != null) {
+          final mins = expires.difference(DateTime.now()).inMinutes;
+          label = mins > 0 ? 'Playing · ${mins}m left' : 'Playing · ending';
+        } else {
+          label = 'Playing';
+        }
+        color = AppColors.activeGreen;
+        break;
+      case 'grace':
+        label = 'Grace period';
+        color = AppColors.adminRed;
+        break;
+      default:
+        label = status;
+        color = AppColors.lightTextSecondary;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        label,
+        style: AppTextStyles.caption(context, color: color)
+            .copyWith(fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -589,46 +785,108 @@ class _SurpriseCardChip extends StatelessWidget {
   }
 }
 
-class _WalletTable extends StatelessWidget {
+class _WalletTable extends StatefulWidget {
   final List<Map<String, dynamic>> rows;
   const _WalletTable({required this.rows});
+
+  @override
+  State<_WalletTable> createState() => _WalletTableState();
+}
+
+class _WalletTableState extends State<_WalletTable> {
+  // 'all' | 'topups' | 'debits' | 'refunds' | 'manual'
+  String _filter = 'all';
+
+  bool _matches(Map<String, dynamic> r, String filter) {
+    final type = (r['type'] as String?) ?? '';
+    final amount = (r['amount_paise'] as int?) ?? 0;
+    switch (filter) {
+      case 'topups':
+        return type == 'topup' || type == 'razorpay_topup' || amount > 0 && type.contains('credit');
+      case 'debits':
+        return amount < 0 && !type.contains('refund');
+      case 'refunds':
+        return type.contains('refund');
+      case 'manual':
+        return type.startsWith('manual_');
+      default:
+        return true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (rows.isEmpty) return const Text('No wallet activity.');
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.lightSurface,
-        border: Border.all(color: AppColors.lightBorder),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('When')),
-          DataColumn(label: Text('Type')),
-          DataColumn(label: Text('Amount')),
-          DataColumn(label: Text('Balance after')),
-          DataColumn(label: Text('Method')),
-        ],
-        rows: [
-          for (final r in rows)
-            DataRow(cells: [
-              DataCell(Text(_short(r['created_at'] as String?))),
-              DataCell(Text((r['type'] as String?) ?? '—')),
-              DataCell(Text(
-                _signed((r['amount_paise'] as int?) ?? 0),
-                style: TextStyle(
-                  color: ((r['amount_paise'] as int?) ?? 0) < 0
-                      ? AppColors.adminRed
-                      : AppColors.activeGreen,
+    if (widget.rows.isEmpty) return const Text('No wallet activity.');
+    final filtered = widget.rows.where((r) => _matches(r, _filter)).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Wrap(
+            spacing: 8,
+            children: [
+              for (final f in const <(String, String)>[
+                ('all', 'All'),
+                ('topups', 'Topups'),
+                ('debits', 'Debits'),
+                ('refunds', 'Refunds'),
+                ('manual', 'Manual'),
+              ])
+                FilterChip(
+                  label: Text(f.$2),
+                  selected: _filter == f.$1,
+                  onSelected: (_) => setState(() => _filter = f.$1),
                 ),
-              )),
-              DataCell(Text(
-                Money.fromPaise((r['balance_after_paise'] as int?) ?? 0),
-              )),
-              DataCell(Text((r['payment_method'] as String?) ?? '—')),
-            ]),
-        ],
-      ),
+            ],
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.lightSurface,
+            border: Border.all(color: AppColors.lightBorder),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: filtered.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'No rows match this filter.',
+                    style: AppTextStyles.body(
+                      context, color: AppColors.lightTextSecondary,
+                    ),
+                  ),
+                )
+              : DataTable(
+                  columns: const [
+                    DataColumn(label: Text('When')),
+                    DataColumn(label: Text('Type')),
+                    DataColumn(label: Text('Amount')),
+                    DataColumn(label: Text('Balance after')),
+                    DataColumn(label: Text('Method')),
+                  ],
+                  rows: [
+                    for (final r in filtered)
+                      DataRow(cells: [
+                        DataCell(Text(_short(r['created_at'] as String?))),
+                        DataCell(Text((r['type'] as String?) ?? '—')),
+                        DataCell(Text(
+                          _signed((r['amount_paise'] as int?) ?? 0),
+                          style: TextStyle(
+                            color: ((r['amount_paise'] as int?) ?? 0) < 0
+                                ? AppColors.adminRed
+                                : AppColors.activeGreen,
+                          ),
+                        )),
+                        DataCell(Text(
+                          Money.fromPaise((r['balance_after_paise'] as int?) ?? 0),
+                        )),
+                        DataCell(Text((r['payment_method'] as String?) ?? '—')),
+                      ]),
+                  ],
+                ),
+        ),
+      ],
     );
   }
 
