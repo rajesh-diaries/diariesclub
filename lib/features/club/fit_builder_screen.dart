@@ -204,6 +204,30 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                     style: AppTextStyles.body(context),
                   ),
                 const SizedBox(height: 16),
+                if (data.linkedCategories.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.adminRed.withValues(alpha: 0.10),
+                      border: Border.all(color: AppColors.adminRed),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'DEBUG: linkedCategories is empty',
+                          style: AppTextStyles.bodyLarge(
+                            context, color: AppColors.adminRed,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text('template keys: ${data.template.keys.toList()}'),
+                        Text('template id: ${data.template['id']}'),
+                        Text('template name: ${data.template['name']}'),
+                      ],
+                    ),
+                  ),
                 for (final lc in data.linkedCategories)
                   _CategorySection(
                     category: lc.category,
