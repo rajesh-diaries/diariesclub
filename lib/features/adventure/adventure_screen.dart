@@ -34,6 +34,23 @@ class AdventureScreen extends ConsumerWidget {
         automaticallyImplyLeading: false,
         title: const Text('Adventure'),
         actions: [
+          TextButton.icon(
+            onPressed: () =>
+                context.push('/onboarding/welcome?revisit=1'),
+            icon: const Icon(
+              PhosphorIconsRegular.info,
+              size: 18,
+              color: AppColors.navy,
+            ),
+            label: const Text(
+              'About',
+              style: TextStyle(color: AppColors.navy),
+            ),
+            style: TextButton.styleFrom(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            ),
+          ),
           IconButton(
             tooltip: 'Wall of Legends',
             icon: const Icon(

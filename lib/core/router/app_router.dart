@@ -23,6 +23,7 @@ import '../../features/onboarding/add_child_screen.dart';
 import '../../features/onboarding/child_details_screen.dart';
 import '../../features/onboarding/family_name_screen.dart';
 import '../../features/onboarding/hero_pick_screen.dart';
+import '../../features/onboarding/welcome_manifesto_screen.dart';
 import '../../features/profile/add_child_screen.dart' as profile_add_child;
 import '../../features/profile/delete_account_screen.dart';
 import '../../features/profile/edit_child_screen.dart';
@@ -135,6 +136,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ── Onboarding (Session 4) ────────────────────────────────────────
+      GoRoute(
+        path: '/onboarding/welcome',
+        name: 'onboarding_welcome',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final revisit = state.uri.queryParameters['revisit'] == '1';
+          return WelcomeManifestoScreen(isRevisit: revisit);
+        },
+      ),
       GoRoute(
         path: '/onboarding/family-name',
         name: 'onboarding_family_name',

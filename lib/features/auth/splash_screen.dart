@@ -71,8 +71,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (!mounted) return;
 
     if (family == null) {
-      // Auth user exists but family_create hasn't run — fresh OTP, resume
-      // at family-name (or a later step if the user got further before kill).
+      // Auth user exists but family_create hasn't run — fresh OTP. First
+      // show the "Brave. Kind. Curious. Creative." welcome manifesto (only
+      // once per family, gated by a SharedPreferences flag), then resume
+      // at family-name or whichever onboarding step they were last on.
+      final seenWelcome =
+          await ref.read(hasSeenWelcomeManifestoProvider.future);
+      if (!mounted) return;
+      if (!seenWelcome) {
+        context.go('/onboarding/welcome');
+        return;
+      }
       final step = await ref.read(onboardingStepProvider.future);
       if (!mounted) return;
       context.go(step.route);

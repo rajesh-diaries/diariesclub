@@ -79,6 +79,31 @@ class OnboardingStepController extends AsyncNotifier<OnboardingStep> {
   }
 }
 
+/// Whether the user has already seen the Welcome Manifesto screen (the
+/// "Brave. Kind. Curious. Creative." intro shown right after first OTP
+/// verify). Persists across reinstalls of the app only as long as the
+/// device's SharedPreferences survive — fine for v1.
+final hasSeenWelcomeManifestoProvider =
+    AsyncNotifierProvider<HasSeenWelcomeManifestoController, bool>(
+  HasSeenWelcomeManifestoController.new,
+);
+
+class HasSeenWelcomeManifestoController extends AsyncNotifier<bool> {
+  static const _key = 'has_seen_welcome_manifesto';
+
+  @override
+  Future<bool> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_key) ?? false;
+  }
+
+  Future<void> markSeen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_key, true);
+    state = const AsyncValue.data(true);
+  }
+}
+
 /// The child UUID created during onboarding, used by the hero-pick step
 /// to know which child to update. Stored in SharedPreferences so it
 /// survives an app kill between child-details and hero-pick.
