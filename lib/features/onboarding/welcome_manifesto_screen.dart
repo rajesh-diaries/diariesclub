@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/providers/onboarding_state_provider.dart'
-    show hasSeenWelcomeManifestoProvider;
+import '../../core/providers/onboarding_state_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 
@@ -46,11 +45,14 @@ class _WelcomeManifestoScreenState
       Navigator.of(context).pop();
       return;
     }
-    await ref.read(hasSeenWelcomeManifestoProvider.notifier).markSeen();
+    // Advance the persisted onboarding step so a cold-start now resumes
+    // at family-name instead of re-showing the welcome forever. The flag
+    // approach is gone — the welcome is now just OnboardingStep.welcome,
+    // and progressing past it is the same as progressing past any step.
+    await ref
+        .read(onboardingStepProvider.notifier)
+        .setStep(OnboardingStep.familyName);
     if (!mounted) return;
-    // Back to splash — it figures out the right destination now that the
-    // welcome flag is set (home for an existing family, family-name for a
-    // brand-new OTP signup, etc.).
     context.go('/');
   }
 

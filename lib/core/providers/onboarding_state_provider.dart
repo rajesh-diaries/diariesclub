@@ -7,9 +7,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Persisted across cold starts in SharedPreferences (`onboarding_step` int).
 /// The Splash screen consults this to resume the user mid-flow if the app
 /// was killed between OTP verify and onboarding completion.
+///
+/// IMPORTANT: enum values are persisted by `index`. Never reorder. New
+/// values must go at the END to avoid invalidating saved state on devices
+/// that already have a stored int.
 enum OnboardingStep {
   /// Family record not yet created. Splash routes here after a successful
-  /// OTP for a new auth user.
+  /// OTP for a new auth user. We keep `familyName` first in the enum so
+  /// existing devices that already persisted index 0 still resume here.
   familyName('/onboarding/family-name'),
 
   /// Family row exists but child decision not yet made (the screen with
@@ -19,18 +24,20 @@ enum OnboardingStep {
   /// Add-child chosen; collecting the child's details.
   childDetails('/onboarding/child-details'),
 
-  /// Child created; picking favourite hero.
+  /// Child created; picking favourite character.
   heroPick('/onboarding/hero-pick'),
 
-  /// Onboarding complete (cafe-only path or post-hero-pick).
-  complete('/home');
+  /// Onboarding complete (cafe-only path or post-character-pick).
+  complete('/home'),
+
+  /// "Brave. Kind. Curious. Creative." brand manifesto. New step added
+  /// AFTER complete in declaration order so existing persisted indexes
+  /// keep working. OTP verify sets this for brand-new family signups.
+  welcome('/onboarding/welcome');
 
   const OnboardingStep(this.route);
   final String route;
 
-  // The persisted int matches the enum's declaration order via the built-in
-  // `index` getter. Don't reorder enum values without a migration of stored
-  // SharedPreferences ints.
   static OnboardingStep fromIndex(int? i) {
     if (i == null || i < 0 || i >= OnboardingStep.values.length) {
       return OnboardingStep.familyName;

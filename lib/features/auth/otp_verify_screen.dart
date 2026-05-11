@@ -152,15 +152,16 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
       if (!mounted) return;
 
       // Persist the right onboarding step so the splash router knows
-      // where to send us, then bounce through splash itself. Splash now
-      // owns the welcome-manifesto gate — without this bounce, a fresh
-      // OTP signup skipped straight past the manifesto into the
-      // family-name form, defeating the whole "brand promise lands
-      // before anything else" goal.
+      // where to send us, then bounce through splash itself.
+      //
+      // Brand-new families (family == null) ALWAYS start at the welcome
+      // manifesto — no flag-gating, no per-uid trickery. The welcome
+      // screen's CTA advances the step to familyName and bounces back
+      // through splash, which then routes to the form.
       if (family == null) {
         await ref
             .read(onboardingStepProvider.notifier)
-            .setStep(OnboardingStep.familyName);
+            .setStep(OnboardingStep.welcome);
       } else if (family['has_children'] == true ||
           family['is_cafe_only'] == true) {
         await ref
