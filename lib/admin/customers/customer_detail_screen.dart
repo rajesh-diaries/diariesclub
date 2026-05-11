@@ -42,6 +42,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   // Referral chain for the family card.
   String? _referredByName;
   int _referralsCount = 0;
+  // Per-child activity summary keyed by child_id.
+  Map<String, Map<String, dynamic>> _childSummary = const {};
   bool _loading = true;
   String? _errorText;
 
@@ -113,12 +115,29 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
         referralsCount = (refs as List).length;
       } catch (_) {}
 
+      // Per-child activity summary in one RPC call.
+      Map<String, Map<String, dynamic>> childSummary = const {};
+      try {
+        final raw = await Supabase.instance.client
+            .rpc<dynamic>('admin_family_children_summary', params: {
+          'p_family_id': widget.familyId,
+        });
+        if (raw is List) {
+          childSummary = {
+            for (final r in raw)
+              if (r is Map && r['child_id'] is String)
+                r['child_id'] as String: Map<String, dynamic>.from(r),
+          };
+        }
+      } catch (_) {}
+
       if (!mounted) return;
       setState(() {
         _family = Map<String, dynamic>.from(family);
         _wallet = wallet == null ? null : Map<String, dynamic>.from(wallet);
         _referredByName = referredByName;
         _referralsCount = referralsCount;
+        _childSummary = childSummary;
         _children = (children as List)
             .map((c) => Map<String, dynamic>.from(c as Map))
             .toList();
@@ -244,6 +263,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                                 s['status'] == 'pending' ||
                                 s['status'] == 'grace')
                             .toList(),
+                        summaryByChildId: _childSummary,
                       ),
                       const SizedBox(height: 24),
                       const _SectionHeader(text: 'Wallet history'),
@@ -426,9 +446,11 @@ class _Tag extends StatelessWidget {
 class _ChildrenTable extends StatelessWidget {
   final List<Map<String, dynamic>> children;
   final List<Map<String, dynamic>> activeSessions;
+  final Map<String, Map<String, dynamic>> summaryByChildId;
   const _ChildrenTable({
     required this.children,
     required this.activeSessions,
+    required this.summaryByChildId,
   });
   @override
   Widget build(BuildContext context) {
@@ -439,33 +461,163 @@ class _ChildrenTable extends StatelessWidget {
       final cid = s['child_id'] as String?;
       if (cid != null) byChild[cid] = s;
     }
+    // Family totals across all kids.
+    int totalVisits = 0;
+    int totalMinutes = 0;
+    int totalWorkshops = 0;
+    int totalCards = 0;
+    int totalPerks = 0;
+    for (final s in summaryByChildId.values) {
+      totalVisits += (s['sessions_completed'] as int?) ?? 0;
+      totalMinutes += (s['total_play_minutes'] as int?) ?? 0;
+      totalWorkshops += (s['workshops_attended'] as int?) ?? 0;
+      totalCards += (s['cards_collected'] as int?) ?? 0;
+      totalPerks += (s['perks_redeemed'] as int?) ?? 0;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (summaryByChildId.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                _AggTile(
+                  icon: PhosphorIconsRegular.confetti,
+                  label: 'Family visits',
+                  value: '$totalVisits',
+                ),
+                _AggTile(
+                  icon: PhosphorIconsRegular.clock,
+                  label: 'Hours played',
+                  value: '${(totalMinutes / 60).toStringAsFixed(1)}h',
+                ),
+                _AggTile(
+                  icon: PhosphorIconsRegular.graduationCap,
+                  label: 'Workshops',
+                  value: '$totalWorkshops',
+                ),
+                _AggTile(
+                  icon: PhosphorIconsRegular.shieldCheck,
+                  label: 'Cards collected',
+                  value: '$totalCards',
+                ),
+                _AggTile(
+                  icon: PhosphorIconsRegular.gift,
+                  label: 'Perks redeemed',
+                  value: '$totalPerks',
+                ),
+              ],
+            ),
+          ),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.lightSurface,
+            border: Border.all(color: AppColors.lightBorder),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columnSpacing: 18,
+              columns: const [
+                DataColumn(label: Text('Name')),
+                DataColumn(label: Text('Status')),
+                DataColumn(label: Text('Born')),
+                DataColumn(label: Text('Hero')),
+                DataColumn(label: Text('Lvl')),
+                DataColumn(label: Text('XP')),
+                DataColumn(label: Text('Visits')),
+                DataColumn(label: Text('Hours')),
+                DataColumn(label: Text('Workshops')),
+                DataColumn(label: Text('Cards')),
+                DataColumn(label: Text('Last visit')),
+                DataColumn(label: Text('Action')),
+              ],
+              rows: [
+                for (final c in children)
+                  _row(context, c, byChild[c['id'] as String?]),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  DataRow _row(
+    BuildContext context,
+    Map<String, dynamic> c,
+    Map<String, dynamic>? session,
+  ) {
+    final id = c['id'] as String?;
+    final summary = id == null ? null : summaryByChildId[id];
+    final visits = (summary?['sessions_completed'] as int?) ?? 0;
+    final mins = (summary?['total_play_minutes'] as int?) ?? 0;
+    final workshops = (summary?['workshops_attended'] as int?) ?? 0;
+    final cards = (summary?['cards_collected'] as int?) ?? 0;
+    final lastVisit = _shortDate(summary?['last_visit_at'] as String?);
+    return DataRow(cells: [
+      DataCell(Text((c['name'] as String?) ?? '—')),
+      DataCell(_SessionBadge(session: session)),
+      DataCell(Text((c['date_of_birth'] as String?) ?? '—')),
+      DataCell(Text((c['favourite_hero'] as String?) ?? '—')),
+      DataCell(Text('${c['current_level'] ?? '—'}')),
+      DataCell(Text('${c['total_xp'] ?? 0}')),
+      DataCell(Text('$visits')),
+      DataCell(Text(mins == 0 ? '—' : '${(mins / 60).toStringAsFixed(1)}h')),
+      DataCell(Text('$workshops')),
+      DataCell(Text('$cards')),
+      DataCell(Text(lastVisit ?? '—')),
+      DataCell(_GrantCardAction(child: c)),
+    ]);
+  }
+}
+
+class _AggTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _AggTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.lightSurface,
         border: Border.all(color: AppColors.lightBorder),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
       ),
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('Name')),
-          DataColumn(label: Text('Status')),
-          DataColumn(label: Text('Date of birth')),
-          DataColumn(label: Text('Hero')),
-          DataColumn(label: Text('Level')),
-          DataColumn(label: Text('Total XP')),
-          DataColumn(label: Text('Surprise card')),
-        ],
-        rows: [
-          for (final c in children)
-            DataRow(cells: [
-              DataCell(Text((c['name'] as String?) ?? '—')),
-              DataCell(_SessionBadge(session: byChild[c['id'] as String?])),
-              DataCell(Text((c['date_of_birth'] as String?) ?? '—')),
-              DataCell(Text((c['favourite_hero'] as String?) ?? '—')),
-              DataCell(Text('${c['current_level'] ?? '—'}')),
-              DataCell(Text('${c['total_xp'] ?? 0}')),
-              DataCell(_GrantCardAction(child: c)),
-            ]),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: AppColors.navy),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: AppTextStyles.caption(
+                  context, color: AppColors.lightTextSecondary,
+                ),
+              ),
+              Text(
+                value,
+                style: AppTextStyles.body(context).copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
