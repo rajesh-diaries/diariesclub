@@ -309,10 +309,17 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
 
           // Drop any selections that have since gone into session.
           _selectedChildIds.removeWhere(inSession.contains);
-          // No default selection — parent taps to opt each kid in. Copy
-          // 'Tap to include each kid. Tally adds up below.' implies an
-          // empty start; pre-selecting contradicted it and risked
-          // accidental over-charges in multi-kid families.
+          // No default selection for multi-kid families — parent taps to
+          // opt each kid in. Copy 'Tap to include each kid. Tally adds up
+          // below.' implies an empty start; pre-selecting contradicted it
+          // and risked accidental over-charges in multi-kid families.
+          //
+          // BUT for single-kid families the picker UI is hidden entirely
+          // (no scroll list rendered below), so without an auto-select the
+          // CTA gets stuck on "Pick at least one kid" with nothing to tap.
+          if (children.length == 1) {
+            _selectedChildIds.add(children.first['id'] as String);
+          }
 
           if (children.isEmpty) {
             return Center(
@@ -378,6 +385,44 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                 );
                               },
                             ),
+                          ),
+                          const SizedBox(height: 24),
+                        ] else ...[
+                          // Single-kid family: no picker, just confirm who.
+                          Row(
+                            children: [
+                              _ChildAvatar(
+                                name: children.first['name'] as String? ?? '—',
+                                photoUrl:
+                                    children.first['photo_url'] as String?,
+                                selected: true,
+                                onTap: () {},
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Playing as',
+                                        style: AppTextStyles.caption(
+                                          context,
+                                          color:
+                                              AppColors.lightTextSecondary,
+                                        )),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      children.first['name'] as String? ??
+                                          '—',
+                                      style: AppTextStyles.bodyLarge(
+                                              context)
+                                          .copyWith(
+                                              fontWeight: FontWeight.w800),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 24),
                         ],
