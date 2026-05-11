@@ -314,17 +314,45 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
               ),
             ],
             const SizedBox(height: 16),
-            // Module 2.7: customer can download admin-generated PDF if cached.
-            if ((package['pdf_url'] as String?)?.isNotEmpty ?? false)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: OutlinedButton.icon(
-                  icon: const Icon(PhosphorIconsRegular.filePdf),
-                  label: const Text('Download menu PDF'),
-                  onPressed: () =>
-                      launchUrl(Uri.parse(package['pdf_url'] as String)),
-                ),
-              ),
+            // PDF download — always shown so customers know one exists; if
+            // the admin hasn't uploaded it yet for this package the button
+            // disables itself and shows a "Coming soon" subline.
+            Builder(
+              builder: (context) {
+                final pdfUrl = (package['pdf_url'] as String?) ?? '';
+                final hasPdf = pdfUrl.isNotEmpty;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: OutlinedButton.icon(
+                    icon: const Icon(PhosphorIconsRegular.filePdf),
+                    label: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Download package with menu & details'),
+                          if (!hasPdf) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Coming soon — your team will share on WhatsApp',
+                              style: AppTextStyles.caption(
+                                context,
+                                color: AppColors.lightTextSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    onPressed:
+                        hasPdf ? () => launchUrl(Uri.parse(pdfUrl)) : null,
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: 16),
             const _SectionHeader(text: 'How booking works'),
             const _HowItWorks(),
