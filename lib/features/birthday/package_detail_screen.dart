@@ -294,11 +294,18 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
             const SizedBox(height: 16),
             const _SectionHeader(text: 'Menu'),
             _Inclusions(raw: package['inclusions']),
-            const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: _UniversalIncludesDetail(),
-            ),
+            if (((package['experience_inclusions'] as List?) ?? const [])
+                .isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _ExperienceBlockDetail(
+                  lines: (package['experience_inclusions'] as List)
+                      .whereType<String>()
+                      .toList(),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             const _SectionHeader(text: 'Not included'),
             const _NotIncluded(),
@@ -621,17 +628,12 @@ class _Inclusions extends StatelessWidget {
   }
 }
 
-/// Universal venue benefits — every birthday package at Diaries Club
-/// includes these regardless of tier. Hardcoded constant; promote to
-/// venue_config later if it ever varies.
-const _universalIncludesDetail = <(IconData, String)>[
-  (Icons.access_time, '2.5 hours play'),
-  (Icons.meeting_room, '3 hours hall'),
-  (Icons.restaurant_menu, 'Food buffet'),
-];
-
-class _UniversalIncludesDetail extends StatelessWidget {
-  const _UniversalIncludesDetail();
+/// Per-package experience block on the detail screen. Sourced from
+/// birthday_packages.experience_inclusions so admin can edit per
+/// package without code changes.
+class _ExperienceBlockDetail extends StatelessWidget {
+  final List<String> lines;
+  const _ExperienceBlockDetail({required this.lines});
 
   @override
   Widget build(BuildContext context) {
@@ -646,7 +648,7 @@ class _UniversalIncludesDetail extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'ALL PACKAGES INCLUDE',
+            'EXPERIENCE',
             style: AppTextStyles.caption(
               context, color: AppColors.lightTextSecondary,
             ).copyWith(letterSpacing: 0.8, fontWeight: FontWeight.w800),
@@ -656,11 +658,12 @@ class _UniversalIncludesDetail extends StatelessWidget {
             spacing: 16,
             runSpacing: 8,
             children: [
-              for (final (icon, label) in _universalIncludesDetail)
+              for (final label in lines)
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(icon, size: 18, color: AppColors.navy),
+                    const Icon(Icons.check_circle,
+                        size: 16, color: AppColors.navy),
                     const SizedBox(width: 6),
                     Text(label, style: AppTextStyles.body(context)),
                   ],

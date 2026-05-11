@@ -97,6 +97,7 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
   final _priceVegCtrl = TextEditingController();
   final _priceNonVegCtrl = TextEditingController();
   final _pdfUrlCtrl = TextEditingController();
+  final _experienceCtrl = TextEditingController();
 
   String _tier = 'little_joy';
   String? _heroTheme;
@@ -140,6 +141,7 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
     _priceVegCtrl.dispose();
     _priceNonVegCtrl.dispose();
     _pdfUrlCtrl.dispose();
+    _experienceCtrl.dispose();
     super.dispose();
   }
 
@@ -190,6 +192,11 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
         final pNon = row['price_per_pax_non_veg_paise'] as int?;
         _priceNonVegCtrl.text = pNon == null ? '' : (pNon ~/ 100).toString();
         _pdfUrlCtrl.text = (row['pdf_url'] as String?) ?? '';
+        // Experience inclusions are an array of strings; render one per
+        // line so admin can add/remove without thinking about JSON.
+        final exp = (row['experience_inclusions'] as List?)?.cast<String>()
+            ?? const <String>[];
+        _experienceCtrl.text = exp.join('\n');
         _loading = false;
       });
     } catch (e) {
@@ -335,6 +342,11 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
         'p_pdf_url': _pdfUrlCtrl.text.trim().isEmpty
             ? null
             : _pdfUrlCtrl.text.trim(),
+        'p_experience_inclusions': _experienceCtrl.text
+            .split('\n')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList(),
       };
 
       String? id = widget.packageId;
@@ -499,6 +511,21 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
                             'Upload the PDF to Supabase Storage (or any '
                             'public URL) and paste it here. Customer sees a '
                             '"View full menu (PDF)" link if filled.',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _experienceCtrl,
+                      maxLines: 5,
+                      decoration: const InputDecoration(
+                        labelText: 'Experience inclusions',
+                        hintText: '2.5 hours play time\n'
+                            '3 hours hall booking\n'
+                            'Food buffet',
+                        helperText:
+                            'One bullet per line. Shown on the package as '
+                            '"EXPERIENCE" — add as many as you like.',
                         border: OutlineInputBorder(),
                       ),
                     ),

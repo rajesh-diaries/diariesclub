@@ -92,6 +92,10 @@ class _PackageCard extends StatelessWidget {
     final inclusionLines = ((package['inclusions'] as List?) ?? const [])
         .whereType<String>()
         .toList();
+    final experienceLines =
+        ((package['experience_inclusions'] as List?) ?? const [])
+            .whereType<String>()
+            .toList();
 
     final badge = tier == 'magical'
         ? const _Badge(text: 'Premium', color: AppColors.navy)
@@ -188,8 +192,10 @@ class _PackageCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 _InclusionsGrid(lines: inclusionLines),
-                const SizedBox(height: 14),
-                const _UniversalIncludes(),
+                if (experienceLines.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  _ExperienceBlock(lines: experienceLines),
+                ],
                 const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
@@ -309,17 +315,13 @@ class _InclusionsGrid extends StatelessWidget {
   }
 }
 
-/// Universal venue benefits — every birthday package at Diaries Club
-/// includes these regardless of tier. Hardcoded as a constant since
-/// it's a venue-level promise (not per-package).
-const _universalIncludes = <(IconData, String)>[
-  (Icons.access_time, '2.5 hours play'),
-  (Icons.meeting_room, '3 hours hall'),
-  (Icons.restaurant_menu, 'Food buffet'),
-];
-
-class _UniversalIncludes extends StatelessWidget {
-  const _UniversalIncludes();
+/// Per-package experience block — admin-authored bullet list of venue
+/// benefits (e.g. '2.5 hours play time', '3 hours hall booking',
+/// 'Food buffet'). Sourced from birthday_packages.experience_inclusions
+/// so each package can advertise its own set.
+class _ExperienceBlock extends StatelessWidget {
+  final List<String> lines;
+  const _ExperienceBlock({required this.lines});
 
   @override
   Widget build(BuildContext context) {
@@ -334,7 +336,7 @@ class _UniversalIncludes extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'ALL PACKAGES INCLUDE',
+            'EXPERIENCE',
             style: AppTextStyles.caption(
               context, color: AppColors.lightTextSecondary,
             ).copyWith(letterSpacing: 0.8, fontWeight: FontWeight.w800),
@@ -344,11 +346,12 @@ class _UniversalIncludes extends StatelessWidget {
             spacing: 14,
             runSpacing: 6,
             children: [
-              for (final (icon, label) in _universalIncludes)
+              for (final label in lines)
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(icon, size: 16, color: AppColors.navy),
+                    const Icon(Icons.check_circle,
+                        size: 14, color: AppColors.navy),
                     const SizedBox(width: 4),
                     Text(label, style: AppTextStyles.caption(context)),
                   ],
