@@ -44,7 +44,7 @@ class BirthdayPackagesScreen extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                   child: Text(
-                    'All packages include exclusive play time, decor, food, and a host.',
+                    'All packages include hall, play and food.',
                     style: AppTextStyles.body(
                       context,
                       color: AppColors.lightTextSecondary,
