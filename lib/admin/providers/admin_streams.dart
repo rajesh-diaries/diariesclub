@@ -71,6 +71,31 @@ final adminTodaySessionCountProvider = FutureProvider<int>((ref) async {
   return (rows as List).length;
 });
 
+/// Selected month for the Birthday CRM dashboard. 1..12; defaults to
+/// current IST month.
+final adminBirthdayDashboardMonthProvider = StateProvider<int>((ref) {
+  final ist = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+  return ist.month;
+});
+
+/// One-shot dashboard fetch for the Birthday CRM (KPIs + attention
+/// counters + birthdays-this-month list). Re-runs when the month
+/// selector changes or when reservations stream emits (so the
+/// numbers stay fresh after a status flip).
+final adminBirthdayDashboardProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final month = ref.watch(adminBirthdayDashboardMonthProvider);
+  // Re-fetch when the reservations stream emits — keeps KPIs in
+  // lockstep with the kanban without manual invalidation.
+  ref.watch(adminBirthdayReservationsProvider);
+  final raw = await Supabase.instance.client.rpc<dynamic>(
+    'admin_birthday_dashboard',
+    params: {'p_month': month},
+  );
+  if (raw is Map) return Map<String, dynamic>.from(raw);
+  return const <String, dynamic>{};
+});
+
 /// Today's healthy-bite distributions (admin dashboard tile). Counts
 /// sessions where staff handed out a bite in the last 24h.
 final adminTodayHealthyBitesProvider = FutureProvider<int>((ref) async {

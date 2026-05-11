@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -42,6 +44,19 @@ class _BirthdayCrmScreenState extends ConsumerState<BirthdayCrmScreen> {
       }
     }
 
+    final dashboard =
+        ref.watch(adminBirthdayDashboardProvider).valueOrNull ??
+            const <String, dynamic>{};
+    final kpis = (dashboard['kpis'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
+    final attention =
+        (dashboard['attention'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
+    final birthdays = ((dashboard['birthdays'] as List?) ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    final selectedMonth = ref.watch(adminBirthdayDashboardMonthProvider);
+
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
       appBar: const AdminAppBar(title: 'Birthday CRM'),
@@ -49,38 +64,64 @@ class _BirthdayCrmScreenState extends ConsumerState<BirthdayCrmScreen> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.all(16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _Column(
-                    title: 'INTERESTED',
-                    color: AppColors.gold,
-                    items: byStatus['interested']!,
-                    onTap: (r) => setState(() => _selected = r),
-                    selectedId: _selected?['id'] as String?,
+                  _AttentionBanner(attention: attention),
+                  const SizedBox(height: 16),
+                  _KpiRow(kpis: kpis),
+                  const SizedBox(height: 24),
+                  _BirthdaysThisMonth(
+                    selectedMonth: selectedMonth,
+                    rows: birthdays,
+                    onMonthChanged: (m) => ref
+                        .read(adminBirthdayDashboardMonthProvider.notifier)
+                        .state = m,
                   ),
-                  _Column(
-                    title: 'CONTACTED',
-                    color: AppColors.navy,
-                    items: byStatus['admin_contacted']!,
-                    onTap: (r) => setState(() => _selected = r),
-                    selectedId: _selected?['id'] as String?,
+                  const SizedBox(height: 24),
+                  Text(
+                    'PIPELINE',
+                    style: AppTextStyles.caption(
+                      context, color: AppColors.lightTextSecondary,
+                    ).copyWith(letterSpacing: 0.8, fontWeight: FontWeight.w800),
                   ),
-                  _Column(
-                    title: 'CONFIRMED',
-                    color: AppColors.activeGreen,
-                    items: byStatus['confirmed']!,
-                    onTap: (r) => setState(() => _selected = r),
-                    selectedId: _selected?['id'] as String?,
-                  ),
-                  _Column(
-                    title: 'COMPLETED',
-                    color: AppColors.xpPurple,
-                    items: byStatus['completed']!,
-                    onTap: (r) => setState(() => _selected = r),
-                    selectedId: _selected?['id'] as String?,
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _Column(
+                          title: 'INTERESTED',
+                          color: AppColors.gold,
+                          items: byStatus['interested']!,
+                          onTap: (r) => setState(() => _selected = r),
+                          selectedId: _selected?['id'] as String?,
+                        ),
+                        _Column(
+                          title: 'CONTACTED',
+                          color: AppColors.navy,
+                          items: byStatus['admin_contacted']!,
+                          onTap: (r) => setState(() => _selected = r),
+                          selectedId: _selected?['id'] as String?,
+                        ),
+                        _Column(
+                          title: 'CONFIRMED',
+                          color: AppColors.activeGreen,
+                          items: byStatus['confirmed']!,
+                          onTap: (r) => setState(() => _selected = r),
+                          selectedId: _selected?['id'] as String?,
+                        ),
+                        _Column(
+                          title: 'COMPLETED',
+                          color: AppColors.xpPurple,
+                          items: byStatus['completed']!,
+                          onTap: (r) => setState(() => _selected = r),
+                          selectedId: _selected?['id'] as String?,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -823,6 +864,420 @@ class _CancelInquiryDialogState extends State<_CancelInquiryDialog> {
           onPressed: () => Navigator.of(context).pop(_reason.text),
         ),
       ],
+    );
+  }
+}
+
+// ─── Dashboard sections ────────────────────────────────────────────────────
+
+class _AttentionBanner extends StatelessWidget {
+  final Map<String, dynamic> attention;
+  const _AttentionBanner({required this.attention});
+
+  @override
+  Widget build(BuildContext context) {
+    final waiting = (attention['new_inquiries_waiting'] as int?) ?? 0;
+    final noInquiry = (attention['kids_no_inquiry_upcoming'] as int?) ?? 0;
+    final thisWeek = (attention['confirmed_this_week'] as int?) ?? 0;
+    if (waiting == 0 && noInquiry == 0 && thisWeek == 0) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.adminRed.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.adminRed.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(PhosphorIconsFill.warning,
+                  color: AppColors.adminRed, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Needs attention',
+                style: AppTextStyles.h3(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (waiting > 0)
+            _AttentionRow(
+              icon: PhosphorIconsRegular.envelope,
+              text:
+                  '$waiting new ${waiting == 1 ? 'inquiry' : 'inquiries'} waiting > 4 h to be contacted',
+            ),
+          if (noInquiry > 0)
+            _AttentionRow(
+              icon: PhosphorIconsRegular.cake,
+              text:
+                  '$noInquiry ${noInquiry == 1 ? 'kid has' : 'kids have'} birthday in next 14 days — no inquiry yet',
+            ),
+          if (thisWeek > 0)
+            _AttentionRow(
+              icon: PhosphorIconsRegular.confetti,
+              text:
+                  '$thisWeek confirmed ${thisWeek == 1 ? 'party' : 'parties'} this week — review checklist',
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttentionRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _AttentionRow({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: AppColors.adminRed),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: AppTextStyles.body(context))),
+        ],
+      ),
+    );
+  }
+}
+
+class _KpiRow extends StatelessWidget {
+  final Map<String, dynamic> kpis;
+  const _KpiRow({required this.kpis});
+
+  @override
+  Widget build(BuildContext context) {
+    final birthdays = (kpis['birthdays_count'] as int?) ?? 0;
+    final inquiries = (kpis['inquiries_count'] as int?) ?? 0;
+    final confirmed = (kpis['confirmed_count'] as int?) ?? 0;
+    final completed = (kpis['completed_count'] as int?) ?? 0;
+    final revenuePaise = (kpis['revenue_paise'] as int?) ?? 0;
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        _KpiTile(
+          icon: PhosphorIconsFill.cake,
+          label: 'Birthdays this month',
+          value: '$birthdays',
+          color: AppColors.gold,
+        ),
+        _KpiTile(
+          icon: PhosphorIconsFill.envelope,
+          label: 'Inquiries',
+          value: '$inquiries',
+          color: AppColors.navy,
+        ),
+        _KpiTile(
+          icon: PhosphorIconsFill.checkCircle,
+          label: 'Confirmed',
+          value: '$confirmed',
+          color: AppColors.activeGreen,
+        ),
+        _KpiTile(
+          icon: PhosphorIconsFill.confetti,
+          label: 'Completed',
+          value: '$completed',
+          color: AppColors.xpPurple,
+        ),
+        _KpiTile(
+          icon: PhosphorIconsFill.coins,
+          label: 'Revenue (est.)',
+          value: Money.fromPaise(revenuePaise),
+          color: AppColors.gold,
+        ),
+      ],
+    );
+  }
+}
+
+class _KpiTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  const _KpiTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 200,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.lightSurface,
+        border: Border.all(color: AppColors.lightBorder),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppTextStyles.caption(
+                    context, color: AppColors.lightTextSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: AppTextStyles.h2(context, color: color),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BirthdaysThisMonth extends StatefulWidget {
+  final int selectedMonth;
+  final List<Map<String, dynamic>> rows;
+  final ValueChanged<int> onMonthChanged;
+  const _BirthdaysThisMonth({
+    required this.selectedMonth,
+    required this.rows,
+    required this.onMonthChanged,
+  });
+
+  @override
+  State<_BirthdaysThisMonth> createState() => _BirthdaysThisMonthState();
+}
+
+class _BirthdaysThisMonthState extends State<_BirthdaysThisMonth> {
+  // 'all' | 'needs_outreach' | 'in_pipeline' | 'completed'
+  String _filter = 'all';
+
+  static const _months = [
+    'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
+  ];
+
+  bool _matches(Map<String, dynamic> r) {
+    final status = r['reservation_status'] as String?;
+    switch (_filter) {
+      case 'needs_outreach':
+        return status == null;
+      case 'in_pipeline':
+        return status == 'interested' ||
+            status == 'admin_contacted' ||
+            status == 'confirmed';
+      case 'completed':
+        return status == 'completed';
+      default:
+        return true;
+    }
+  }
+
+  Future<void> _whatsApp(String? phone) async {
+    if (phone == null || phone.isEmpty) return;
+    final clean = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    try {
+      await launchUrl(
+        Uri.parse('https://wa.me/$clean'),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.rows.where(_matches).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Text(
+              'BIRTHDAYS',
+              style: AppTextStyles.caption(
+                context, color: AppColors.lightTextSecondary,
+              ).copyWith(letterSpacing: 0.8, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(width: 12),
+            DropdownButton<int>(
+              value: widget.selectedMonth,
+              underline: const SizedBox.shrink(),
+              items: [
+                for (var m = 1; m <= 12; m++)
+                  DropdownMenuItem(value: m, child: Text(_months[m - 1])),
+              ],
+              onChanged: (v) {
+                if (v != null) widget.onMonthChanged(v);
+              },
+            ),
+            const Spacer(),
+            Text(
+              '${filtered.length} of ${widget.rows.length}',
+              style: AppTextStyles.caption(
+                context, color: AppColors.lightTextSecondary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final f in const <(String, String)>[
+              ('all', 'All'),
+              ('needs_outreach', 'Needs outreach'),
+              ('in_pipeline', 'In pipeline'),
+              ('completed', 'Completed'),
+            ])
+              FilterChip(
+                label: Text(f.$2),
+                selected: _filter == f.$1,
+                onSelected: (_) => setState(() => _filter = f.$1),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.lightSurface,
+            border: Border.all(color: AppColors.lightBorder),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: filtered.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    widget.rows.isEmpty
+                        ? 'No birthdays in this month.'
+                        : 'No rows match this filter.',
+                    style: AppTextStyles.body(
+                      context, color: AppColors.lightTextSecondary,
+                    ),
+                  ),
+                )
+              : Column(
+                  children: [
+                    for (final r in filtered)
+                      _BirthdayRow(
+                        row: r,
+                        onWhatsApp: () =>
+                            _whatsApp(r['family_phone'] as String?),
+                      ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BirthdayRow extends StatelessWidget {
+  final Map<String, dynamic> row;
+  final VoidCallback onWhatsApp;
+  const _BirthdayRow({required this.row, required this.onWhatsApp});
+
+  static const _months = [
+    'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (row['child_name'] as String?) ?? '—';
+    final family = (row['family_name'] as String?) ?? '—';
+    final day = (row['birthday_day'] as num?)?.toInt() ?? 0;
+    final month = (row['birthday_month'] as num?)?.toInt() ?? 0;
+    final status = row['reservation_status'] as String?;
+    final dateLabel = month > 0 && day > 0
+        ? '${_months[month - 1]} $day'
+        : '—';
+
+    final (Color color, String label) = switch (status) {
+      'interested' => (AppColors.gold, '🟡 Interested'),
+      'admin_contacted' => (AppColors.navy, '📞 Contacted'),
+      'confirmed' => (AppColors.activeGreen, '✅ Confirmed'),
+      'completed' => (AppColors.xpPurple, '🎉 Completed'),
+      _ => (AppColors.adminRed, '❌ No inquiry'),
+    };
+
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppColors.lightBorder, width: 0.5),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              dateLabel,
+              style: AppTextStyles.body(context).copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: AppTextStyles.body(context).copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  family,
+                  style: AppTextStyles.caption(
+                    context, color: AppColors.lightTextSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.caption(context, color: color).copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          OutlinedButton.icon(
+            onPressed: onWhatsApp,
+            icon: const Icon(PhosphorIconsRegular.whatsappLogo, size: 16),
+            label: const Text('Reach out'),
+          ),
+        ],
+      ),
     );
   }
 }
