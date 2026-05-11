@@ -177,7 +177,12 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
       appBar: AppBar(
-        title: Text((tpl['name'] as String?) ?? 'Build your meal'),
+        // VERSION MARKER — if you see V4 in the title, the new code is
+        // running. Otherwise you're on stale build / cached JS.
+        title: Text(
+          'V4 · ${(tpl['name'] as String?) ?? 'Build your meal'}',
+        ),
+        backgroundColor: Colors.purple.shade100,
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 120),
