@@ -151,30 +151,33 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
 
       if (!mounted) return;
 
-      // Persist the right onboarding step so the splash router knows
-      // where to send us, then bounce through splash itself.
-      //
-      // Brand-new families (family == null) ALWAYS start at the welcome
-      // manifesto — no flag-gating, no per-uid trickery. The welcome
-      // screen's CTA advances the step to familyName and bounces back
-      // through splash, which then routes to the form.
+      // Brand-new families (family == null) → land on the welcome
+      // manifesto, full stop. Existing families with children → home.
+      // Half-onboarded families (family row but no kid) → resume at
+      // add-child. We route DIRECTLY here instead of bouncing through
+      // splash so there's no chance of timing weirdness between the
+      // setStep write and the splash's read.
       if (family == null) {
         await ref
             .read(onboardingStepProvider.notifier)
             .setStep(OnboardingStep.welcome);
+        if (!mounted) return;
+        context.go('/onboarding/welcome');
       } else if (family['has_children'] == true ||
           family['is_cafe_only'] == true) {
         await ref
             .read(onboardingStepProvider.notifier)
             .setStep(OnboardingStep.complete);
         unawaited(Supabase.instance.client.rpc('family_touch_active'));
+        if (!mounted) return;
+        context.go('/home');
       } else {
         await ref
             .read(onboardingStepProvider.notifier)
             .setStep(OnboardingStep.addChild);
+        if (!mounted) return;
+        context.go('/onboarding/add-child');
       }
-      if (!mounted) return;
-      context.go('/');
     } on AuthException catch (e) {
       setState(() {
         _errorText = "Couldn't verify. Please try again. (${e.message})";
