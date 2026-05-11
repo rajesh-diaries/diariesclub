@@ -448,21 +448,10 @@ class _TaxInvoiceHeader extends StatelessWidget {
                     .copyWith(fontWeight: FontWeight.w700),
               ),
             ),
-          if (customerGstin != null && customerGstin!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'BILLED TO',
-              style: AppTextStyles.caption(
-                context,
-                color: AppColors.lightTextSecondary,
-              ).copyWith(letterSpacing: 1.2, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'Buyer GSTIN $customerGstin',
-              style: AppTextStyles.body(context),
-            ),
-          ],
+          // Buyer GSTIN intentionally not shown — food at 5% GST has no
+          // ITC under Indian GST regime, so capturing/displaying it adds
+          // no value to the customer. Birthday-party invoices (18% on
+          // services) live on a separate admin surface where ITC matters.
         ],
       ),
     );

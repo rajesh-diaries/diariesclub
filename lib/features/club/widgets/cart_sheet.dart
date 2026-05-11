@@ -35,14 +35,6 @@ class CartSheet extends ConsumerStatefulWidget {
 class _CartSheetState extends ConsumerState<CartSheet> {
   bool _busy = false;
   String? _errorText;
-  bool _b2b = false;
-  final _gstinCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _gstinCtrl.dispose();
-    super.dispose();
-  }
 
   Future<void> _placeOrder() async {
     final cart = ref.read(cartProvider);
@@ -87,15 +79,6 @@ class _CartSheetState extends ConsumerState<CartSheet> {
     final idem = const Uuid().v4();
 
     try {
-      final gstin = _b2b ? _gstinCtrl.text.trim() : null;
-      // Quick format check for India GSTIN — 15 chars, last is alphanumeric.
-      if (gstin != null && gstin.isNotEmpty && gstin.length != 15) {
-        setState(() {
-          _busy = false;
-          _errorText = 'GSTIN should be 15 characters.';
-        });
-        return;
-      }
       final result = await Supabase.instance.client
           .rpc<Map<String, dynamic>>('order_place', params: {
         'p_venue_id': _venueId,
@@ -105,7 +88,6 @@ class _CartSheetState extends ConsumerState<CartSheet> {
         'p_payment_method': payment.rpcValue,
         'p_combo_id': null,
         'p_idempotency_key': idem,
-        'p_customer_gstin': (gstin != null && gstin.isNotEmpty) ? gstin : null,
       });
       final orderId = result['order_id'] as String?;
       if (orderId == null) throw StateError('order_place returned no id');
@@ -257,12 +239,6 @@ class _CartSheetState extends ConsumerState<CartSheet> {
                   _PaymentSelector(
                     walletBalance: balance,
                     requiredPaise: total,
-                  ),
-                  const SizedBox(height: 12),
-                  _GstinField(
-                    b2b: _b2b,
-                    controller: _gstinCtrl,
-                    onToggle: (v) => setState(() => _b2b = v),
                   ),
                   if (_errorText != null) ...[
                     const SizedBox(height: 12),
@@ -461,11 +437,11 @@ class _Summary extends StatelessWidget {
         children: [
           if (foodPaise > 0) ...[
             _SummaryRow(
-              label: 'Food subtotal',
+              label: 'Subtotal',
               value: Money.fromPaise(foodPaise),
             ),
             _SummaryRow(
-              label: 'GST $pct% (food)',
+              label: 'GST $pct%',
               value: Money.fromPaise(foodGstPaise),
             ),
           ],
@@ -538,58 +514,6 @@ class _SummaryRow extends StatelessWidget {
           Text(value, style: AppTextStyles.body(context, color: color)),
         ],
       ),
-    );
-  }
-}
-
-class _GstinField extends StatelessWidget {
-  final bool b2b;
-  final TextEditingController controller;
-  final ValueChanged<bool> onToggle;
-  const _GstinField({
-    required this.b2b,
-    required this.controller,
-    required this.onToggle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          value: b2b,
-          onChanged: onToggle,
-          title: Text(
-            'Add company GSTIN for invoice',
-            style: AppTextStyles.body(context),
-          ),
-          subtitle: Text(
-            'Get a B2B tax invoice — usable for input tax credit.',
-            style: AppTextStyles.caption(
-              context,
-              color: AppColors.lightTextSecondary,
-            ),
-          ),
-        ),
-        if (b2b)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: TextField(
-              controller: controller,
-              maxLength: 15,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                labelText: 'GSTIN',
-                hintText: '15-character GSTIN (e.g. 36ABCDE1234F1Z5)',
-                border: OutlineInputBorder(),
-                counterText: '',
-              ),
-            ),
-          ),
-      ],
     );
   }
 }
