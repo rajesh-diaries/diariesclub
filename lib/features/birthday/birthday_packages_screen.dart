@@ -180,23 +180,16 @@ class _PackageCard extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 14),
-                ...inclusionLines.take(6).map((line) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.check,
-                            size: 16,
-                            color: AppColors.activeGreen,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(line,
-                                style: AppTextStyles.body(context)),
-                          ),
-                        ],
-                      ),
-                    )),
+                Text(
+                  'MENU',
+                  style: AppTextStyles.caption(
+                    context, color: AppColors.lightTextSecondary,
+                  ).copyWith(letterSpacing: 0.8, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                _InclusionsGrid(lines: inclusionLines),
+                const SizedBox(height: 14),
+                const _UniversalIncludes(),
                 const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
@@ -263,6 +256,106 @@ class _Badge extends StatelessWidget {
           fontWeight: FontWeight.w800,
           letterSpacing: 0.6,
         ),
+      ),
+    );
+  }
+}
+
+/// 2-column grid of inclusion bullets. Reads denser than a single
+/// column when there are 4+ items but still wraps cleanly on narrow
+/// devices (single column under ~360px).
+class _InclusionsGrid extends StatelessWidget {
+  final List<String> lines;
+  const _InclusionsGrid({required this.lines});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final twoColumn = c.maxWidth >= 360;
+        final colWidth = twoColumn ? (c.maxWidth - 12) / 2 : c.maxWidth;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          children: [
+            for (final line in lines)
+              SizedBox(
+                width: colWidth,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Icon(
+                        Icons.check,
+                        size: 16,
+                        color: AppColors.activeGreen,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        line,
+                        style: AppTextStyles.body(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Universal venue benefits — every birthday package at Diaries Club
+/// includes these regardless of tier. Hardcoded as a constant since
+/// it's a venue-level promise (not per-package).
+const _universalIncludes = <(IconData, String)>[
+  (Icons.access_time, '2.5 hours play'),
+  (Icons.meeting_room, '3 hours hall'),
+  (Icons.restaurant_menu, 'Food buffet'),
+];
+
+class _UniversalIncludes extends StatelessWidget {
+  const _UniversalIncludes();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.lightBackground,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.lightBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'ALL PACKAGES INCLUDE',
+            style: AppTextStyles.caption(
+              context, color: AppColors.lightTextSecondary,
+            ).copyWith(letterSpacing: 0.8, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 14,
+            runSpacing: 6,
+            children: [
+              for (final (icon, label) in _universalIncludes)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 16, color: AppColors.navy),
+                    const SizedBox(width: 4),
+                    Text(label, style: AppTextStyles.caption(context)),
+                  ],
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

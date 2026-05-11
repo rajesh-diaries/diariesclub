@@ -292,8 +292,13 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
               maxGuests: maxGuests,
             ),
             const SizedBox(height: 16),
-            const _SectionHeader(text: "What's included"),
+            const _SectionHeader(text: 'Menu'),
             _Inclusions(raw: package['inclusions']),
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: _UniversalIncludesDetail(),
+            ),
             const SizedBox(height: 16),
             const _SectionHeader(text: 'Not included'),
             const _NotIncluded(),
@@ -579,30 +584,89 @@ class _Inclusions extends StatelessWidget {
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final twoColumn = c.maxWidth >= 360;
+          final colWidth = twoColumn ? (c.maxWidth - 12) / 2 : c.maxWidth;
+          return Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              for (final l in lines)
+                SizedBox(
+                  width: colWidth,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 3),
+                        child: Icon(
+                          PhosphorIconsFill.checkCircle,
+                          size: 18,
+                          color: AppColors.activeGreen,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(l, style: AppTextStyles.body(context)),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Universal venue benefits — every birthday package at Diaries Club
+/// includes these regardless of tier. Hardcoded constant; promote to
+/// venue_config later if it ever varies.
+const _universalIncludesDetail = <(IconData, String)>[
+  (Icons.access_time, '2.5 hours play'),
+  (Icons.meeting_room, '3 hours hall'),
+  (Icons.restaurant_menu, 'Food buffet'),
+];
+
+class _UniversalIncludesDetail extends StatelessWidget {
+  const _UniversalIncludesDetail();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.lightBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.lightBorder),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final l in lines)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 3),
-                    child: Icon(
-                      PhosphorIconsFill.checkCircle,
-                      size: 18,
-                      color: AppColors.activeGreen,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(l, style: AppTextStyles.body(context)),
-                  ),
-                ],
-              ),
-            ),
+          Text(
+            'ALL PACKAGES INCLUDE',
+            style: AppTextStyles.caption(
+              context, color: AppColors.lightTextSecondary,
+            ).copyWith(letterSpacing: 0.8, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            children: [
+              for (final (icon, label) in _universalIncludesDetail)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 18, color: AppColors.navy),
+                    const SizedBox(width: 6),
+                    Text(label, style: AppTextStyles.body(context)),
+                  ],
+                ),
+            ],
+          ),
         ],
       ),
     );
