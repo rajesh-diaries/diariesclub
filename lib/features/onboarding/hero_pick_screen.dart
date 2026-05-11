@@ -87,7 +87,7 @@ class _HeroPickScreenState extends ConsumerState<HeroPickScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 16),
-              Text('Pick a favourite hero', style: AppTextStyles.h1(context)),
+              Text('Pick a favourite character', style: AppTextStyles.h1(context)),
               const SizedBox(height: 8),
               Text(
                 "They'll all be along for the adventure — pick the one your kid loves the most.",

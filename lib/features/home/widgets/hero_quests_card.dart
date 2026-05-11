@@ -147,7 +147,7 @@ class _ChildQuestsRow extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Text(
-              (child['name'] as String?) ?? 'Hero',
+              (child['name'] as String?) ?? 'Your kid',
               style: AppTextStyles.body(context).copyWith(
                 fontWeight: FontWeight.w800,
               ),

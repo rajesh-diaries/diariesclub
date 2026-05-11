@@ -18,7 +18,7 @@ class HeroRecapCardWidget extends ConsumerWidget {
     final sessionId = recap['session_id'] as String;
     final totalXp = (recap['total_xp_pool'] as int?) ?? 0;
     final childName =
-        ((recap['children'] as Map?)?['name'] as String?) ?? 'Your hero';
+        ((recap['children'] as Map?)?['name'] as String?) ?? 'Your kid';
     final deadline = recap['reflection_deadline'] as String?;
     final hoursLeft = _hoursUntilDeadline(deadline);
 
@@ -54,7 +54,7 @@ class HeroRecapCardWidget extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Hero Recap',
+                  'Adventure Recap',
                   style: AppTextStyles.caption(context, color: Colors.white70),
                 ),
               ],

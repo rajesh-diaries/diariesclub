@@ -112,9 +112,9 @@ class _NotificationsSettingsScreenState
                         ),
               ),
               _Toggle(
-                title: 'Hero progression',
+                title: 'Adventure progress',
                 subtitle:
-                    'Stage transitions, hero card unlocks, level-ups.',
+                    'Stage transitions, character card unlocks, level-ups.',
                 value: prefs.heroProgression,
                 onChanged: _busy
                     ? null

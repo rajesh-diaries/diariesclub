@@ -75,7 +75,7 @@ class _HydrationReminderBannerState
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Quick sip of water for your hero — keeps the play going strong.',
+                  'Quick sip of water for your kid — keeps the play going strong.',
                   style: AppTextStyles.caption(
                     context,
                     color: AppColors.lightTextSecondary,

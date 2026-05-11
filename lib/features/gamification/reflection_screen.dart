@@ -281,7 +281,7 @@ class _Body extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         'Tap moments that felt true. We split XP across the '
-                        'four heroes based on what you tap.',
+                        'four characters based on what you tap.',
                         style: AppTextStyles.body(
                           context,
                           color: AppColors.lightTextSecondary,

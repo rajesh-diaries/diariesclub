@@ -30,7 +30,7 @@ class PostSessionHomeView extends ConsumerWidget {
         'session_id': sessionId,
         'total_xp_pool': session['total_xp_earned'] ?? 0,
         'reflection_deadline': session['reflection_deadline'],
-        'children': const {'name': 'Your hero'},
+        'children': const {'name': 'Your kid'},
       },
     );
 

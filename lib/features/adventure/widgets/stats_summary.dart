@@ -72,7 +72,7 @@ class StatsSummary extends ConsumerWidget {
                     value: s?.daysAsHero == null
                         ? '—'
                         : '${s!.daysAsHero}',
-                    label: 'Days as a hero',
+                    label: 'Days on the journey',
                   ),
                 ),
               ],

@@ -116,7 +116,7 @@ class PerTraitDetailScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    "Your hero hasn't reached their first milestone yet — "
+                    "Your kid hasn't reached their first milestone yet — "
                     'keep playing to grow!',
                     style: AppTextStyles.body(
                       context,

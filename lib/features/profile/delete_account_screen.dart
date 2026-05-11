@@ -144,7 +144,7 @@ class _DeleteAccountScreenState
                 text: 'Your wallet balance will be lost.',
               ),
               const _Bullet(
-                text: 'Hero cards and adventure progress will be removed.',
+                text: 'Character cards and adventure progress will be removed.',
               ),
               const SizedBox(height: 12),
               Text(

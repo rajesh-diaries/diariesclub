@@ -55,7 +55,7 @@ class ChildAdventureDashboard extends ConsumerWidget {
       );
     }
 
-    final childName = (child['name'] as String?) ?? 'Hero';
+    final childName = (child['name'] as String?) ?? 'Your kid';
     return ListView(
       padding: const EdgeInsets.only(bottom: 96),
       children: [

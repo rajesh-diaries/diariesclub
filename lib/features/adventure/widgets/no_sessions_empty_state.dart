@@ -34,7 +34,7 @@ class NoSessionsEmptyState extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                "Your hero's adventure begins after their first session.",
+                "Your kid's adventure begins after their first session.",
                 style: AppTextStyles.body(
                   context,
                   color: AppColors.lightTextSecondary,

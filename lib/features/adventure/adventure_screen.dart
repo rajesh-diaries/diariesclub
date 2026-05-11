@@ -111,7 +111,7 @@ class _MultiChildSelector extends ConsumerWidget {
             Text('Whose adventure?', style: AppTextStyles.h1(context)),
             const SizedBox(height: 6),
             Text(
-              'Pick a hero to follow today.',
+              'Pick a character to follow today.',
               style: AppTextStyles.body(
                 context,
                 color: AppColors.lightTextSecondary,

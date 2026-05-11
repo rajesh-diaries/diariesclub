@@ -240,7 +240,7 @@ class _AddChildScreenState extends ConsumerState<AddChildScreen> {
                 style: AppTextStyles.body(context),
               ),
               const SizedBox(height: 24),
-              Text('Pick a favourite hero',
+              Text('Pick a favourite character',
                   style: AppTextStyles.bodyLarge(context)),
               const SizedBox(height: 12),
               HeroPicker(

@@ -55,7 +55,7 @@ class NotificationChannels {
       AndroidNotificationChannel(
         defaultChannelId,
         'General',
-        description: 'Order updates, hero card unlocks, wallet alerts.',
+        description: 'Order updates, character card unlocks, wallet alerts.',
         importance: Importance.defaultImportance,
       ),
       AndroidNotificationChannel(

@@ -88,7 +88,7 @@ class _WelcomeManifestoScreenState
                       delay: const Duration(milliseconds: 1200),
                       skipAnimation: stagger,
                       child: Text(
-                        'MEET THE HEROES',
+                        'MEET THE CHARACTERS',
                         style: AppTextStyles.caption(
                           context,
                           color: AppColors.lightTextSecondary,
@@ -585,7 +585,7 @@ class _RewardsPromise extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'A favorite treat. A sticker for their wall. A free upgrade on something they love. A one-of-a-kind hero card that\'s theirs forever.',
+            'A favorite treat. A sticker for their wall. A free upgrade on something they love. A one-of-a-kind character card that\'s theirs forever.',
             style: AppTextStyles.body(context),
           ),
           const SizedBox(height: 10),
@@ -630,7 +630,7 @@ class _HeroWithin extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'They become a Hero Within of Diaries Club.',
+            'They unlock The Diaries Within.',
             style: AppTextStyles.h3(context).copyWith(
               color: AppColors.gold,
               fontWeight: FontWeight.w900,
@@ -648,7 +648,7 @@ class _HeroWithin extends StatelessWidget {
           ),
           const _HeroWithinRow(
             emoji: '🏛',
-            text: 'Their name on the Hall of Heroes at our venue — forever',
+            text: 'Their name on the Hall of Diaries at our venue — forever',
           ),
           const _HeroWithinRow(
             emoji: '✨',

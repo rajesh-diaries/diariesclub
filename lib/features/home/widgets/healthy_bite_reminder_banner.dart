@@ -114,7 +114,7 @@ class _HealthyBiteReminderBannerState
     final childName = children.firstWhere(
       (c) => c['id'] == childId,
       orElse: () => const <String, dynamic>{},
-    )['name'] as String? ?? 'Your hero';
+    )['name'] as String? ?? 'Your kid';
 
     // Side effect: fire local notification once when first eligible.
     // Banner is rebuilt on the parent's 1Hz tick, so this fires on the

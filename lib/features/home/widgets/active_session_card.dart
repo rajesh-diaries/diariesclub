@@ -48,7 +48,7 @@ class _ActiveSessionCardState extends ConsumerState<ActiveSessionCard> {
       (c) => c['id'] == childId,
       orElse: () => const <String, dynamic>{},
     );
-    final childName = (child['name'] as String?) ?? 'Hero';
+    final childName = (child['name'] as String?) ?? 'Your kid';
 
     final expiresAtStr = session['expires_at'] as String?;
     final expiresAt = expiresAtStr != null

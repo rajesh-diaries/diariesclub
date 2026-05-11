@@ -223,7 +223,7 @@ class _Body extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      (card['name'] as String?) ?? 'Hero card',
+                      (card['name'] as String?) ?? 'Character card',
                       style: AppTextStyles.h3(context, color: Colors.white),
                     ),
                     const Spacer(),

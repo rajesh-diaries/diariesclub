@@ -149,7 +149,7 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
       builder: (_) => AlertDialog(
         title: Text('Remove $name?'),
         content: const Text(
-          'Their adventure progress, hero cards, and history will be archived '
+          'Their adventure progress, character cards, and history will be archived '
           'but kept for your records.',
         ),
         actions: [
@@ -302,7 +302,7 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              Text('Favourite hero', style: AppTextStyles.bodyLarge(context)),
+              Text('Favourite character', style: AppTextStyles.bodyLarge(context)),
               const SizedBox(height: 12),
               HeroPicker(
                 selected: _hero,

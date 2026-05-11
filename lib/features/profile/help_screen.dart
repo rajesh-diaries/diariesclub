@@ -180,7 +180,7 @@ class _FaqAccordion extends StatelessWidget {
     _FaqSection('About Diaries Club', [
       _FaqItem(
         'What is Diaries Club?',
-        "A premium kids' play space + café with a hero-themed adventure.",
+        "A premium kids' play space + café where character grows through play.",
       ),
       _FaqItem(
         'What are Diaries Coins?',
@@ -219,13 +219,13 @@ class _FaqAccordion extends StatelessWidget {
         "Razorpay confirmations land within ~5 seconds. If it's been longer than a minute, message us on WhatsApp and we'll fix it.",
       ),
     ]),
-    _FaqSection('Hero Adventure', [
+    _FaqSection('The Adventure', [
       _FaqItem(
         'How do my kids earn XP?',
         'Every play session, workshop, and reflection awards XP. Different activities favour different traits.',
       ),
       _FaqItem(
-        'What are hero traits?',
+        'What are character traits?',
         'Brave (Rafi), Kind (Ellie), Curious (Gerry), Creative (Zena). Each trait progresses through 5 stages.',
       ),
       _FaqItem(
@@ -244,7 +244,7 @@ class _FaqAccordion extends StatelessWidget {
       ),
       _FaqItem(
         'What is included?',
-        'Decor, hosting, hero card for the birthday kid, and venue access. Food add-ons live in the package detail.',
+        'Decor, hosting, character card for the birthday kid, and venue access. Food add-ons live in the package detail.',
       ),
     ]),
     _FaqSection('Account', [

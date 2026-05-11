@@ -198,7 +198,7 @@ class _ReflectionBlock extends StatelessWidget {
                 size: 22,
               ),
               const SizedBox(width: 8),
-              Text('Hero Recap', style: AppTextStyles.h3(context)),
+              Text('Adventure Recap', style: AppTextStyles.h3(context)),
             ],
           ),
           const SizedBox(height: 4),

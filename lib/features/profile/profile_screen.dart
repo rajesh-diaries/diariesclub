@@ -74,7 +74,7 @@ class _Body extends ConsumerWidget {
         ProfileSectionHeader(title: 'Diaries Coins'),
         _CoinsSection(),
 
-        ProfileSectionHeader(title: 'Hero perks'),
+        ProfileSectionHeader(title: 'Adventure perks'),
         _HeroPerksSection(),
 
         ProfileSectionHeader(title: 'Activity'),
@@ -423,7 +423,7 @@ class _PerkRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${childName.isEmpty ? 'Hero' : childName} · ${_stageTitle(stage)}',
+              '${childName.isEmpty ? 'Your kid' : childName} · ${_stageTitle(stage)}',
               style: AppTextStyles.caption(
                 context,
                 color: AppColors.lightTextSecondary,

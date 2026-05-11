@@ -146,7 +146,7 @@ class _Empty extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            "Take 5 minutes after your next session to reflect — that's how heroes grow.",
+            "Take 5 minutes after your next session to reflect — that's how characters grow.",
             style: AppTextStyles.body(
               context,
               color: AppColors.lightTextSecondary,

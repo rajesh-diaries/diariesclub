@@ -137,7 +137,7 @@ class _ParentLogMomentSheetState extends ConsumerState<ParentLogMomentSheet> {
                           const SizedBox(height: 2),
                           Text(
                             _hero == null
-                                ? 'Pick the hero that grows from this moment.'
+                                ? 'Pick the character that grows from this moment.'
                                 : 'Or write your own at the bottom.',
                             style: AppTextStyles.caption(
                               context,
@@ -324,7 +324,7 @@ class _MomentPicker extends StatelessWidget {
                   TextButton.icon(
                     onPressed: onBack,
                     icon: const Icon(Icons.arrow_back_ios_new, size: 14),
-                    label: const Text('Change hero'),
+                    label: const Text('Change character'),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.lightTextSecondary,
                       padding: EdgeInsets.zero,
@@ -389,7 +389,7 @@ class _MomentPicker extends StatelessWidget {
               ],
               const SizedBox(height: 12),
               Text(
-                'Each logged moment is +5 XP for that hero, and 3 logs per kid per day.',
+                'Each logged moment is +5 XP for that character, and 3 logs per kid per day.',
                 style: AppTextStyles.caption(
                   context,
                   color: AppColors.lightTextSecondary,
