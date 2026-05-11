@@ -50,9 +50,11 @@ class OrderTrackingScreen extends ConsumerWidget {
               ),
             );
           }
+          final cfg = ref.watch(venueConfigProvider).valueOrNull ?? const {};
           return _Body(
             order: order,
             items: itemsAsync.valueOrNull ?? const [],
+            cfg: cfg,
           );
         },
       ),
@@ -63,7 +65,12 @@ class OrderTrackingScreen extends ConsumerWidget {
 class _Body extends ConsumerWidget {
   final Map<String, dynamic> order;
   final List<Map<String, dynamic>> items;
-  const _Body({required this.order, required this.items});
+  final Map<String, dynamic> cfg;
+  const _Body({
+    required this.order,
+    required this.items,
+    required this.cfg,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -93,6 +100,15 @@ class _Body extends ConsumerWidget {
           children: [
             _StatusHero(status: status),
             const SizedBox(height: 24),
+            if (invoice != null) ...[
+              _TaxInvoiceHeader(
+                cfg: cfg,
+                invoiceNumber: invoice,
+                customerGstin: customerGstin,
+                createdAt: order['created_at'] as String?,
+              ),
+              const SizedBox(height: 16),
+            ],
             _Section(
               title: 'Order details',
               child: Column(
@@ -167,24 +183,8 @@ class _Body extends ConsumerWidget {
                         ),
                       ),
                     ),
-                  if (invoice != null) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'Invoice $invoice',
-                      style: AppTextStyles.caption(
-                        context,
-                        color: AppColors.lightTextSecondary,
-                      ),
-                    ),
-                  ],
-                  if (customerGstin != null && customerGstin.isNotEmpty)
-                    Text(
-                      'Buyer GSTIN $customerGstin',
-                      style: AppTextStyles.caption(
-                        context,
-                        color: AppColors.lightTextSecondary,
-                      ),
-                    ),
+                  // Invoice number + buyer GSTIN render in the
+                  // _TaxInvoiceHeader above; no duplicates here.
                   if (coins > 0) ...[
                     const SizedBox(height: 4),
                     Text(
@@ -212,32 +212,6 @@ class _Body extends ConsumerWidget {
               child: Text(
                 _fulfillmentLabel(fulfillment),
                 style: AppTextStyles.body(context),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.lightBackground,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    PhosphorIconsRegular.envelope,
-                    color: AppColors.navy,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Invoice will be emailed.',
-                      style: AppTextStyles.caption(
-                        context,
-                        color: AppColors.lightTextSecondary,
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
             const SizedBox(height: 16),
@@ -387,6 +361,121 @@ class _Section extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _TaxInvoiceHeader extends StatelessWidget {
+  final Map<String, dynamic> cfg;
+  final String invoiceNumber;
+  final String? customerGstin;
+  final String? createdAt;
+  const _TaxInvoiceHeader({
+    required this.cfg,
+    required this.invoiceNumber,
+    required this.customerGstin,
+    required this.createdAt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bizName = (cfg['business_name'] as String?) ?? 'Diaries Club';
+    final gstin = (cfg['gstin'] as String?) ?? '';
+    final address = (cfg['venue_address'] as String?) ?? '';
+    final phone = (cfg['venue_phone'] as String?) ?? '';
+    final email = (cfg['venue_email'] as String?) ?? '';
+    final dateStr =
+        createdAt != null ? _formatDate(DateTime.tryParse(createdAt!)) : '';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.lightSurface,
+        border: Border.all(color: AppColors.navy.withValues(alpha: 0.30)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'TAX INVOICE',
+                style: AppTextStyles.caption(context, color: AppColors.navy)
+                    .copyWith(letterSpacing: 1.6, fontWeight: FontWeight.w800),
+              ),
+              Text(
+                invoiceNumber,
+                style: AppTextStyles.bodyLarge(context, color: AppColors.navy),
+              ),
+            ],
+          ),
+          if (dateStr.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                dateStr,
+                style: AppTextStyles.caption(
+                  context,
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
+            ),
+          const Divider(height: 16),
+          Text(bizName, style: AppTextStyles.bodyLarge(context)),
+          if (address.isNotEmpty)
+            Text(
+              address,
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+          if (phone.isNotEmpty || email.isNotEmpty)
+            Text(
+              [phone, email].where((s) => s.isNotEmpty).join(' · '),
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+          if (gstin.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'GSTIN $gstin',
+                style: AppTextStyles.body(context, color: AppColors.navy)
+                    .copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+          if (customerGstin != null && customerGstin!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'BILLED TO',
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ).copyWith(letterSpacing: 1.2, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Buyer GSTIN $customerGstin',
+              style: AppTextStyles.body(context),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime? dt) {
+    if (dt == null) return '';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final local = dt.toLocal();
+    return '${local.day} ${months[local.month - 1]} ${local.year}';
   }
 }
 
