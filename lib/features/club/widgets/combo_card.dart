@@ -89,13 +89,7 @@ class ComboCard extends ConsumerWidget {
                             color: AppColors.navy,
                           ),
                         ),
-                        Text(
-                          'incl. GST',
-                          style: AppTextStyles.caption(
-                            context,
-                            color: AppColors.lightTextSecondary,
-                          ),
-                        ),
+                        // GST shown at billing — see cart breakdown.
                       ],
                     ),
                   ],

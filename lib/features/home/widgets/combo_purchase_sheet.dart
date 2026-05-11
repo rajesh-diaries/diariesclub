@@ -140,6 +140,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
         'p_payment_method': 'wallet',
         'p_combo_id': null,
         'p_idempotency_key': const Uuid().v4(),
+        'p_customer_gstin': null,
       });
       final orderId = result['order_id'] as String?;
 

@@ -25,9 +25,10 @@ class OrderTrackingScreen extends ConsumerWidget {
     final orderAsync = ref.watch(orderStreamProvider(orderId));
     final itemsAsync = ref.watch(orderItemsProvider(orderId));
 
+    final invoice = orderAsync.valueOrNull?['invoice_number'] as String?;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Order #${orderId.substring(0, 6)}'),
+        title: Text(invoice ?? 'Order #${orderId.substring(0, 6)}'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/club'),
@@ -72,6 +73,17 @@ class _Body extends ConsumerWidget {
     final coins = (order['coins_earned'] as int?) ?? 0;
     final payment = (order['payment_method'] as String?) ?? '—';
     final fulfillment = (order['fulfillment_mode'] as String?) ?? '—';
+    final invoice = order['invoice_number'] as String?;
+    final customerGstin = order['customer_gstin'] as String?;
+    final foodTaxable = (order['food_taxable_paise'] as int?) ?? 0;
+    final foodGst = (order['food_gst_paise'] as int?) ?? 0;
+    final sessionValue = (order['session_value_paise'] as int?) ?? 0;
+    final sessionTaxable = (order['session_taxable_paise'] as int?) ?? 0;
+    final sessionGst = (order['session_gst_paise'] as int?) ?? 0;
+    final rounding = (order['rounding_paise'] as int?) ?? 0;
+    // New orders carry the split fields; pre-0100 orders fall back to
+    // the legacy single-rate display.
+    final hasSplit = foodTaxable > 0 || sessionValue > 0;
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -108,13 +120,43 @@ class _Body extends ConsumerWidget {
                       ),
                     ),
                   const Divider(),
+                  if (hasSplit) ...[
+                    if (foodTaxable > 0) ...[
+                      _kv(context, 'Food (taxable)',
+                          Money.fromPaise(foodTaxable)),
+                      _kv(context, 'GST 5% (food)',
+                          Money.fromPaise(foodGst)),
+                    ],
+                    if (sessionValue > 0) ...[
+                      _kv(context, 'Play session (incl. GST)',
+                          Money.fromPaise(sessionValue)),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12, bottom: 2),
+                        child: Text(
+                          'incl. ${Money.fromPaise(sessionGst)} GST '
+                          '@ 18% on ${Money.fromPaise(sessionTaxable)}',
+                          style: AppTextStyles.caption(
+                            context,
+                            color: AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (rounding != 0)
+                      _kv(
+                        context,
+                        'Rounding',
+                        (rounding > 0 ? '+' : '') + Money.fromPaise(rounding),
+                      ),
+                    const Divider(),
+                  ],
                   _kv(
                     context,
                     'Total',
                     Money.fromPaise(total),
                     bold: true,
                   ),
-                  if (gst > 0)
+                  if (!hasSplit && gst > 0)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(
@@ -123,6 +165,24 @@ class _Body extends ConsumerWidget {
                           context,
                           color: AppColors.lightTextSecondary,
                         ),
+                      ),
+                    ),
+                  if (invoice != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Invoice $invoice',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                  if (customerGstin != null && customerGstin.isNotEmpty)
+                    Text(
+                      'Buyer GSTIN $customerGstin',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
                       ),
                     ),
                   if (coins > 0) ...[

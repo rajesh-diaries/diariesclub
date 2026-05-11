@@ -115,13 +115,9 @@ class MenuItemCard extends ConsumerWidget {
                               color: AppColors.navy,
                             ),
                           ),
-                          Text(
-                            'incl. GST',
-                            style: AppTextStyles.caption(
-                              context,
-                              color: AppColors.lightTextSecondary,
-                            ),
-                          ),
+                          // GST 5% added at billing (see cart breakdown).
+                          // No 'incl. GST' label here — menu prices are
+                          // pre-GST for food per 2026-05-11 policy.
                         ],
                       ),
                       const Spacer(),

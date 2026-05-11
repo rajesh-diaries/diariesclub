@@ -35,6 +35,14 @@ class CartSheet extends ConsumerStatefulWidget {
 class _CartSheetState extends ConsumerState<CartSheet> {
   bool _busy = false;
   String? _errorText;
+  bool _b2b = false;
+  final _gstinCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _gstinCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _placeOrder() async {
     final cart = ref.read(cartProvider);
@@ -79,6 +87,15 @@ class _CartSheetState extends ConsumerState<CartSheet> {
     final idem = const Uuid().v4();
 
     try {
+      final gstin = _b2b ? _gstinCtrl.text.trim() : null;
+      // Quick format check for India GSTIN — 15 chars, last is alphanumeric.
+      if (gstin != null && gstin.isNotEmpty && gstin.length != 15) {
+        setState(() {
+          _busy = false;
+          _errorText = 'GSTIN should be 15 characters.';
+        });
+        return;
+      }
       final result = await Supabase.instance.client
           .rpc<Map<String, dynamic>>('order_place', params: {
         'p_venue_id': _venueId,
@@ -88,6 +105,7 @@ class _CartSheetState extends ConsumerState<CartSheet> {
         'p_payment_method': payment.rpcValue,
         'p_combo_id': null,
         'p_idempotency_key': idem,
+        'p_customer_gstin': (gstin != null && gstin.isNotEmpty) ? gstin : null,
       });
       final orderId = result['order_id'] as String?;
       if (orderId == null) throw StateError('order_place returned no id');
@@ -141,18 +159,34 @@ class _CartSheetState extends ConsumerState<CartSheet> {
     final balance = ref.watch(walletBalancePaiseProvider) ?? 0;
     final cfg = ref.watch(venueConfigProvider).valueOrNull ?? const {};
     final cashbackPct = (cfg['cashback_percent'] as num?)?.toDouble() ?? 7.0;
-    final gstPct = (cfg['gst_percent'] as num?)?.toDouble() ?? 18.0;
+    final foodGstPct = (cfg['food_gst_percent'] as num?)?.toDouble() ?? 5.0;
 
     if (cart.isEmpty) return const _EmptyBag();
 
-    final total = cart.totalPaise;
-    final subtotal = (total * 100 / (100 + gstPct)).floor();
-    // Coins are whole-rupee-equivalent integers. Convert paise → rupees
-    // first (subtotal / 100), then apply cashback %, then floor.
-    // Note: this is a rough preview. The server's cashback math also
-    // strips the play-session portion from combos; the cart can't easily
-    // know that here. The receipt shows the authoritative number.
-    final coins = (subtotal / 100 * cashbackPct / 100).floor();
+    // Mixed-GST preview math (policy 2026-05-11):
+    //   food prices (menu + fit_meal) are PRE-GST → add 5% on top
+    //   combo prices are all-in (any session portion stays 18% inclusive)
+    //   final total rounded to nearest rupee (server is authoritative).
+    var foodPaise = 0;
+    var comboPaise = 0;
+    for (final l in cart.lines) {
+      if (l is ComboLine) {
+        comboPaise += l.linePaise;
+      } else {
+        foodPaise += l.linePaise;
+      }
+    }
+    final foodGstPaise = (foodPaise * foodGstPct / 100).round();
+    final preRound = foodPaise + foodGstPaise + comboPaise;
+    final total = ((preRound + 50) ~/ 100) * 100;
+    final roundingPaise = total - preRound;
+
+    // Coins are whole-rupee-equivalent integers. Cashback applies on the
+    // taxable (pre-GST) value; combos: server strips the play portion, the
+    // cart can only show a rough preview. Receipt shows the authoritative
+    // number.
+    final coinsBasePaise = foodPaise + comboPaise;
+    final coins = (coinsBasePaise / 100 * cashbackPct / 100).floor();
     final payment = ref.watch(cartPaymentMethodProvider);
 
     return Container(
@@ -209,8 +243,11 @@ class _CartSheetState extends ConsumerState<CartSheet> {
                   _LineList(lines: cart.lines),
                   const SizedBox(height: 16),
                   _Summary(
-                    subtotalPaise: subtotal,
-                    gstPaise: total - subtotal,
+                    foodPaise: foodPaise,
+                    foodGstPaise: foodGstPaise,
+                    foodGstPct: foodGstPct,
+                    comboPaise: comboPaise,
+                    roundingPaise: roundingPaise,
                     totalPaise: total,
                     coinsEarned: payment == CartPaymentMethod.wallet ? coins : 0,
                   ),
@@ -220,6 +257,12 @@ class _CartSheetState extends ConsumerState<CartSheet> {
                   _PaymentSelector(
                     walletBalance: balance,
                     requiredPaise: total,
+                  ),
+                  const SizedBox(height: 12),
+                  _GstinField(
+                    b2b: _b2b,
+                    controller: _gstinCtrl,
+                    onToggle: (v) => setState(() => _b2b = v),
                   ),
                   if (_errorText != null) ...[
                     const SizedBox(height: 12),
@@ -390,30 +433,59 @@ class _LineCard extends ConsumerWidget {
 }
 
 class _Summary extends StatelessWidget {
-  final int subtotalPaise;
-  final int gstPaise;
+  final int foodPaise;
+  final int foodGstPaise;
+  final double foodGstPct;
+  final int comboPaise;
+  final int roundingPaise;
   final int totalPaise;
   final int coinsEarned;
   const _Summary({
-    required this.subtotalPaise,
-    required this.gstPaise,
+    required this.foodPaise,
+    required this.foodGstPaise,
+    required this.foodGstPct,
+    required this.comboPaise,
+    required this.roundingPaise,
     required this.totalPaise,
     required this.coinsEarned,
   });
 
   @override
   Widget build(BuildContext context) {
+    final pct = foodGstPct == foodGstPct.roundToDouble()
+        ? foodGstPct.toInt().toString()
+        : foodGstPct.toString();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Column(
         children: [
+          if (foodPaise > 0) ...[
+            _SummaryRow(
+              label: 'Food subtotal',
+              value: Money.fromPaise(foodPaise),
+            ),
+            _SummaryRow(
+              label: 'GST $pct% (food)',
+              value: Money.fromPaise(foodGstPaise),
+            ),
+          ],
+          if (comboPaise > 0)
+            _SummaryRow(
+              label: 'Combos (incl. play & GST)',
+              value: Money.fromPaise(comboPaise),
+            ),
+          if (roundingPaise != 0)
+            _SummaryRow(
+              label: 'Rounding',
+              value: (roundingPaise > 0 ? '+' : '') +
+                  Money.fromPaise(roundingPaise),
+              muted: true,
+            ),
+          const Divider(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Total (incl. GST)',
-                style: AppTextStyles.bodyLarge(context),
-              ),
+              Text('Total', style: AppTextStyles.bodyLarge(context)),
               Text(
                 Money.fromPaise(totalPaise),
                 style: AppTextStyles.h3(context, color: AppColors.navy),
@@ -440,6 +512,84 @@ class _Summary extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _SummaryRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool muted;
+  const _SummaryRow({
+    required this.label,
+    required this.value,
+    this.muted = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = muted ? AppColors.lightTextSecondary : null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppTextStyles.body(context, color: color)),
+          Text(value, style: AppTextStyles.body(context, color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+class _GstinField extends StatelessWidget {
+  final bool b2b;
+  final TextEditingController controller;
+  final ValueChanged<bool> onToggle;
+  const _GstinField({
+    required this.b2b,
+    required this.controller,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          value: b2b,
+          onChanged: onToggle,
+          title: Text(
+            'Add company GSTIN for invoice',
+            style: AppTextStyles.body(context),
+          ),
+          subtitle: Text(
+            'Get a B2B tax invoice — usable for input tax credit.',
+            style: AppTextStyles.caption(
+              context,
+              color: AppColors.lightTextSecondary,
+            ),
+          ),
+        ),
+        if (b2b)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: TextField(
+              controller: controller,
+              maxLength: 15,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'GSTIN',
+                hintText: '15-character GSTIN (e.g. 36ABCDE1234F1Z5)',
+                border: OutlineInputBorder(),
+                counterText: '',
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
