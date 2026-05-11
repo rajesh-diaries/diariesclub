@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/providers/active_sessions_provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/family_children_provider.dart';
+import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
@@ -146,23 +147,22 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
 
       if (!mounted) return;
       Navigator.of(context).pop();
-      if (withSession) {
-        // Active session view shows the new pending session.
-        context.go('/home');
-      } else if (orderId != null) {
+      // Always land on the invoice/tracking screen so the customer sees
+      // the GST breakdown and invoice number. For session combos, the
+      // pending session still shows up on the home tab next time they
+      // visit it.
+      if (orderId != null) {
         context.push('/club/order/$orderId');
       } else {
         context.go('/club');
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            withSession
-                ? "${combo['name']} purchased — session pending, food on the way"
-                : "Order placed — we'll prep it now",
+      if (withSession) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Session pending — scan at the desk to start.'),
           ),
-        ),
-      );
+        );
+      }
     } on PostgrestException catch (e) {
       debugPrint('[COMBO_PURCHASE] PostgrestException: code=${e.code} '
           'message=${e.message} details=${e.details} hint=${e.hint}');
@@ -196,6 +196,27 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
     final cover = combo['cover_image_url'] as String?;
     final name = (combo['name'] as String?) ?? '';
     final desc = inclusions['description'] as String?;
+
+    // Mixed-GST split for combos (mirrors server math in order_place):
+    //   session_value comes from venue_config session_Xhr price
+    //     (already GST-inclusive at 18%)
+    //   food_portion = combo.price - session_value (pre-GST)
+    //   add 5% on food, round grand total to nearest rupee
+    final cfg = ref.watch(venueConfigProvider).valueOrNull ?? const {};
+    final foodGstPct =
+        (cfg['food_gst_percent'] as num?)?.toDouble() ?? 5.0;
+    final session1hr = (cfg['session_1hr_price_paise'] as int?) ?? 80000;
+    final session2hr = (cfg['session_2hr_price_paise'] as int?) ?? 110000;
+    final sessionValue = !hasSession
+        ? 0
+        : (sessionMinutes == 60
+            ? session1hr
+            : (sessionMinutes == 120 ? session2hr : 0));
+    final foodPortion = (price - sessionValue).clamp(0, 1 << 30).toInt();
+    final foodGst = (foodPortion * foodGstPct / 100).round();
+    final rawTotal = foodPortion + foodGst + sessionValue;
+    final grandTotal = ((rawTotal + 50) ~/ 100) * 100;
+    final rounding = grandTotal - rawTotal;
 
     final allChildren =
         ref.watch(familyChildrenProvider).valueOrNull ?? const [];
@@ -318,6 +339,29 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
                       label: (r['name'] as String?) ?? '—',
                     ),
                   const Divider(height: 16),
+                  if (foodPortion > 0) ...[
+                    _BreakdownRow(
+                      label: 'Subtotal (food)',
+                      value: Money.fromPaise(foodPortion),
+                    ),
+                    _BreakdownRow(
+                      label: 'GST ${foodGstPct.toInt()}%',
+                      value: Money.fromPaise(foodGst),
+                    ),
+                  ],
+                  if (sessionValue > 0)
+                    _BreakdownRow(
+                      label: 'Play session (incl. GST)',
+                      value: Money.fromPaise(sessionValue),
+                    ),
+                  if (rounding != 0)
+                    _BreakdownRow(
+                      label: 'Rounding',
+                      value: (rounding > 0 ? '+' : '') +
+                          Money.fromPaise(rounding),
+                      muted: true,
+                    ),
+                  const Divider(height: 16),
                   Row(
                     children: [
                       Expanded(
@@ -329,7 +373,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
                         ),
                       ),
                       Text(
-                        Money.fromPaise(price),
+                        Money.fromPaise(grandTotal),
                         style: AppTextStyles.h3(
                           context,
                           color: AppColors.navy,
@@ -376,7 +420,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
                       ),
                     )
                   : Text(
-                      'Place order · ${Money.fromPaise(price)}',
+                      'Place order · ${Money.fromPaise(grandTotal)}',
                       style: AppTextStyles.body(context).copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w800,
@@ -468,6 +512,32 @@ class _LineRow extends StatelessWidget {
           Icon(icon, size: 18, color: AppColors.navy),
           const SizedBox(width: 10),
           Expanded(child: Text(label, style: AppTextStyles.body(context))),
+        ],
+      ),
+    );
+  }
+}
+
+class _BreakdownRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool muted;
+  const _BreakdownRow({
+    required this.label,
+    required this.value,
+    this.muted = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = muted ? AppColors.lightTextSecondary : null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppTextStyles.body(context, color: color)),
+          Text(value, style: AppTextStyles.body(context, color: color)),
         ],
       ),
     );
