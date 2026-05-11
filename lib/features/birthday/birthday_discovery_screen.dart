@@ -86,8 +86,6 @@ class BirthdayDiscoveryScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               const _MainCta(),
               const SizedBox(height: 16),
-              const _PackagesTeaser(),
-              const SizedBox(height: 16),
               const _HelpRow(),
               const SizedBox(height: 24),
             ],
@@ -198,63 +196,6 @@ class _MainCta extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _PackagesTeaser extends StatelessWidget {
-  const _PackagesTeaser();
-
-  static const _tiers = <(String, String)>[
-    ('Pearl Hall', 'Little Joy · Happy Tales'),
-    ('The Grand', 'Grand · Magical'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < _tiers.length; i++) ...[
-          Expanded(
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
-              decoration: BoxDecoration(
-                color: AppColors.lightBackground,
-                border: Border.all(color: AppColors.lightBorder),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(
-                children: [
-                  const Icon(
-                    PhosphorIconsFill.cake,
-                    color: AppColors.gold,
-                    size: 22,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _tiers[i].$1,
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.body(context).copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _tiers[i].$2,
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.caption(
-                      context,
-                      color: AppColors.lightTextSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (i < _tiers.length - 1) const SizedBox(width: 8),
-        ],
-      ],
     );
   }
 }
