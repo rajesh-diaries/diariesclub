@@ -157,22 +157,17 @@ class _PackageCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 4,
                   children: [
-                    _PriceChip(
-                      label: 'Veg',
-                      pricePaise: priceVeg,
-                    ),
-                    _PriceChip(
-                      label: 'Non-Veg',
-                      pricePaise: priceNonVeg,
-                    ),
-                    Text(
-                      'per pax · 18% GST extra',
-                      style: AppTextStyles.caption(
-                        context,
-                        color: AppColors.lightTextSecondary,
-                      ),
-                    ),
+                    _PriceChip(label: 'Veg', pricePaise: priceVeg),
+                    _PriceChip(label: 'Non-Veg', pricePaise: priceNonVeg),
                   ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'per pax · 18% GST extra',
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.lightTextSecondary,
+                  ),
                 ),
                 if (description.isNotEmpty) ...[
                   const SizedBox(height: 8),
