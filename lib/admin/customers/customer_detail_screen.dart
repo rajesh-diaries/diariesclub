@@ -44,6 +44,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   int _referralsCount = 0;
   // Per-child activity summary keyed by child_id.
   Map<String, Map<String, dynamic>> _childSummary = const {};
+  // Family-level aggregates (birthday inquiries, coupons, total spent).
+  Map<String, dynamic> _familyStats = const {};
   bool _loading = true;
   String? _errorText;
 
@@ -115,19 +117,27 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
         referralsCount = (refs as List).length;
       } catch (_) {}
 
-      // Per-child activity summary in one RPC call.
+      // Combined per-child + family-level summary in one RPC call.
       Map<String, Map<String, dynamic>> childSummary = const {};
+      Map<String, dynamic> familyStats = const {};
       try {
         final raw = await Supabase.instance.client
             .rpc<dynamic>('admin_family_children_summary', params: {
           'p_family_id': widget.familyId,
         });
-        if (raw is List) {
-          childSummary = {
-            for (final r in raw)
-              if (r is Map && r['child_id'] is String)
-                r['child_id'] as String: Map<String, dynamic>.from(r),
-          };
+        if (raw is Map) {
+          final kids = raw['children'];
+          if (kids is List) {
+            childSummary = {
+              for (final r in kids)
+                if (r is Map && r['child_id'] is String)
+                  r['child_id'] as String: Map<String, dynamic>.from(r),
+            };
+          }
+          final fam = raw['family'];
+          if (fam is Map) {
+            familyStats = Map<String, dynamic>.from(fam);
+          }
         }
       } catch (_) {}
 
@@ -138,6 +148,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
         _referredByName = referredByName;
         _referralsCount = referralsCount;
         _childSummary = childSummary;
+        _familyStats = familyStats;
         _children = (children as List)
             .map((c) => Map<String, dynamic>.from(c as Map))
             .toList();
@@ -264,6 +275,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                                 s['status'] == 'grace')
                             .toList(),
                         summaryByChildId: _childSummary,
+                        familyStats: _familyStats,
                       ),
                       const SizedBox(height: 24),
                       const _SectionHeader(text: 'Wallet history'),
@@ -447,10 +459,12 @@ class _ChildrenTable extends StatelessWidget {
   final List<Map<String, dynamic>> children;
   final List<Map<String, dynamic>> activeSessions;
   final Map<String, Map<String, dynamic>> summaryByChildId;
+  final Map<String, dynamic> familyStats;
   const _ChildrenTable({
     required this.children,
     required this.activeSessions,
     required this.summaryByChildId,
+    required this.familyStats,
   });
   @override
   Widget build(BuildContext context) {
@@ -467,13 +481,23 @@ class _ChildrenTable extends StatelessWidget {
     int totalWorkshops = 0;
     int totalCards = 0;
     int totalPerks = 0;
+    int totalReflections = 0;
+    int totalBites = 0;
     for (final s in summaryByChildId.values) {
       totalVisits += (s['sessions_completed'] as int?) ?? 0;
       totalMinutes += (s['total_play_minutes'] as int?) ?? 0;
       totalWorkshops += (s['workshops_attended'] as int?) ?? 0;
       totalCards += (s['cards_collected'] as int?) ?? 0;
       totalPerks += (s['perks_redeemed'] as int?) ?? 0;
+      totalReflections += (s['reflections_completed'] as int?) ?? 0;
+      totalBites += (s['healthy_bites_earned'] as int?) ?? 0;
     }
+    final birthdayInquiries =
+        (familyStats['birthday_inquiries_count'] as int?) ?? 0;
+    final couponsRedeemed =
+        (familyStats['coupons_redeemed_count'] as int?) ?? 0;
+    final familySpentPaise =
+        (familyStats['family_total_spent_paise'] as int?) ?? 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -495,6 +519,11 @@ class _ChildrenTable extends StatelessWidget {
                   value: '${(totalMinutes / 60).toStringAsFixed(1)}h',
                 ),
                 _AggTile(
+                  icon: PhosphorIconsRegular.coin,
+                  label: 'Total spent',
+                  value: Money.fromPaise(familySpentPaise),
+                ),
+                _AggTile(
                   icon: PhosphorIconsRegular.graduationCap,
                   label: 'Workshops',
                   value: '$totalWorkshops',
@@ -509,6 +538,26 @@ class _ChildrenTable extends StatelessWidget {
                   label: 'Perks redeemed',
                   value: '$totalPerks',
                 ),
+                _AggTile(
+                  icon: PhosphorIconsRegular.heart,
+                  label: 'Reflections',
+                  value: '$totalReflections',
+                ),
+                _AggTile(
+                  icon: PhosphorIconsRegular.cookie,
+                  label: 'Healthy bites',
+                  value: '$totalBites',
+                ),
+                _AggTile(
+                  icon: PhosphorIconsRegular.cake,
+                  label: 'Birthday inquiries',
+                  value: '$birthdayInquiries',
+                ),
+                _AggTile(
+                  icon: PhosphorIconsRegular.ticket,
+                  label: 'Coupons used',
+                  value: '$couponsRedeemed',
+                ),
               ],
             ),
           ),
@@ -521,7 +570,7 @@ class _ChildrenTable extends StatelessWidget {
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
-              columnSpacing: 18,
+              columnSpacing: 16,
               columns: const [
                 DataColumn(label: Text('Name')),
                 DataColumn(label: Text('Status')),
@@ -531,8 +580,12 @@ class _ChildrenTable extends StatelessWidget {
                 DataColumn(label: Text('XP')),
                 DataColumn(label: Text('Visits')),
                 DataColumn(label: Text('Hours')),
+                DataColumn(label: Text('Spent')),
                 DataColumn(label: Text('Workshops')),
                 DataColumn(label: Text('Cards')),
+                DataColumn(label: Text('Bites')),
+                DataColumn(label: Text('Reflections')),
+                DataColumn(label: Text('Streak')),
                 DataColumn(label: Text('Last visit')),
                 DataColumn(label: Text('Action')),
               ],
@@ -556,8 +609,12 @@ class _ChildrenTable extends StatelessWidget {
     final summary = id == null ? null : summaryByChildId[id];
     final visits = (summary?['sessions_completed'] as int?) ?? 0;
     final mins = (summary?['total_play_minutes'] as int?) ?? 0;
+    final spent = (summary?['money_spent_paise'] as int?) ?? 0;
     final workshops = (summary?['workshops_attended'] as int?) ?? 0;
     final cards = (summary?['cards_collected'] as int?) ?? 0;
+    final bites = (summary?['healthy_bites_earned'] as int?) ?? 0;
+    final reflections = (summary?['reflections_completed'] as int?) ?? 0;
+    final streak = (summary?['streak_weeks'] as int?) ?? 0;
     final lastVisit = _shortDate(summary?['last_visit_at'] as String?);
     return DataRow(cells: [
       DataCell(Text((c['name'] as String?) ?? '—')),
@@ -568,8 +625,12 @@ class _ChildrenTable extends StatelessWidget {
       DataCell(Text('${c['total_xp'] ?? 0}')),
       DataCell(Text('$visits')),
       DataCell(Text(mins == 0 ? '—' : '${(mins / 60).toStringAsFixed(1)}h')),
+      DataCell(Text(spent == 0 ? '—' : Money.fromPaise(spent))),
       DataCell(Text('$workshops')),
       DataCell(Text('$cards')),
+      DataCell(Text('$bites')),
+      DataCell(Text('$reflections')),
+      DataCell(Text(streak == 0 ? '—' : '${streak}w')),
       DataCell(Text(lastVisit ?? '—')),
       DataCell(_GrantCardAction(child: c)),
     ]);
