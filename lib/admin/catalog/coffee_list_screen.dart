@@ -281,7 +281,8 @@ class _TableState extends State<_Table> {
               onMarkAvailable: () => _bulkSet(context, available: true),
             ),
           ),
-        Container(
+        Expanded(
+          child: Container(
           decoration: BoxDecoration(
             color: AppColors.lightSurface,
             border: Border.all(color: AppColors.lightBorder),
@@ -408,6 +409,7 @@ class _TableState extends State<_Table> {
                 ],
               ),
             ),
+          ),
           ),
         ),
       ],
