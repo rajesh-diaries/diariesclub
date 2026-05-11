@@ -144,37 +144,36 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
       // Prime the local cache so other screens see the family without an
       // extra round-trip. Safe even if family is null (caller will fetch).
       ref.invalidate(currentFamilyProvider);
+      // The welcome-manifesto flag is keyed by auth.uid — the uid just
+      // changed, so re-evaluate so splash can see whether THIS account
+      // has seen the manifesto yet.
+      ref.invalidate(hasSeenWelcomeManifestoProvider);
 
       if (!mounted) return;
 
+      // Persist the right onboarding step so the splash router knows
+      // where to send us, then bounce through splash itself. Splash now
+      // owns the welcome-manifesto gate — without this bounce, a fresh
+      // OTP signup skipped straight past the manifesto into the
+      // family-name form, defeating the whole "brand promise lands
+      // before anything else" goal.
       if (family == null) {
-        // Brand-new user. Onboarding starts at family-name.
         await ref
             .read(onboardingStepProvider.notifier)
             .setStep(OnboardingStep.familyName);
-        if (!mounted) return;
-        context.go('/onboarding/family-name');
-        return;
-      }
-
-      // Existing family. If they have a child OR are cafe-only, they're done.
-      if (family['has_children'] == true || family['is_cafe_only'] == true) {
+      } else if (family['has_children'] == true ||
+          family['is_cafe_only'] == true) {
         await ref
             .read(onboardingStepProvider.notifier)
             .setStep(OnboardingStep.complete);
-        // Touch last_active_at — best effort.
         unawaited(Supabase.instance.client.rpc('family_touch_active'));
-        if (!mounted) return;
-        context.go('/home');
-        return;
+      } else {
+        await ref
+            .read(onboardingStepProvider.notifier)
+            .setStep(OnboardingStep.addChild);
       }
-
-      // Family row exists but no child yet — drop them at add-child.
-      await ref
-          .read(onboardingStepProvider.notifier)
-          .setStep(OnboardingStep.addChild);
       if (!mounted) return;
-      context.go('/onboarding/add-child');
+      context.go('/');
     } on AuthException catch (e) {
       setState(() {
         _errorText = "Couldn't verify. Please try again. (${e.message})";
