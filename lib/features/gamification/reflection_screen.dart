@@ -224,6 +224,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
               ),
               data: (moments) => _Body(
                 childName: childName,
+                childId: childId,
                 moments: moments,
                 selected: _selected,
                 onToggle: _toggle,
@@ -248,6 +249,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
 
 class _Body extends StatelessWidget {
   final String childName;
+  final String childId;
   final List<dynamic> moments;
   final Set<String> selected;
   final ValueChanged<String> onToggle;
@@ -256,6 +258,7 @@ class _Body extends StatelessWidget {
 
   const _Body({
     required this.childName,
+    required this.childId,
     required this.moments,
     required this.selected,
     required this.onToggle,
@@ -309,6 +312,8 @@ class _Body extends StatelessWidget {
                     cards: (byTrait[trait] ?? const []).cast(),
                     selectedTags: selected,
                     onToggle: onToggle,
+                    childId: childId,
+                    childName: childName,
                   ),
                 if (errorText != null)
                   Padding(

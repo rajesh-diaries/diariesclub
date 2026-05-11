@@ -4,18 +4,22 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/reflection_moments_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../adventure/widgets/parent_log_moment_sheet.dart';
 import 'reflection_card.dart';
 
-/// Trait header + N-card grid used inside the reflection screen. The card
-/// count per trait was originally pinned at 3 (RPC-enforced); migration
-/// 0105 dropped that cap so trait_section now chunks the list into rows
-/// of 3 — 6 cards render as two rows, etc. Short tails fill with
-/// SizedBox spacers so the last row keeps its 3-column rhythm.
+/// Trait header + grid of preset moments on the reflection screen.
+///
+/// Layout: 5 preset cards in a 3-column grid, with slot 6 (bottom-right)
+/// reserved for a "+ More moments" tile that opens the parent-log sheet
+/// pre-pinned to this trait — giving the parent access to the wider pool
+/// of moments plus a free-text "write our own" entry.
 class TraitSection extends StatelessWidget {
   final String trait;
   final List<ReflectionMoment> cards;
   final Set<String> selectedTags;
   final ValueChanged<String> onToggle;
+  final String childId;
+  final String childName;
 
   const TraitSection({
     super.key,
@@ -23,12 +27,18 @@ class TraitSection extends StatelessWidget {
     required this.cards,
     required this.selectedTags,
     required this.onToggle,
+    required this.childId,
+    required this.childName,
   });
+
+  static const _presetSlots = 5;
 
   @override
   Widget build(BuildContext context) {
     final color = _heroColor(trait);
     final iconData = _heroIcon(trait);
+    // First N cards as presets; slot N+1 is the "+ More" tile.
+    final presets = cards.take(_presetSlots).toList();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -64,25 +74,46 @@ class TraitSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          // Chunk into rows of 3. IntrinsicHeight bounds each row's
-          // vertical extent to the tallest card so stretch doesn't trip
-          // box.dart:251 inside the parent ScrollView.
-          for (int start = 0; start < cards.length; start += 3) ...[
+          // Total tiles to render = presets + 1 "+ More" tile. Chunked
+          // into rows of 3. IntrinsicHeight per row keeps card heights
+          // aligned without forcing infinite vertical constraints.
+          for (int start = 0; start < _presetSlots + 1; start += 3) ...[
             if (start > 0) const SizedBox(height: 10),
             IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: List<Widget>.generate(3, (i) {
-                  final cardIndex = start + i;
+                  final tileIndex = start + i;
                   final spacer = i > 0
                       ? const SizedBox(width: 10)
                       : const SizedBox.shrink();
-                  if (cardIndex >= cards.length) {
+                  // The very last tile in the grid is the "+ More" CTA.
+                  final isMoreTile = tileIndex == _presetSlots;
+
+                  if (tileIndex > _presetSlots) {
                     return Expanded(
                       child: Row(children: [spacer, const Spacer()]),
                     );
                   }
-                  final card = cards[cardIndex];
+                  if (isMoreTile) {
+                    return Expanded(
+                      child: Row(children: [
+                        spacer,
+                        Expanded(
+                          child: _MoreMomentsTile(
+                            accent: color,
+                            onTap: () => _openMoreSheet(context),
+                          ),
+                        ),
+                      ]),
+                    );
+                  }
+                  if (tileIndex >= presets.length) {
+                    return Expanded(
+                      child: Row(children: [spacer, const Spacer()]),
+                    );
+                  }
+                  final card = presets[tileIndex];
                   return Expanded(
                     child: Row(children: [
                       spacer,
@@ -100,6 +131,20 @@ class TraitSection extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  void _openMoreSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      useRootNavigator: true,
+      builder: (_) => ParentLogMomentSheet(
+        childId: childId,
+        childName: childName,
+        initialHero: trait,
       ),
     );
   }
@@ -135,4 +180,63 @@ class TraitSection extends StatelessWidget {
         'zena' => PhosphorIconsFill.palette,
         _ => PhosphorIconsFill.circle,
       };
+}
+
+class _MoreMomentsTile extends StatelessWidget {
+  final Color accent;
+  final VoidCallback onTap;
+  const _MoreMomentsTile({required this.accent, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: accent.withValues(alpha: 0.45),
+            style: BorderStyle.solid,
+            width: 1.4,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Icon(PhosphorIconsRegular.plus, color: accent, size: 18),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'More moments',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.caption(context, color: accent).copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'or write our own',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

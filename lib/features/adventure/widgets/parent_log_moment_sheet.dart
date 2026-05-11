@@ -17,10 +17,16 @@ import '../data/parent_log_moments_data.dart';
 class ParentLogMomentSheet extends ConsumerStatefulWidget {
   final String childId;
   final String childName;
+  /// When set, skips the hero picker step and opens directly to the moment
+  /// list for this hero. The "Change character" back button is hidden in
+  /// this mode — callers (e.g. the reflection screen's "+ More moments"
+  /// tile) want a single-character flow.
+  final String? initialHero;
   const ParentLogMomentSheet({
     super.key,
     required this.childId,
     required this.childName,
+    this.initialHero,
   });
 
   @override
@@ -35,6 +41,14 @@ class _ParentLogMomentSheetState extends ConsumerState<ParentLogMomentSheet> {
   final _customCtrl = TextEditingController();
   bool _submitting = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialHero != null) {
+      _hero = widget.initialHero;
+    }
+  }
 
   @override
   void dispose() {
@@ -170,6 +184,7 @@ class _ParentLogMomentSheetState extends ConsumerState<ParentLogMomentSheet> {
                         controller: controller,
                         submitting: _submitting,
                         error: _error,
+                        lockedToHero: widget.initialHero != null,
                         onPickPreset: (text) =>
                             _submit(text: text, source: 'preset'),
                         onSeeMore: () => setState(() => _showAll = true),
@@ -284,6 +299,7 @@ class _MomentPicker extends StatelessWidget {
   final ScrollController controller;
   final bool submitting;
   final String? error;
+  final bool lockedToHero;
   final ValueChanged<String> onPickPreset;
   final VoidCallback onSeeMore;
   final VoidCallback onEnterCustom;
@@ -298,6 +314,7 @@ class _MomentPicker extends StatelessWidget {
     required this.controller,
     required this.submitting,
     required this.error,
+    required this.lockedToHero,
     required this.onPickPreset,
     required this.onSeeMore,
     required this.onEnterCustom,
@@ -321,15 +338,16 @@ class _MomentPicker extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  TextButton.icon(
-                    onPressed: onBack,
-                    icon: const Icon(Icons.arrow_back_ios_new, size: 14),
-                    label: const Text('Change character'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.lightTextSecondary,
-                      padding: EdgeInsets.zero,
+                  if (!lockedToHero)
+                    TextButton.icon(
+                      onPressed: onBack,
+                      icon: const Icon(Icons.arrow_back_ios_new, size: 14),
+                      label: const Text('Change character'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.lightTextSecondary,
+                        padding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
                   const Spacer(),
                   _HeroChip(hero: hero, accent: accent),
                 ],
