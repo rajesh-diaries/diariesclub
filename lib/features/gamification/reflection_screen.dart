@@ -29,6 +29,19 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
   bool _submitting = false;
   String? _errorText;
 
+  @override
+  void initState() {
+    super.initState();
+    // Force a fresh fetch of the reflection moments on every mount. The
+    // moments-per-recap RPC is cheap (~ms) and the underlying pool can
+    // grow when admin authors new ones; we don't want a cached 3-card
+    // result from an older session to keep showing on this device.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(reflectionMomentsProvider(widget.sessionId));
+    });
+  }
+
   void _toggle(String tag) {
     setState(() {
       if (!_selected.add(tag)) _selected.remove(tag);
