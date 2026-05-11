@@ -12,13 +12,23 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// migration 0051 to make this stream possible.
 final birthdayPackagesProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) async* {
+  // Filter to birthday-category only. Other categories (snack_play,
+  // weekly, etc.) live in the same table but render on their own
+  // surfaces. Note: Supabase realtime stream doesn't support chained
+  // .eq filters cleanly across versions, so we keep the existing
+  // is_active stream filter and apply category client-side. Volume
+  // is tiny (<50 rows total).
   final stream = Supabase.instance.client
       .from('birthday_packages')
       .stream(primaryKey: ['id'])
       .eq('is_active', true)
       .order('sort_order', ascending: true);
   await for (final rows in stream) {
-    yield rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    yield rows
+        .where((r) =>
+            (r['category'] as String? ?? 'birthday') == 'birthday')
+        .map((r) => Map<String, dynamic>.from(r))
+        .toList();
   }
 });
 

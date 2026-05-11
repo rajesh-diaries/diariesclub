@@ -98,9 +98,8 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
   final _priceNonVegCtrl = TextEditingController();
   final _pdfUrlCtrl = TextEditingController();
   final _experienceCtrl = TextEditingController();
-
-  String _tier = 'little_joy';
-  String? _heroTheme;
+  final _tierCtrl = TextEditingController();
+  String _category = 'birthday';
   Uint8List? _photoBytes;
   String? _existingCoverUrl;
   bool _isActive = true;
@@ -142,6 +141,7 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
     _priceNonVegCtrl.dispose();
     _pdfUrlCtrl.dispose();
     _experienceCtrl.dispose();
+    _tierCtrl.dispose();
     super.dispose();
   }
 
@@ -173,8 +173,8 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
         _maxKidsCtrl.text = (row['max_kids'] as int?)?.toString() ?? '';
         _maxAdultsCtrl.text = (row['max_adults'] as int?)?.toString() ?? '';
         _sortCtrl.text = (row['sort_order'] as int?)?.toString() ?? '0';
-        _tier = (row['tier'] as String?) ?? 'little_joy';
-        _heroTheme = row['hero_theme'] as String?;
+        _tierCtrl.text = (row['tier'] as String?) ?? '';
+        _category = (row['category'] as String?) ?? 'birthday';
         _existingCoverUrl = row['cover_image_url'] as String?;
         _isActive = (row['is_active'] as bool?) ?? true;
         final gallery = (row['gallery_image_urls'] as List?)?.cast<String>() ?? const [];
@@ -311,9 +311,13 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
           .where((s) => s.isNotEmpty)
           .toList();
 
+      final tierVal = _tierCtrl.text.trim().isEmpty
+          ? 'custom'
+          : _tierCtrl.text.trim();
       final params = {
         'p_name': _nameCtrl.text.trim(),
-        'p_tier': _tier,
+        'p_tier': tierVal,
+        'p_category': _category,
         'p_description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
         'p_price_paise': priceLegacy == null ? null : priceLegacy * 100,
         'p_deposit_paise':
@@ -329,7 +333,7 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
         'p_menu_options': menuOptionsJson,
         'p_non_food_offerings': nonFoodJson,
         'p_available_days': availableJson,
-        'p_hero_theme': _heroTheme,
+        'p_hero_theme': null,
         'p_sort_order': int.tryParse(_sortCtrl.text.trim()) ?? 0,
         // Slice 2 fields.
         'p_hall_name': _hallNameCtrl.text.trim().isEmpty
@@ -436,37 +440,59 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            initialValue: _tier,
+                            initialValue: _category,
                             decoration: const InputDecoration(
-                              labelText: 'Tier', border: OutlineInputBorder(),
+                              labelText: 'Category',
+                              helperText:
+                                  'Surface this package belongs on',
+                              border: OutlineInputBorder(),
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'little_joy', child: Text('Little Joy')),
-                              DropdownMenuItem(value: 'happy_tales', child: Text('Happy Tales')),
-                              DropdownMenuItem(value: 'grand', child: Text('Grand')),
-                              DropdownMenuItem(value: 'magical', child: Text('Magical')),
-                              DropdownMenuItem(value: 'custom', child: Text('Custom')),
+                              DropdownMenuItem(
+                                value: 'birthday',
+                                child: Text('Birthday'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'snack_play',
+                                child: Text('Snack & Play (coming)'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'weekly',
+                                child: Text('Weekly event (coming)'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'other',
+                                child: Text('Other'),
+                              ),
                             ],
-                            onChanged: (v) => setState(() => _tier = v ?? 'little_joy'),
+                            onChanged: (v) =>
+                                setState(() => _category = v ?? 'birthday'),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _hallNameCtrl.text.isEmpty
-                                ? null
-                                : _hallNameCtrl.text,
+                          child: TextField(
+                            controller: _tierCtrl,
                             decoration: const InputDecoration(
-                              labelText: 'Hall', border: OutlineInputBorder(),
+                              labelText: 'Tier (free text)',
+                              hintText: 'little_joy / weekly_basics / ...',
+                              helperText: 'Internal slug — any string OK',
+                              border: OutlineInputBorder(),
                             ),
-                            items: const [
-                              DropdownMenuItem(value: 'Pearl', child: Text('Pearl')),
-                              DropdownMenuItem(value: 'The Grand', child: Text('The Grand')),
-                            ],
-                            onChanged: (v) => setState(() => _hallNameCtrl.text = v ?? ''),
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _hallNameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Hall (free text)',
+                        hintText: 'Pearl / The Grand / …',
+                        helperText:
+                            'Shown on the package card. Type any hall name.',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -548,21 +574,6 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _numField('Deposit (₹) — optional', _depositCtrl),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: DropdownButtonFormField<String?>(
-                            initialValue: _heroTheme,
-                            decoration: const InputDecoration(
-                              labelText: 'Hero theme (legacy)',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: const [
-                              DropdownMenuItem(value: null, child: Text('— None —')),
-                              DropdownMenuItem(value: 'mixed', child: Text('Mixed')),
-                            ],
-                            onChanged: (v) => setState(() => _heroTheme = v),
-                          ),
                         ),
                       ],
                     ),
