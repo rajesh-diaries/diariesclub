@@ -141,7 +141,13 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/onboarding/add-child'),
+          onPressed: () async {
+            await ref
+                .read(onboardingStepProvider.notifier)
+                .setStep(OnboardingStep.addChild);
+            if (!context.mounted) return;
+            context.go('/onboarding/add-child');
+          },
         ),
       ),
       body: SafeArea(

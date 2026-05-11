@@ -67,7 +67,18 @@ class _AddChildScreenState extends ConsumerState<AddChildScreen> {
       appBar: AppBar(
         title: const ProgressDots(currentStep: 2),
         centerTitle: true,
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _isSkipping
+              ? null
+              : () async {
+                  await ref
+                      .read(onboardingStepProvider.notifier)
+                      .setStep(OnboardingStep.familyName);
+                  if (!context.mounted) return;
+                  context.go('/onboarding/family-name');
+                },
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(

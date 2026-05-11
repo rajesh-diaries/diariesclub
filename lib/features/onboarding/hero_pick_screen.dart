@@ -78,7 +78,16 @@ class _HeroPickScreenState extends ConsumerState<HeroPickScreen> {
       appBar: AppBar(
         title: const ProgressDots(currentStep: 4),
         centerTitle: true,
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () async {
+            await ref
+                .read(onboardingStepProvider.notifier)
+                .setStep(OnboardingStep.childDetails);
+            if (!context.mounted) return;
+            context.go('/onboarding/child-details');
+          },
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
