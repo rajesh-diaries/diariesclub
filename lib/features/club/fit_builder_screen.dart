@@ -177,144 +177,133 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
       appBar: AppBar(
-        // VERSION MARKER — if you see V4 in the title, the new code is
-        // running. Otherwise you're on stale build / cached JS.
-        title: Text(
-          'V4 · ${(tpl['name'] as String?) ?? 'Build your meal'}',
-        ),
-        backgroundColor: Colors.purple.shade100,
+        title: Text((tpl['name'] as String?) ?? 'Build your meal'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 120),
+      // Single Column body — the previous Scaffold.bottomSheet pattern
+      // collapsed the body content on Flutter web. Replaced with an
+      // Expanded ListView + a fixed bottom bar so the layout is
+      // dead-predictable.
+      body: Column(
         children: [
-          if ((tpl['photo_url'] as String?)?.isNotEmpty ?? false)
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.network(
-                tpl['photo_url'] as String,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  color: AppColors.fitGreen.withValues(alpha: 0.15),
-                ),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: 24),
               children: [
-                if ((tpl['description'] as String?)?.isNotEmpty ?? false)
-                  Text(
-                    tpl['description'] as String,
-                    style: AppTextStyles.body(context),
+                if ((tpl['photo_url'] as String?)?.isNotEmpty ?? false)
+                  AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: Image.network(
+                      tpl['photo_url'] as String,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: AppColors.fitGreen.withValues(alpha: 0.15),
+                      ),
+                    ),
                   ),
-                const SizedBox(height: 16),
-                // Build-marker — if you see "BUILD v3" the new code is
-                // running. If you don't see this banner at all, hot-restart
-                // didn't pick up the change; do a full cold restart.
-                Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.withValues(alpha: 0.15),
-                    border: Border.all(color: Colors.purple, width: 2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        '🔧 BUILD v3 — sections debug',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: Colors.purple,
+                      if ((tpl['description'] as String?)?.isNotEmpty ?? false)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Text(
+                            tpl['description'] as String,
+                            style: AppTextStyles.body(context),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text('Sections received: ${data.linkedCategories.length}'),
-                      Text('Template name: ${data.template['name']}'),
+                      for (final lc in data.linkedCategories)
+                        _CategorySection(
+                          category: lc.category,
+                          linker: lc.linker,
+                          options: lc.options,
+                          selection: _selections[lc.category['id']],
+                          onSelectionChange: (sel) {
+                            final catId = lc.category['id'] as String;
+                            setState(() {
+                              if (sel == null ||
+                                  (sel is List && sel.isEmpty)) {
+                                _selections.remove(catId);
+                              } else {
+                                _selections[catId] = sel;
+                              }
+                            });
+                            _refreshPrice(context);
+                          },
+                        ),
                       if (data.linkedCategories.isEmpty)
-                        const Text(
-                          '↪ EMPTY — RPC parser returned no sections',
-                          style: TextStyle(color: Colors.red),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: Center(
+                            child: Text(
+                              'No sections to customise.',
+                              style: AppTextStyles.body(
+                                context, color: AppColors.lightTextSecondary,
+                              ),
+                            ),
+                          ),
                         ),
+                      if (_errorText != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          _errorText!,
+                          style: AppTextStyles.caption(
+                            context, color: AppColors.adminRed,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                for (final lc in data.linkedCategories)
-                  _CategorySection(
-                    category: lc.category,
-                    linker: lc.linker,
-                    options: lc.options,
-                    selection: _selections[lc.category['id']],
-                    onSelectionChange: (sel) {
-                      final catId = lc.category['id'] as String;
-                      setState(() {
-                        if (sel == null ||
-                            (sel is List && sel.isEmpty)) {
-                          _selections.remove(catId);
-                        } else {
-                          _selections[catId] = sel;
-                        }
-                      });
-                      _refreshPrice(context);
-                    },
-                  ),
-                if (_errorText != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _errorText!,
-                    style: AppTextStyles.caption(
-                      context, color: AppColors.adminRed,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
+          // Fixed bottom bar — replaces Scaffold.bottomSheet.
+          SafeArea(
+            top: false,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              decoration: const BoxDecoration(
+                color: AppColors.lightSurface,
+                border: Border(top: BorderSide(color: AppColors.lightBorder)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total',
+                          style: AppTextStyles.caption(
+                            context, color: AppColors.lightTextSecondary,
+                          ),
+                        ),
+                        Text(
+                          Money.fromPaise(final_),
+                          style: AppTextStyles.h2(
+                            context, color: AppColors.fitGreen,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: 200,
+                    child: PrimaryButton(
+                      label: 'Add to cart',
+                      loading: _busy,
+                      onPressed: allRequiredFilled && !_busy
+                          ? () => _addToCart(data, final_)
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
-      ),
-      bottomSheet: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-          decoration: const BoxDecoration(
-            color: AppColors.lightSurface,
-            border: Border(top: BorderSide(color: AppColors.lightBorder)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Total',
-                      style: AppTextStyles.caption(
-                        context, color: AppColors.lightTextSecondary,
-                      ),
-                    ),
-                    Text(
-                      Money.fromPaise(final_),
-                      style: AppTextStyles.h2(
-                        context, color: AppColors.fitGreen,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(
-                width: 200,
-                child: PrimaryButton(
-                  label: 'Add to cart',
-                  loading: _busy,
-                  onPressed: allRequiredFilled && !_busy
-                      ? () => _addToCart(data, final_)
-                      : null,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
