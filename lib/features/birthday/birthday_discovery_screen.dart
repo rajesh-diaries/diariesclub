@@ -50,8 +50,21 @@ class BirthdayDiscoveryScreen extends ConsumerWidget {
 
     final upcomingBirthday =
         upcoming.isEmpty ? null : upcoming.first;
-    final selectedChild = upcomingBirthday?.child ??
-        (children.isEmpty ? null : children.first);
+    // upcomingBirthdaysProvider is a FutureProvider — its `child` Map is
+    // a snapshot at fetch time. The interest-state radio mutates a
+    // column on the live children stream, so we MUST resolve the latest
+    // child from the realtime `children` list (otherwise the radio
+    // appears stuck on the old value after the user toggles).
+    Map<String, dynamic>? selectedChild;
+    if (upcomingBirthday != null) {
+      final id = upcomingBirthday.child['id'] as String?;
+      selectedChild = children.firstWhere(
+        (c) => c['id'] == id,
+        orElse: () => upcomingBirthday.child,
+      );
+    } else if (children.isNotEmpty) {
+      selectedChild = children.first;
+    }
 
     return Scaffold(
       appBar: AppBar(
