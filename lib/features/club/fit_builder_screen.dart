@@ -471,16 +471,22 @@ final fitTemplateDetailProvider =
     // empty sections for the customer despite RLS appearing correct —
     // the SECURITY DEFINER bypass guarantees a clean read.
     final raw = await Supabase.instance.client
-        .rpc<Map<String, dynamic>>('fit_template_detail', params: {
+        .rpc<dynamic>('fit_template_detail', params: {
       'p_template_id': templateId,
     });
+    final root = raw is Map
+        ? Map<String, dynamic>.from(raw)
+        : <String, dynamic>{};
 
-    final tpl = Map<String, dynamic>.from(
-      (raw['template'] as Map?) ?? const <String, dynamic>{},
-    );
+    final tpl = root['template'] is Map
+        ? Map<String, dynamic>.from(root['template'] as Map)
+        : <String, dynamic>{};
 
-    final sections = ((raw['sections'] as List?) ?? const [])
-        .map((s) => Map<String, dynamic>.from(s as Map))
+    final sections = (root['sections'] is List
+            ? List<dynamic>.from(root['sections'] as List)
+            : const <dynamic>[])
+        .whereType<Map<dynamic, dynamic>>()
+        .map((s) => Map<String, dynamic>.from(s))
         .toList();
 
     final List<_LinkedCategory> linked = [];
