@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Onboarding step identifiers.
 ///
@@ -81,25 +82,32 @@ class OnboardingStepController extends AsyncNotifier<OnboardingStep> {
 
 /// Whether the user has already seen the Welcome Manifesto screen (the
 /// "Brave. Kind. Curious. Creative." intro shown right after first OTP
-/// verify). Persists across reinstalls of the app only as long as the
-/// device's SharedPreferences survive — fine for v1.
+/// verify). The flag is scoped to the current auth.uid — every new
+/// signed-in account sees the welcome once, regardless of how many
+/// other accounts have logged into the device before. Falls back to a
+/// device-wide key for sessions where auth.uid isn't yet available.
 final hasSeenWelcomeManifestoProvider =
     AsyncNotifierProvider<HasSeenWelcomeManifestoController, bool>(
   HasSeenWelcomeManifestoController.new,
 );
 
 class HasSeenWelcomeManifestoController extends AsyncNotifier<bool> {
-  static const _key = 'has_seen_welcome_manifesto';
+  static String _key() {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    return uid == null
+        ? 'has_seen_welcome_manifesto'
+        : 'has_seen_welcome_manifesto_$uid';
+  }
 
   @override
   Future<bool> build() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_key) ?? false;
+    return prefs.getBool(_key()) ?? false;
   }
 
   Future<void> markSeen() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_key, true);
+    await prefs.setBool(_key(), true);
     state = const AsyncValue.data(true);
   }
 }
