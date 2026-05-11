@@ -22,6 +22,8 @@ class LiveOpsScreen extends ConsumerWidget {
     final todaySessions =
         ref.watch(adminTodaySessionCountProvider).valueOrNull ?? 0;
     final todayCash = ref.watch(adminTodayCashProvider).valueOrNull ?? 0;
+    final todayBites =
+        ref.watch(adminTodayHealthyBitesProvider).valueOrNull ?? 0;
 
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
@@ -36,6 +38,7 @@ class LiveOpsScreen extends ConsumerWidget {
               todaySessions: todaySessions,
               pendingRefunds: pendingRefunds.length,
               todayCashPaise: todayCash,
+              todayBites: todayBites,
             ),
             const SizedBox(height: 24),
             _ActiveSessionsCard(sessions: activeSessions),
@@ -54,53 +57,52 @@ class _StatRow extends StatelessWidget {
   final int todaySessions;
   final int pendingRefunds;
   final int todayCashPaise;
+  final int todayBites;
   const _StatRow({
     required this.activeSessions,
     required this.todaySessions,
     required this.pendingRefunds,
     required this.todayCashPaise,
+    required this.todayBites,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Wrap(
+      spacing: 16,
+      runSpacing: 16,
       children: [
-        Expanded(
-          child: _StatCard(
-            label: 'Active sessions',
-            value: '$activeSessions',
-            icon: PhosphorIconsFill.pulse,
-            color: AppColors.activeGreen,
-          ),
+        _StatCard(
+          label: 'Active sessions',
+          value: '$activeSessions',
+          icon: PhosphorIconsFill.pulse,
+          color: AppColors.activeGreen,
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _StatCard(
-            label: 'Today',
-            value: '$todaySessions',
-            icon: PhosphorIconsFill.calendar,
-            color: AppColors.navy,
-          ),
+        _StatCard(
+          label: 'Today',
+          value: '$todaySessions',
+          icon: PhosphorIconsFill.calendar,
+          color: AppColors.navy,
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _StatCard(
-            label: 'Pending refunds',
-            value: '$pendingRefunds',
-            icon: PhosphorIconsFill.arrowUUpLeft,
-            color: pendingRefunds > 0
-                ? AppColors.adminRed
-                : AppColors.lightTextSecondary,
-          ),
+        _StatCard(
+          label: 'Healthy bites today',
+          value: '$todayBites',
+          icon: PhosphorIconsFill.cookie,
+          color: AppColors.xpPurple,
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _StatCard(
-            label: 'Cash today',
-            value: Money.fromPaise(todayCashPaise),
-            icon: PhosphorIconsFill.coins,
-            color: AppColors.gold,
-          ),
+        _StatCard(
+          label: 'Pending refunds',
+          value: '$pendingRefunds',
+          icon: PhosphorIconsFill.arrowUUpLeft,
+          color: pendingRefunds > 0
+              ? AppColors.adminRed
+              : AppColors.lightTextSecondary,
+        ),
+        _StatCard(
+          label: 'Cash today',
+          value: Money.fromPaise(todayCashPaise),
+          icon: PhosphorIconsFill.coins,
+          color: AppColors.gold,
         ),
       ],
     );
@@ -122,6 +124,7 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: 240,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.lightSurface,
@@ -135,11 +138,14 @@ class _StatCard extends StatelessWidget {
             children: [
               Icon(icon, color: color, size: 20),
               const SizedBox(width: 8),
-              Text(
-                label,
-                style: AppTextStyles.caption(
-                  context,
-                  color: AppColors.lightTextSecondary,
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.lightTextSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

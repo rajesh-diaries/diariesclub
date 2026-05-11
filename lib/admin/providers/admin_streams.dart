@@ -71,6 +71,21 @@ final adminTodaySessionCountProvider = FutureProvider<int>((ref) async {
   return (rows as List).length;
 });
 
+/// Today's healthy-bite distributions (admin dashboard tile). Counts
+/// sessions where staff handed out a bite in the last 24h.
+final adminTodayHealthyBitesProvider = FutureProvider<int>((ref) async {
+  final since = DateTime.now()
+      .toUtc()
+      .subtract(const Duration(hours: 24))
+      .toIso8601String();
+  final rows = await Supabase.instance.client
+      .from('sessions')
+      .select('id')
+      .eq('healthy_bite_distributed', true)
+      .gte('created_at', since);
+  return (rows as List).length;
+});
+
 /// Today's cash collected across cash + cash_walkin payment methods.
 final adminTodayCashProvider = FutureProvider<int>((ref) async {
   final since = DateTime.now()
