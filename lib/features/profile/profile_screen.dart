@@ -408,12 +408,15 @@ class _PickedPerkRow extends StatelessWidget {
     final code = (row['code'] as String?) ?? '';
     final label = (row['perk_label'] as String?) ?? 'Perk';
     final stage = (row['stage'] as String?) ?? '';
+    final trait = (row['trait'] as String?) ?? '';
     final childName = (row['child_name'] as String?) ?? '';
     final expiresAt =
         DateTime.tryParse((row['expires_at'] as String?) ?? '');
     final daysLeft = expiresAt == null
         ? null
         : expiresAt.difference(DateTime.now()).inDays;
+    final traitColor = _traitColor(trait);
+    final traitName = _traitName(trait);
 
     return ListTile(
       leading: Container(
@@ -422,11 +425,11 @@ class _PickedPerkRow extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColors.gold.withValues(alpha: 0.20),
+          color: traitColor.withValues(alpha: 0.20),
         ),
-        child: const Icon(
-          PhosphorIconsFill.gift,
-          color: AppColors.gold,
+        child: Icon(
+          _traitIcon(trait),
+          color: traitColor,
           size: 20,
         ),
       ),
@@ -440,7 +443,9 @@ class _PickedPerkRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${childName.isEmpty ? 'Your kid' : childName} · ${_stageTitle(stage)}',
+              traitName.isEmpty
+                  ? '${childName.isEmpty ? 'Your kid' : childName} · ${_stageTitle(stage)}'
+                  : '${childName.isEmpty ? 'Your kid' : childName} · $traitName · ${_stageTitle(stage)}',
               style: AppTextStyles.caption(
                 context,
                 color: AppColors.lightTextSecondary,
@@ -506,6 +511,30 @@ class _PickedPerkRow extends StatelessWidget {
   }
 }
 
+String _traitName(String t) => switch (t) {
+      'rafi' => 'Rafi',
+      'ellie' => 'Ellie',
+      'gerry' => 'Gerry',
+      'zena' => 'Zena',
+      _ => '',
+    };
+
+Color _traitColor(String t) => switch (t) {
+      'rafi' => AppColors.rafiCoral,
+      'ellie' => AppColors.ellieBlue,
+      'gerry' => AppColors.gerryAmber,
+      'zena' => AppColors.zenaGreen,
+      _ => AppColors.gold,
+    };
+
+IconData _traitIcon(String t) => switch (t) {
+      'rafi' => PhosphorIconsFill.shieldStar,
+      'ellie' => PhosphorIconsFill.heart,
+      'gerry' => PhosphorIconsFill.magnifyingGlass,
+      'zena' => PhosphorIconsFill.palette,
+      _ => PhosphorIconsFill.gift,
+    };
+
 class _UnchosenPerkRow extends ConsumerStatefulWidget {
   final Map<String, dynamic> row;
   const _UnchosenPerkRow({required this.row});
@@ -552,6 +581,8 @@ class _UnchosenPerkRowState extends ConsumerState<_UnchosenPerkRow> {
     final stage = (widget.row['stage'] as String?) ?? '';
     final trait = widget.row['trait'] as String?;
     final childName = (widget.row['child_name'] as String?) ?? '';
+    final traitName = _traitName(trait ?? '');
+    final traitColor = _traitColor(trait ?? '');
     final options = ref.watch(
       stagePerkOptionsProvider((stage: stage, trait: trait)),
     );
@@ -569,11 +600,11 @@ class _UnchosenPerkRowState extends ConsumerState<_UnchosenPerkRow> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.gold.withValues(alpha: 0.20),
+                  color: traitColor.withValues(alpha: 0.20),
                 ),
-                child: const Icon(
-                  PhosphorIconsFill.sparkle,
-                  color: AppColors.gold,
+                child: Icon(
+                  _traitIcon(trait ?? ''),
+                  color: traitColor,
                   size: 20,
                 ),
               ),
@@ -583,7 +614,9 @@ class _UnchosenPerkRowState extends ConsumerState<_UnchosenPerkRow> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Pick your ${_stageTitle(stage)} reward',
+                      traitName.isEmpty
+                          ? 'Pick your ${_stageTitle(stage)} reward'
+                          : 'Pick your $traitName ${_stageTitle(stage)} reward',
                       style: AppTextStyles.body(context)
                           .copyWith(fontWeight: FontWeight.w800),
                     ),
