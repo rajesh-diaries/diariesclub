@@ -40,51 +40,93 @@ class _SubscriptionBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final cfg = ref.watch(venueConfigProvider).valueOrNull ?? const {};
+    final fitAppUrl = (cfg['fit_app_url'] as String?)?.trim() ?? '';
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => _openFitWhatsApp(context, ref),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.fitGreen.withValues(alpha: 0.95),
-                AppColors.fitGreen.withValues(alpha: 0.75),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
             borderRadius: BorderRadius.circular(14),
-          ),
-          child: Row(
-            children: [
-              const Icon(PhosphorIconsFill.forkKnife,
-                  color: Colors.white, size: 28),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'FIT meals, delivered weekly to your door',
-                      style: AppTextStyles.h3(context, color: Colors.white),
+            onTap: () => _openFitWhatsApp(context, ref),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.fitGreen.withValues(alpha: 0.95),
+                    AppColors.fitGreen.withValues(alpha: 0.75),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  const Icon(PhosphorIconsFill.forkKnife,
+                      color: Colors.white, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'FIT meal subscriptions — delivered home',
+                          style: AppTextStyles.h3(context, color: Colors.white),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Daily, weekly, monthly plans · '
+                          'Tap to chat on WhatsApp →',
+                          style: AppTextStyles.body(
+                            context,
+                            color: Colors.white.withValues(alpha: 0.92),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Tap to subscribe on WhatsApp →',
-                      style: AppTextStyles.body(
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (fitAppUrl.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Already use the FIT app?',
+                      style: AppTextStyles.caption(
                         context,
-                        color: Colors.white.withValues(alpha: 0.92),
+                        color: AppColors.lightTextSecondary,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 32),
+                    ),
+                    onPressed: () => launchUrl(
+                      Uri.parse(fitAppUrl),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    child: Text(
+                      'Open it →',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.fitGreen,
+                      ).copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -108,8 +150,8 @@ Future<void> _openFitWhatsApp(BuildContext context, WidgetRef ref) async {
       '';
   final greeting = familyName.isEmpty ? 'Hi!' : 'Hi! I\'m $familyName.';
   final msg =
-      "$greeting I'd like to subscribe to weekly FIT meal delivery. "
-      'Could you share details + how you take my address?';
+      "$greeting I'd like to know about FIT meal subscription plans "
+      "(daily / weekly / monthly). What's the best fit for my family?";
   final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
   final uri = Uri.parse(
       'https://wa.me/$digits?text=${Uri.encodeComponent(msg)}');
