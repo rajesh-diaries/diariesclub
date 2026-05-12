@@ -337,11 +337,16 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
         'admin_birthday_reservation_contact',
         params: {'p_reservation_id': widget.reservation['id']},
       );
-      widget.onAction();
     } on PostgrestException catch (e) {
       _showError(e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
+      // Always refresh — on success the new state lands; on error
+      // (e.g. invalid_state because the DB advanced between drawer
+      // open and this click) the drawer picks up the actual current
+      // state so the user can act on it instead of hitting the same
+      // error again.
+      widget.onAction();
     }
   }
 
@@ -366,11 +371,16 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
           'p_deposit_paid_paise': result.depositPaise,
         },
       );
-      widget.onAction();
     } on PostgrestException catch (e) {
       _showError(e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
+      // Always refresh — on success the new state lands; on error
+      // (e.g. invalid_state because the DB advanced between drawer
+      // open and this click) the drawer picks up the actual current
+      // state so the user can act on it instead of hitting the same
+      // error again.
+      widget.onAction();
     }
   }
 
@@ -394,11 +404,16 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
           if (result.adminNotes != null) 'p_admin_notes': result.adminNotes,
         },
       );
-      widget.onAction();
     } on PostgrestException catch (e) {
       _showError(e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
+      // Always refresh — on success the new state lands; on error
+      // (e.g. invalid_state because the DB advanced between drawer
+      // open and this click) the drawer picks up the actual current
+      // state so the user can act on it instead of hitting the same
+      // error again.
+      widget.onAction();
     }
   }
 
@@ -417,11 +432,16 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
           'p_reason': reason.trim(),
         },
       );
-      widget.onAction();
     } on PostgrestException catch (e) {
       _showError(e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
+      // Always refresh — on success the new state lands; on error
+      // (e.g. invalid_state because the DB advanced between drawer
+      // open and this click) the drawer picks up the actual current
+      // state so the user can act on it instead of hitting the same
+      // error again.
+      widget.onAction();
     }
   }
 
@@ -456,11 +476,16 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
         'admin_birthday_reservation_complete',
         params: {'p_reservation_id': widget.reservation['id']},
       );
-      widget.onAction();
     } on PostgrestException catch (e) {
       _showError(e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
+      // Always refresh — on success the new state lands; on error
+      // (e.g. invalid_state because the DB advanced between drawer
+      // open and this click) the drawer picks up the actual current
+      // state so the user can act on it instead of hitting the same
+      // error again.
+      widget.onAction();
     }
   }
 
