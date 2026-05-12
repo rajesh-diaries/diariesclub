@@ -550,8 +550,11 @@ class _UnchosenPerkRowState extends ConsumerState<_UnchosenPerkRow> {
   @override
   Widget build(BuildContext context) {
     final stage = (widget.row['stage'] as String?) ?? '';
+    final trait = widget.row['trait'] as String?;
     final childName = (widget.row['child_name'] as String?) ?? '';
-    final options = ref.watch(stagePerkOptionsProvider(stage));
+    final options = ref.watch(
+      stagePerkOptionsProvider((stage: stage, trait: trait)),
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -757,18 +760,25 @@ final unredeemedHeroPerksProvider =
   }).toList();
 });
 
-/// The live admin-configured options for a stage. Used to render the
-/// pick UI when a customer opens an unchosen perk slot.
+/// The live admin-configured options for a (stage, trait). Used to
+/// render the pick UI when a customer opens an unchosen perk slot.
+/// Welcome stage uses trait NULL; other stages filter by the grant's
+/// trait so Rafi options don't show up on an Ellie slot.
 final stagePerkOptionsProvider = FutureProvider.family<
-    List<Map<String, dynamic>>, String>((ref, stage) async {
-  final rows = await Supabase.instance.client
-      .from('stage_perks')
-      .select('id, perk_label, perk_description, validity_days')
-      .eq('stage', stage)
-      .eq('is_active', true)
-      .order('perk_label');
-  return List<Map<String, dynamic>>.from(rows);
-});
+    List<Map<String, dynamic>>, ({String stage, String? trait})>(
+  (ref, key) async {
+    final q = Supabase.instance.client
+        .from('stage_perks')
+        .select('id, perk_label, perk_description, validity_days')
+        .eq('stage', key.stage)
+        .eq('is_active', true);
+    final filtered = key.stage == 'welcome' || key.trait == null
+        ? q.isFilter('trait', null)
+        : q.eq('trait', key.trait!);
+    final rows = await filtered.order('perk_label');
+    return List<Map<String, dynamic>>.from(rows);
+  },
+);
 
 // ---------------------------------------------------------------------------
 //  Activity section
