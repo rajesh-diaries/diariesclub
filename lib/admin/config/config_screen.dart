@@ -600,8 +600,38 @@ class _XpSectionState extends State<_XpSection> {
   late final _levels = TextEditingController(
     text: jsonEncode(widget.config['level_thresholds'] ?? []),
   );
-  late String _referralTrait =
-      (widget.config['xp_referral_bonus_trait'] as String?) ?? 'rafi';
+
+  // amount_key → trait_config_key. Rows that don't have a trait dropdown
+  // (per_session_minute + reflection_participation) are customer-driven —
+  // their split comes from moment taps, not a fixed trait.
+  static const Map<String, String> _traitForAmount = {
+    'xp_healthy_bite':        'xp_healthy_bite_trait',
+    'xp_workshop_attendance': '',  // routed per-workshop, not via venue_config
+    'xp_birthday_hosted':     'xp_birthday_hosted_trait',
+    'xp_birthday_guest':      'xp_birthday_guest_trait',
+    'xp_first_session':       'xp_first_session_trait',
+    'xp_streak_bonus':        'xp_streak_bonus_trait',
+    'xp_referral_bonus_rafi': 'xp_referral_bonus_trait',
+    'xp_birthday_bonus':      'xp_birthday_bonus_trait',
+  };
+
+  late final Map<String, String> _traitValues = {
+    for (final entry in _traitForAmount.entries)
+      if (entry.value.isNotEmpty)
+        entry.value: (widget.config[entry.value] as String?) ??
+            _defaultTrait(entry.key),
+  };
+
+  static String _defaultTrait(String amountKey) => switch (amountKey) {
+        'xp_healthy_bite' => 'ellie',
+        'xp_birthday_hosted' => 'split',
+        'xp_birthday_guest' => 'ellie',
+        'xp_birthday_bonus' => 'split',
+        'xp_first_session' => 'rafi',
+        'xp_streak_bonus' => 'split',
+        'xp_referral_bonus_rafi' => 'rafi',
+        _ => 'rafi',
+      };
 
   @override
   void dispose() {
@@ -626,61 +656,24 @@ class _XpSectionState extends State<_XpSection> {
               label: entry.value,
               controller: _ctrls[entry.key]!,
             ),
-            if (entry.key == 'xp_referral_bonus_rafi') ...[
-              const SizedBox(height: 4),
+            if (_traitForAmount[entry.key]?.isNotEmpty ?? false)
+              _TraitDropdown(
+                value: _traitValues[_traitForAmount[entry.key]!] ?? 'rafi',
+                onChanged: (v) => setState(
+                  () => _traitValues[_traitForAmount[entry.key]!] = v,
+                ),
+              )
+            else if (entry.key == 'xp_workshop_attendance')
               Padding(
                 padding: const EdgeInsets.only(left: 4, bottom: 12),
-                child: Row(
-                  children: [
-                    Text(
-                      'Goes to:',
-                      style: AppTextStyles.caption(
-                        context,
-                        color: AppColors.lightTextSecondary,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _referralTrait,
-                        isDense: true,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8,
-                          ),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'rafi',
-                            child: Text('🛡  Rafi the Brave'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'ellie',
-                            child: Text('❤️  Ellie the Kind'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'gerry',
-                            child: Text('🔍  Gerry the Curious'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'zena',
-                            child: Text('🎨  Zena the Creative'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'split',
-                            child: Text('⚖  Split equally across all 4'),
-                          ),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) setState(() => _referralTrait = v);
-                        },
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'Trait is set per workshop in admin/workshops.',
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.lightTextSecondary,
+                  ),
                 ),
               ),
-            ],
           ],
           const SizedBox(height: 12),
           Text('Stage thresholds per trait (5 ints)',
@@ -730,7 +723,7 @@ class _XpSectionState extends State<_XpSection> {
               await widget.save({
                 for (final k in _xpKeys.keys)
                   k: int.tryParse(_ctrls[k]!.text) ?? 0,
-                'xp_referral_bonus_trait': _referralTrait,
+                ..._traitValues,
                 'stage_thresholds_per_trait': stages,
                 'level_thresholds': levels,
               });
@@ -1295,6 +1288,55 @@ class _RupeeField extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Dropdown used beneath each admin-defined XP earner to pick which
+/// character the XP routes to. 4 traits + a "split equally" option.
+class _TraitDropdown extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+  const _TraitDropdown({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, top: 2, bottom: 14),
+      child: Row(
+        children: [
+          Text(
+            'Goes to:',
+            style: AppTextStyles.caption(
+              context,
+              color: AppColors.lightTextSecondary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: DropdownButtonFormField<String>(
+              initialValue: value,
+              isDense: true,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 8,
+                ),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'rafi',  child: Text('🛡  Rafi the Brave')),
+                DropdownMenuItem(value: 'ellie', child: Text('❤️  Ellie the Kind')),
+                DropdownMenuItem(value: 'gerry', child: Text('🔍  Gerry the Curious')),
+                DropdownMenuItem(value: 'zena',  child: Text('🎨  Zena the Creative')),
+                DropdownMenuItem(value: 'split', child: Text('⚖  Split equally across all 4')),
+              ],
+              onChanged: (v) {
+                if (v != null) onChanged(v);
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
