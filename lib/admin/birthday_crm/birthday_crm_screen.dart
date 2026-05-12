@@ -589,7 +589,7 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
           onPressed: _confirmDate,
         ),
       'confirmed' => AdminPrimaryButton(
-          label: 'Mark completed (auto-award cards)',
+          label: 'Mark party completed',
           onPressed: _markCompleted,
         ),
       'completed' => Text(

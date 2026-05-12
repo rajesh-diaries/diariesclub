@@ -74,13 +74,13 @@ class _AlbumPendingState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Photos coming in 3-5 days',
+              'Your little memory is on its way',
               style: AppTextStyles.h3(context),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              "We'll send a push the moment your album is ready.",
+              "We'll share it here once it's ready.",
               style: AppTextStyles.body(
                 context,
                 color: AppColors.lightTextSecondary,
