@@ -1,8 +1,10 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -142,9 +144,9 @@ class _PackageCard extends StatelessWidget {
                     children: [
                       _Chip(
                         icon: pdfUrl != null
-                            ? PhosphorIconsFill.checkCircle
+                            ? PhosphorIconsFill.filePdf
                             : PhosphorIconsRegular.warningCircle,
-                        label: pdfUrl != null ? 'PDF cached' : 'PDF stale',
+                        label: pdfUrl != null ? 'PDF uploaded' : 'No PDF',
                         color: pdfUrl != null
                             ? AppColors.activeGreen
                             : AppColors.lightTextSecondary,
@@ -164,14 +166,33 @@ class _PackageCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        icon: const Icon(PhosphorIconsRegular.filePdf, size: 14),
-                        label: const Text('PDF'),
-                        onPressed: () =>
-                            _regeneratePdf(context, row['id'] as String),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: Icon(
+                            pdfUrl == null
+                                ? PhosphorIconsRegular.upload
+                                : PhosphorIconsRegular.arrowsClockwise,
+                            size: 14,
+                          ),
+                          label: Text(pdfUrl == null ? 'Upload PDF' : 'Replace PDF'),
+                          onPressed: () =>
+                              _pickAndUploadPdf(context, row['id'] as String),
+                        ),
                       ),
                     ],
                   ),
+                  if (pdfUrl != null) ...[
+                    const SizedBox(height: 6),
+                    TextButton.icon(
+                      icon: const Icon(PhosphorIconsRegular.arrowSquareOut,
+                          size: 14),
+                      label: const Text('Open current PDF'),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                      ),
+                      onPressed: () => launchUrl(Uri.parse(pdfUrl)),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -181,24 +202,56 @@ class _PackageCard extends StatelessWidget {
     );
   }
 
-  Future<void> _regeneratePdf(BuildContext context, String id) async {
-    try {
-      await Supabase.instance.client.rpc<dynamic>(
-        'admin_package_regenerate_pdf',
-        params: {'p_id': id},
-      );
+  static const _bucket = 'package-pdfs';
+
+  Future<void> _pickAndUploadPdf(
+      BuildContext context, String packageId) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PDF generation queued — refresh in a few seconds')),
+        const SnackBar(content: Text("Couldn't read that file.")),
       );
-      // Refresh after a short delay so the new pdf_url shows up.
-      Future.delayed(const Duration(seconds: 3), () {
-        ref.invalidate(packagesAdminListProvider);
-      });
+      return;
+    }
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Uploading PDF…')),
+    );
+
+    try {
+      final path =
+          '$packageId/menu-${DateTime.now().millisecondsSinceEpoch}.pdf';
+      await Supabase.instance.client.storage.from(_bucket).uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(contentType: 'application/pdf'),
+          );
+      final publicUrl =
+          Supabase.instance.client.storage.from(_bucket).getPublicUrl(path);
+
+      await Supabase.instance.client.rpc<dynamic>(
+        'admin_package_set_pdf_url',
+        params: {'p_package_id': packageId, 'p_pdf_url': publicUrl},
+      );
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PDF uploaded — customers can download now.')),
+      );
+      ref.invalidate(packagesAdminListProvider);
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not queue PDF: $e')),
+        SnackBar(content: Text("Couldn't upload PDF: $e")),
       );
     }
   }
