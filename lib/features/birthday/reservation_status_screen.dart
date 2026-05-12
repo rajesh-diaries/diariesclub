@@ -38,8 +38,12 @@ class ReservationStatusScreen extends ConsumerWidget {
         // deep link).
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
+          // Don't fall back to /birthday — the discovery screen
+          // auto-redirects back to this same status page when the
+          // family has an active reservation, so the user appeared
+          // stuck. /home is the right escape hatch.
           onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/birthday'),
+              context.canPop() ? context.pop() : context.go('/home'),
         ),
         actions: [
           PopupMenuButton<String>(
