@@ -109,8 +109,13 @@ class _ConfigFormState extends State<_ConfigForm> {
             const SizedBox(height: 12),
             _XpSection(config: c, busy: _busy, save: _save),
             const SizedBox(height: 12),
-            _MilestonesSection(config: c, busy: _busy, save: _save),
-            const SizedBox(height: 12),
+            // Visit milestones — parked. Config is saved to
+            // venue_config.visit_milestones but no RPC reads it yet.
+            // Re-enable the section here when the award flow is wired
+            // (visit_count increment + threshold check + reward_xp +
+            // reward_paise wallet credit + customer-facing display).
+            // _MilestonesSection(config: c, busy: _busy, save: _save),
+            // const SizedBox(height: 12),
             _BirthdaySection(config: c, busy: _busy, save: _save),
             const SizedBox(height: 12),
             _SessionTimingSection(config: c, busy: _busy, save: _save),
