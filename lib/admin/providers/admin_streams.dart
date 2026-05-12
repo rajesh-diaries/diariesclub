@@ -42,20 +42,31 @@ final adminAllRefundsProvider =
   }
 });
 
-/// Realtime stream of birthday reservations not in terminal state.
-/// Powers the Birthday CRM kanban.
+/// Birthday reservations for the CRM kanban.
+///
+/// Switched from .stream() to a polling .select() because the realtime
+/// subscription was returning zero rows for admins (PIPELINE columns
+/// stuck on 0 even though the dashboard RPC counted inquiries). The
+/// kanban refreshes via ref.refresh after any RPC action (contact /
+/// confirm / cancel / complete) plus a 30s polling tick for ambient
+/// freshness.
 final adminBirthdayReservationsProvider =
-    StreamProvider<List<Map<String, dynamic>>>((ref) async* {
-  final stream = Supabase.instance.client
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  // Ambient refresh: re-poll every 30s so new inquiries surface without
+  // needing a manual page reload.
+  final ticker = Stream<void>.periodic(const Duration(seconds: 30));
+  final sub = ticker.listen((_) => ref.invalidateSelf());
+  ref.onDispose(sub.cancel);
+
+  final rows = await Supabase.instance.client
       .from('birthday_reservations')
-      .stream(primaryKey: ['id'])
+      .select()
       .order('created_at', ascending: false);
-  await for (final rows in stream) {
-    yield rows
-        .where((r) =>
-            r['status'] != 'cancelled' && r['status'] != 'no_show')
-        .toList();
-  }
+  return (rows as List)
+      .map((r) => Map<String, dynamic>.from(r as Map))
+      .where(
+          (r) => r['status'] != 'cancelled' && r['status'] != 'no_show')
+      .toList();
 });
 
 /// Today's session count (admin dashboard top stat).

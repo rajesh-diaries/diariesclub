@@ -78,6 +78,15 @@ class _BirthdayCrmScreenState extends ConsumerState<BirthdayCrmScreen> {
                     onMonthChanged: (m) => ref
                         .read(adminBirthdayDashboardMonthProvider.notifier)
                         .state = m,
+                    onRowTap: (rid) {
+                      final match = reservations.firstWhere(
+                        (r) => r['id'] == rid,
+                        orElse: () => const <String, dynamic>{},
+                      );
+                      if (match.isNotEmpty) {
+                        setState(() => _selected = match);
+                      }
+                    },
                   ),
                   const SizedBox(height: 24),
                   Text(
@@ -1055,10 +1064,15 @@ class _BirthdaysThisMonth extends StatefulWidget {
   final int selectedMonth;
   final List<Map<String, dynamic>> rows;
   final ValueChanged<int> onMonthChanged;
+  /// Tap on a row with an active inquiry opens the detail drawer. The
+  /// callback receives the reservation_id; the parent matches it to a
+  /// reservation row and sets _selected.
+  final ValueChanged<String> onRowTap;
   const _BirthdaysThisMonth({
     required this.selectedMonth,
     required this.rows,
     required this.onMonthChanged,
+    required this.onRowTap,
   });
 
   @override
@@ -1178,6 +1192,10 @@ class _BirthdaysThisMonthState extends State<_BirthdaysThisMonth> {
                         row: r,
                         onWhatsApp: () =>
                             _whatsApp(r['family_phone'] as String?),
+                        onTap: () {
+                          final rid = r['reservation_id'] as String?;
+                          if (rid != null) widget.onRowTap(rid);
+                        },
                       ),
                   ],
                 ),
@@ -1190,7 +1208,12 @@ class _BirthdaysThisMonthState extends State<_BirthdaysThisMonth> {
 class _BirthdayRow extends StatelessWidget {
   final Map<String, dynamic> row;
   final VoidCallback onWhatsApp;
-  const _BirthdayRow({required this.row, required this.onWhatsApp});
+  final VoidCallback onTap;
+  const _BirthdayRow({
+    required this.row,
+    required this.onWhatsApp,
+    required this.onTap,
+  });
 
   static const _months = [
     'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
@@ -1215,24 +1238,27 @@ class _BirthdayRow extends StatelessWidget {
       _ => (AppColors.adminRed, '❌ No inquiry'),
     };
 
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: AppColors.lightBorder, width: 0.5),
+    final hasReservation = row['reservation_id'] != null;
+    return InkWell(
+      onTap: hasReservation ? onTap : null,
+      child: Container(
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: AppColors.lightBorder, width: 0.5),
+          ),
         ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              dateLabel,
-              style: AppTextStyles.body(context).copyWith(
-                fontWeight: FontWeight.w800,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 80,
+              child: Text(
+                dateLabel,
+                style: AppTextStyles.body(context).copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
-          ),
           Expanded(
             flex: 2,
             child: Column(
@@ -1270,13 +1296,14 @@ class _BirthdayRow extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          OutlinedButton.icon(
-            onPressed: onWhatsApp,
-            icon: const Icon(PhosphorIconsRegular.whatsappLogo, size: 16),
-            label: const Text('Reach out'),
-          ),
-        ],
+            const SizedBox(width: 12),
+            OutlinedButton.icon(
+              onPressed: onWhatsApp,
+              icon: const Icon(PhosphorIconsRegular.whatsappLogo, size: 16),
+              label: const Text('Reach out'),
+            ),
+          ],
+        ),
       ),
     );
   }
