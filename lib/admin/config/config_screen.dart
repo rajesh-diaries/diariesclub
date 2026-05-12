@@ -584,7 +584,7 @@ class _XpSectionState extends State<_XpSection> {
     'xp_birthday_guest': 'XP — birthday guest',
     'xp_first_session': 'XP — first session bonus',
     'xp_streak_bonus': 'XP — streak bonus',
-    'xp_referral_bonus_rafi': 'XP — referral bonus (Rafi)',
+    'xp_referral_bonus_rafi': 'XP — referral bonus',
     'xp_birthday_bonus': 'XP — birthday bonus',
     'stage_imminent_xp_gap': 'Stage-imminent XP gap',
   };
@@ -600,6 +600,8 @@ class _XpSectionState extends State<_XpSection> {
   late final _levels = TextEditingController(
     text: jsonEncode(widget.config['level_thresholds'] ?? []),
   );
+  late String _referralTrait =
+      (widget.config['xp_referral_bonus_trait'] as String?) ?? 'rafi';
 
   @override
   void dispose() {
@@ -619,11 +621,67 @@ class _XpSectionState extends State<_XpSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final entry in _xpKeys.entries)
+          for (final entry in _xpKeys.entries) ...[
             _NumField(
               label: entry.value,
               controller: _ctrls[entry.key]!,
             ),
+            if (entry.key == 'xp_referral_bonus_rafi') ...[
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 12),
+                child: Row(
+                  children: [
+                    Text(
+                      'Goes to:',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _referralTrait,
+                        isDense: true,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8,
+                          ),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'rafi',
+                            child: Text('🛡  Rafi the Brave'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'ellie',
+                            child: Text('❤️  Ellie the Kind'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'gerry',
+                            child: Text('🔍  Gerry the Curious'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'zena',
+                            child: Text('🎨  Zena the Creative'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'split',
+                            child: Text('⚖  Split equally across all 4'),
+                          ),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) setState(() => _referralTrait = v);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
           const SizedBox(height: 12),
           Text('Stage thresholds per trait (5 ints)',
               style: AppTextStyles.body(context).copyWith(
@@ -672,6 +730,7 @@ class _XpSectionState extends State<_XpSection> {
               await widget.save({
                 for (final k in _xpKeys.keys)
                   k: int.tryParse(_ctrls[k]!.text) ?? 0,
+                'xp_referral_bonus_trait': _referralTrait,
                 'stage_thresholds_per_trait': stages,
                 'level_thresholds': levels,
               });
