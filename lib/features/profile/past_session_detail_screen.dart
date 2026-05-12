@@ -131,7 +131,7 @@ class _Body extends StatelessWidget {
 
   String _statusLabel(String status) => switch (status) {
         'active' => 'Active',
-        'grace' => 'In grace',
+        'grace' => 'Wrapping up',
         'completed' => 'Completed',
         'auto_closed' => 'Auto-closed',
         'void' => 'Cancelled',

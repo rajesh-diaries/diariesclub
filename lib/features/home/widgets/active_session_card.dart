@@ -143,8 +143,8 @@ class _ActiveSessionCardState extends ConsumerState<ActiveSessionCard> {
     if (isGrace) {
       final overrun = -diff.inMinutes;
       return overrun <= 0
-          ? 'In grace period'
-          : 'Grace · +$overrun min over';
+          ? 'Wrapping up'
+          : 'Wrapping up · +$overrun min';
     }
     final mins = diff.inMinutes;
     final secs = diff.inSeconds.remainder(60);

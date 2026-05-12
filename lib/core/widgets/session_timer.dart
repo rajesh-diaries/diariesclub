@@ -112,7 +112,7 @@ class _SessionTimerState extends ConsumerState<SessionTimerWidget> {
     final m = _remaining.inMinutes;
     final s = _remaining.inSeconds.remainder(60);
     return _isGrace
-        ? 'Session in grace period, $m minutes $s seconds overrun'
+        ? "Time's up. $m minutes $s seconds over. Wrap up or extend."
         : '$m minutes $s seconds remaining';
   }
 }
@@ -156,7 +156,7 @@ class _Compact extends StatelessWidget {
           Text(label, style: AppTextStyles.bodyLarge(context, color: color)),
           if (isGrace) ...[
             const SizedBox(width: 8),
-            Text('overtime',
+            Text('wrapping up',
                 style: AppTextStyles.caption(context, color: color)),
           ],
         ],
@@ -187,7 +187,7 @@ class _Regular extends StatelessWidget {
           Text(label, style: AppTextStyles.h1(context, color: color)),
           const SizedBox(height: 4),
           Text(
-            isGrace ? 'over time' : 'time remaining',
+            isGrace ? 'Wrap up or extend' : 'time remaining',
             style: AppTextStyles.caption(
               context,
               color: AppColors.lightTextSecondary,
@@ -225,7 +225,7 @@ class _Dominant extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            isGrace ? 'Planning to extend?' : 'time remaining',
+            isGrace ? 'Wrap up or extend?' : 'time remaining',
             style: AppTextStyles.body(
               context,
               color: AppColors.lightTextSecondary,

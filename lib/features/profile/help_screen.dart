@@ -198,7 +198,7 @@ class _FaqAccordion extends StatelessWidget {
       ),
       _FaqItem(
         'What if my time runs out?',
-        'We give you a soft grace period. You can extend in 30-min or 1-hour blocks, or wrap up.',
+        "When your time's up, you'll see a wrap-up screen. Tap Extend for a 30-min or 1-hour top-up, or wrap up to finish.",
       ),
       _FaqItem(
         'Can I extend?',

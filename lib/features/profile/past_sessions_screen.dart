@@ -145,7 +145,7 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
       'active' => ('Active', AppColors.activeGreen),
-      'grace' => ('In grace', AppColors.warningYellow),
+      'grace' => ('Wrapping up', AppColors.warningYellow),
       'completed' => ('Completed', AppColors.lightTextSecondary),
       'auto_closed' => ('Auto-closed', AppColors.warningYellow),
       'void' => ('Cancelled', AppColors.adminRed),
