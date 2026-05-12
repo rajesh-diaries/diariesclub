@@ -601,7 +601,7 @@ class _ActionCard extends StatelessWidget {
         'See party details below. Bring the cake — we handle the rest.',
       'completed' when albumReady => 'Tap below to open your keepsake.',
       'completed' =>
-        "We'll send a push when your little memory is ready.",
+        "We'll let you know the moment your little memory arrives.",
       _ => null,
     };
     if (body == null) return const SizedBox.shrink();
