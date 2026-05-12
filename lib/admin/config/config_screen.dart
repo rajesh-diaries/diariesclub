@@ -208,11 +208,6 @@ class _PricingSectionState extends State<_PricingSection> {
         ((widget.config['session_extension_per_hour_paise'] as int? ?? 0) ~/ 100)
             .toString(),
   );
-  late final _overtime = TextEditingController(
-    text: ((widget.config['overtime_per_min_paise'] as int? ?? 0) ~/ 100)
-        .toString(),
-  );
-
   late final _extOptions = JsonbListEditor(
     initial: widget.config['session_extension_options'] as List? ?? [],
     fields: const [
@@ -231,7 +226,6 @@ class _PricingSectionState extends State<_PricingSection> {
     _oneHr.dispose();
     _twoHr.dispose();
     _ext.dispose();
-    _overtime.dispose();
     _slots.dispose();
     super.dispose();
   }
@@ -247,10 +241,6 @@ class _PricingSectionState extends State<_PricingSection> {
           _RupeeField(label: '1-hour session', controller: _oneHr),
           _RupeeField(label: '2-hour session', controller: _twoHr),
           _RupeeField(label: 'Extension per hour', controller: _ext),
-          _RupeeField(
-            label: 'Overtime per minute (after grace)',
-            controller: _overtime,
-          ),
           const SizedBox(height: 12),
           Text('Extension quick options',
               style: AppTextStyles.body(context).copyWith(
@@ -288,8 +278,6 @@ class _PricingSectionState extends State<_PricingSection> {
                     (int.tryParse(_twoHr.text) ?? 0) * 100,
                 'session_extension_per_hour_paise':
                     (int.tryParse(_ext.text) ?? 0) * 100,
-                'overtime_per_min_paise':
-                    (int.tryParse(_overtime.text) ?? 0) * 100,
                 'session_extension_options': _extOptions.snapshot(),
                 'pre_booking_slots_per_day': slots,
               });
