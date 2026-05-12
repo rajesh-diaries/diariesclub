@@ -813,9 +813,6 @@ class _BirthdaySectionState extends State<_BirthdaySection> {
   late final _homeCardThreshold = TextEditingController(
     text: '${widget.config['birthday_home_card_threshold_days'] ?? 28}',
   );
-  late final _interestTtl = TextEditingController(
-    text: '${widget.config['birthday_interest_ttl_hours'] ?? 48}',
-  );
   late bool _bookingEnabled =
       (widget.config['birthday_booking_enabled'] as bool?) ?? true;
 
@@ -836,7 +833,6 @@ class _BirthdaySectionState extends State<_BirthdaySection> {
   void dispose() {
     _autocancel.dispose();
     _homeCardThreshold.dispose();
-    _interestTtl.dispose();
     _wishTime.dispose();
     _wishCelebrating.dispose();
     _wishDefault.dispose();
@@ -866,11 +862,6 @@ class _BirthdaySectionState extends State<_BirthdaySection> {
             label: 'Home-card threshold (days before birthday)',
             controller: _homeCardThreshold,
             hint: '28',
-          ),
-          _NumField(
-            label: 'Interest TTL (hours, soft hold)',
-            controller: _interestTtl,
-            hint: '48',
           ),
           const Divider(height: 24),
           SwitchListTile.adaptive(
@@ -904,8 +895,6 @@ class _BirthdaySectionState extends State<_BirthdaySection> {
                   int.tryParse(_autocancel.text) ?? 24,
               'birthday_home_card_threshold_days':
                   int.tryParse(_homeCardThreshold.text) ?? 28,
-              'birthday_interest_ttl_hours':
-                  int.tryParse(_interestTtl.text) ?? 48,
               'child_birthday_wish_enabled': _wishEnabled,
               'child_birthday_wish_time': _wishTime.text.trim(),
               'child_birthday_wish_copy_celebrating': _wishCelebrating.text,
