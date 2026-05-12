@@ -8,8 +8,10 @@ import '../../core/theme/app_text_styles.dart';
 import '../widgets/admin_app_bar.dart';
 import '../widgets/admin_buttons.dart';
 
+// Welcome stage is intentionally omitted — the engine only grants perks
+// on stage *transitions*, and "welcome" is the initial state nothing
+// ever transitions into. The first real perk drop is at Seedling.
 const _stages = [
-  'welcome',
   'seedling',
   'explorer',
   'adventurer',
@@ -27,8 +29,7 @@ const _stageLabels = {
 };
 
 const _stageBlurbs = {
-  'welcome': '0 XP — kid joined Diaries Club',
-  'seedling': '1+ XP — first XP earned',
+  'seedling': '1+ XP — first XP earned · sticker drop',
   'explorer': '200+ XP',
   'adventurer': '400+ XP',
   'champion': '800+ XP',
@@ -119,8 +120,9 @@ class _Header extends StatelessWidget {
           Expanded(
             child: Text(
               'Each stage transition (per character, per kid) grants one '
-              'perk slot. Keep 2+ active perks per section so customers '
-              'can pick. With just 1 active perk, we auto-pick.',
+              'perk slot. Seedling = 1 sticker per character (auto-grants). '
+              'Explorer onwards: keep 2+ active per section so customers '
+              'can pick.',
               style: AppTextStyles.body(context),
             ),
           ),
@@ -519,11 +521,22 @@ class _CharacterSection extends ConsumerWidget {
     return '${_stageLabels[stage]} — ${_traitLabels[trait]}';
   }
 
+  String _hintText(int activeCount) {
+    if (stage == 'seedling') {
+      return 'Add 1 perk — the sticker for this character.';
+    }
+    if (activeCount == 0) return 'Add 2+ perks so customers can pick.';
+    return 'Add 1 more so customers can pick.';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activeCount =
         perks.where((p) => (p['is_active'] as bool?) ?? false).length;
-    final needsMore = stage != 'welcome' && activeCount < 2;
+    // Seedling drops just one perk (the sticker). Everywhere else we
+    // want 2+ so the customer can pick.
+    final minActive = stage == 'seedling' ? 1 : 2;
+    final needsMore = stage != 'welcome' && activeCount < minActive;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -575,9 +588,7 @@ class _CharacterSection extends ConsumerWidget {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    activeCount == 0
-                        ? 'Add 2+ perks so customers can pick.'
-                        : 'Add 1 more so customers can pick.',
+                    _hintText(activeCount),
                     style: AppTextStyles.caption(
                       context,
                       color: AppColors.gold,
