@@ -285,9 +285,9 @@ class _StatusHeader extends StatelessWidget {
         ),
       'completed' when albumReady => const _HeaderSpec(
           gradient: [AppColors.gold, AppColors.activeGreen],
-          icon: PhosphorIconsFill.images,
-          title: 'Album is ready!',
-          subtitle: 'Tap below to relive the day.',
+          icon: PhosphorIconsFill.gift,
+          title: 'A little memory from us',
+          subtitle: 'Tap below to open it.',
         ),
       'completed' => _HeaderSpec(
           gradient: [
@@ -296,7 +296,7 @@ class _StatusHeader extends StatelessWidget {
           ],
           icon: PhosphorIconsFill.confetti,
           title: 'Thank you for celebrating',
-          subtitle: 'Photos coming in 3-5 days.',
+          subtitle: 'A small keepsake is on its way.',
         ),
       'cancelled' => const _HeaderSpec(
           gradient: [
@@ -448,7 +448,7 @@ class _PipelineTimeline extends StatelessWidget {
       ('Team reaching out', null),
       ('Date confirmed', null),
       ('Party day', null),
-      ('Album ready', 'Photos in 3-5 days after the party'),
+      ('A little memory', 'A small keepsake from us, after the party'),
     ];
 
     final currentIndex = switch (status) {
@@ -581,9 +581,9 @@ class _ActionCard extends StatelessWidget {
         'Our team has been in touch. Check your WhatsApp for the next steps.',
       'confirmed' =>
         'See party details below. Bring the cake — we handle the rest.',
-      'completed' when albumReady => 'Tap below to see the album.',
+      'completed' when albumReady => 'Tap below to open your keepsake.',
       'completed' =>
-        "We'll send a push the moment the album is ready (3-5 days).",
+        "We'll send a push when your little memory is ready.",
       _ => null,
     };
     if (body == null) return const SizedBox.shrink();
@@ -603,7 +603,7 @@ class _ActionCard extends StatelessWidget {
           if (status == 'completed' && albumReady) ...[
             const SizedBox(height: 12),
             PrimaryButton(
-              label: 'View album',
+              label: 'Open keepsake',
               onPressed: () =>
                   context.push('/birthday/album/${reservation['id']}'),
             ),
