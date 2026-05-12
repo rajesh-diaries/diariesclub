@@ -3,19 +3,28 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/auth_provider.dart';
 
-/// Realtime stream of one reservation row. Used by the status screen +
-/// the album screen. `birthday_reservations` is in supabase_realtime
-/// (added in 0014), so admin status flips land within seconds.
+/// One reservation row, derived from the family-wide stream.
+///
+/// We used to open a separate `.stream().eq('id', id)` per row, but
+/// the realtime subscription on a UUID-filtered stream was erroring
+/// out intermittently in production (E-BSTAT on the status screen).
+/// The family-wide stream already loads up to 20 reservations and
+/// stays subscribed for the session — pulling one row out of it is
+/// free and removes a flaky network channel.
 final reservationByIdProvider =
-    StreamProvider.family<Map<String, dynamic>?, String>((ref, id) async* {
-  final stream = Supabase.instance.client
-      .from('birthday_reservations')
-      .stream(primaryKey: ['id'])
-      .eq('id', id)
-      .limit(1);
-  await for (final rows in stream) {
-    yield rows.isEmpty ? null : rows.first;
-  }
+    Provider.family<AsyncValue<Map<String, dynamic>?>, String>((ref, id) {
+  final async = ref.watch(familyReservationsProvider);
+  return async.when(
+    loading: () => const AsyncValue.loading(),
+    error: AsyncValue.error,
+    data: (rows) {
+      final match = rows.firstWhere(
+        (r) => r['id'] == id,
+        orElse: () => const <String, dynamic>{},
+      );
+      return AsyncValue.data(match.isEmpty ? null : match);
+    },
+  );
 });
 
 /// Realtime stream of all reservations for the current family. Used by
