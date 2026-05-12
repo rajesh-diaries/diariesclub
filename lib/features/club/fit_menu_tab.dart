@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/providers/current_family_provider.dart';
+import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
@@ -41,7 +44,7 @@ class _SubscriptionBanner extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _showWaitlistModal(context, ref),
+        onTap: () => _openFitWhatsApp(context, ref),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -57,7 +60,7 @@ class _SubscriptionBanner extends ConsumerWidget {
           ),
           child: Row(
             children: [
-              const Icon(PhosphorIconsFill.calendarCheck,
+              const Icon(PhosphorIconsFill.forkKnife,
                   color: Colors.white, size: 28),
               const SizedBox(width: 12),
               Expanded(
@@ -65,12 +68,12 @@ class _SubscriptionBanner extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Coming soon: FIT meals delivered weekly',
+                      'FIT meals, delivered weekly to your door',
                       style: AppTextStyles.h3(context, color: Colors.white),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Tap to join the waitlist →',
+                      'Tap to subscribe on WhatsApp →',
                       style: AppTextStyles.body(
                         context,
                         color: Colors.white.withValues(alpha: 0.92),
@@ -87,109 +90,30 @@ class _SubscriptionBanner extends ConsumerWidget {
   }
 }
 
-Future<void> _showWaitlistModal(BuildContext context, WidgetRef ref) async {
-  final emailCtrl = TextEditingController();
-  bool busy = false;
-  String? error;
-
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    builder: (sheetCtx) => StatefulBuilder(
-      builder: (_, setSt) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          24, 16, 24, MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.lightBorder,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text('Join the FIT waitlist', style: AppTextStyles.h2(sheetCtx)),
-            const SizedBox(height: 8),
-            Text(
-              "We'll email you when weekly delivery launches in your area. "
-              'No spam.',
-              style: AppTextStyles.body(
-                sheetCtx,
-                color: AppColors.lightTextSecondary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                hintText: 'you@example.com',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            if (error != null) ...[
-              const SizedBox(height: 8),
-              Text(error!, style: AppTextStyles.caption(
-                sheetCtx, color: AppColors.adminRed,
-              )),
-            ],
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: busy
-                  ? null
-                  : () async {
-                      final email = emailCtrl.text.trim();
-                      if (email.isEmpty || !email.contains('@')) {
-                        setSt(() => error = 'Please enter a valid email.');
-                        return;
-                      }
-                      setSt(() {
-                        busy = true;
-                        error = null;
-                      });
-                      try {
-                        await Supabase.instance.client.rpc<dynamic>(
-                          'fit_subscription_waitlist_join',
-                          params: {'p_email': email},
-                        );
-                        if (!sheetCtx.mounted) return;
-                        Navigator.of(sheetCtx).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('You\'re on the list — thanks!'),
-                          ),
-                        );
-                      } catch (e) {
-                        if (!sheetCtx.mounted) return;
-                        setSt(() {
-                          busy = false;
-                          error = 'Could not save: $e';
-                        });
-                      }
-                    },
-              child: busy
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
-                      ),
-                    )
-                  : const Text('Join waitlist'),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
+Future<void> _openFitWhatsApp(BuildContext context, WidgetRef ref) async {
+  final cfg = ref.read(venueConfigProvider).valueOrNull ?? const {};
+  // Prefer the dedicated FIT line; fall back to the main venue WhatsApp.
+  final phone = (cfg['fit_whatsapp_phone'] as String?)?.trim().isNotEmpty == true
+      ? cfg['fit_whatsapp_phone'] as String
+      : (cfg['whatsapp_support_phone'] as String?) ?? '';
+  if (phone.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('FIT subscription channel not configured yet.')),
+    );
+    return;
+  }
+  final familyName = ref
+          .read(currentFamilyProvider)
+          .valueOrNull?['name'] as String? ??
+      '';
+  final greeting = familyName.isEmpty ? 'Hi!' : 'Hi! I\'m $familyName.';
+  final msg =
+      "$greeting I'd like to subscribe to weekly FIT meal delivery. "
+      'Could you share details + how you take my address?';
+  final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
+  final uri = Uri.parse(
+      'https://wa.me/$digits?text=${Uri.encodeComponent(msg)}');
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
 }
 
 class _FitTemplatesSection extends ConsumerWidget {
