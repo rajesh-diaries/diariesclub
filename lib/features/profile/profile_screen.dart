@@ -735,7 +735,7 @@ final unredeemedHeroPerksProvider =
       .select(
         'id, code, stage, trait, granted_at, expires_at, perk_id, '
         'children!inner(name), '
-        'stage_perks(perk_label, perk_description)',
+        'stage_perks(perk_label, perk_description, is_active)',
       )
       .eq('family_id', familyId)
       .isFilter('redeemed_at', null)
@@ -750,10 +750,17 @@ final unredeemedHeroPerksProvider =
       'child_name': children?['name'],
       'perk_label': perk?['perk_label'],
       'perk_description': perk?['perk_description'],
+      'perk_is_active': perk?['is_active'],
     };
   }).where((m) {
-    // Hide expired chosen slots; keep all unchosen ones (they don't
-    // expire until picked).
+    // Live admin state: if a chosen perk has been archived (is_active
+    // = false), drop the grant from the customer view — admin's intent
+    // is to retire it, and the kid should see the latest live options.
+    // Unchosen slots (perk_id NULL) always stay; their picker reads
+    // from the live stagePerkOptionsProvider so it follows admin too.
+    if (m['perk_id'] != null && m['perk_is_active'] == false) {
+      return false;
+    }
     final exp = m['expires_at'] as String?;
     if (exp == null) return true;
     return exp.compareTo(nowIso) >= 0;
