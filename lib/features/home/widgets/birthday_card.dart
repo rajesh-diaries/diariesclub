@@ -307,10 +307,10 @@ class _BirthdayCardTile extends StatelessWidget {
       case _Variant.albumReady:
         return _CardSpec(
           gradient: const [AppColors.gold, AppColors.activeGreen],
-          icon: PhosphorIconsFill.images,
-          title: "$name's album is ready!",
-          subtitle: 'Tap to relive the moments.',
-          cta: 'View album →',
+          icon: PhosphorIconsFill.gift,
+          title: 'A little memory for $name',
+          subtitle: 'Tap to open your keepsake.',
+          cta: 'Open keepsake →',
         );
       case _Variant.hidden:
         return const _CardSpec(
