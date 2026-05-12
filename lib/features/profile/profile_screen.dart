@@ -388,6 +388,23 @@ class _PerkRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final perkId = row['perk_id'] as String?;
+    if (perkId == null) {
+      return _UnchosenPerkRow(row: row);
+    }
+    return _PickedPerkRow(row: row);
+  }
+}
+
+class _PickedPerkRow extends StatelessWidget {
+  final Map<String, dynamic> row;
+  const _PickedPerkRow({required this.row});
+
+  String _stageTitle(String s) =>
+      s.isEmpty ? '?' : '${s[0].toUpperCase()}${s.substring(1)}';
+
+  @override
+  Widget build(BuildContext context) {
     final code = (row['code'] as String?) ?? '';
     final label = (row['perk_label'] as String?) ?? 'Perk';
     final stage = (row['stage'] as String?) ?? '';
@@ -487,28 +504,240 @@ class _PerkRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _UnchosenPerkRow extends ConsumerStatefulWidget {
+  final Map<String, dynamic> row;
+  const _UnchosenPerkRow({required this.row});
+
+  @override
+  ConsumerState<_UnchosenPerkRow> createState() => _UnchosenPerkRowState();
+}
+
+class _UnchosenPerkRowState extends ConsumerState<_UnchosenPerkRow> {
+  bool _busy = false;
 
   String _stageTitle(String s) =>
       s.isEmpty ? '?' : '${s[0].toUpperCase()}${s.substring(1)}';
+
+  Future<void> _pick(String perkId, String label) async {
+    if (_busy) return;
+    final grantId = widget.row['id'] as String;
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'stage_perk_pick',
+        params: {
+          'p_grant_id': grantId,
+          'p_perk_id': perkId,
+        },
+      );
+      ref.invalidate(unredeemedHeroPerksProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Locked in: $label')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't lock that reward: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stage = (widget.row['stage'] as String?) ?? '';
+    final childName = (widget.row['child_name'] as String?) ?? '';
+    final options = ref.watch(stagePerkOptionsProvider(stage));
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.gold.withValues(alpha: 0.20),
+                ),
+                child: const Icon(
+                  PhosphorIconsFill.sparkle,
+                  color: AppColors.gold,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pick your ${_stageTitle(stage)} reward',
+                      style: AppTextStyles.body(context)
+                          .copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    if (childName.isNotEmpty)
+                      Text(
+                        '$childName · choose one — locked once picked',
+                        style: AppTextStyles.caption(
+                          context,
+                          color: AppColors.lightTextSecondary,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          options.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+            error: (_, __) => Text(
+              "Couldn't load reward options.",
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+            data: (opts) {
+              if (opts.isEmpty) {
+                return Text(
+                  'No reward options configured yet. Check back soon!',
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.lightTextSecondary,
+                  ),
+                );
+              }
+              return Column(
+                children: [
+                  for (final o in opts)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _PerkOptionCard(
+                        label: (o['perk_label'] as String?) ?? 'Reward',
+                        description: o['perk_description'] as String?,
+                        busy: _busy,
+                        onPick: () => _pick(
+                          o['id'] as String,
+                          (o['perk_label'] as String?) ?? 'Reward',
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-/// Stream of unredeemed, unexpired hero perk grants for the family,
-/// joined with the perk definition + child name. RLS scopes by family.
+class _PerkOptionCard extends StatelessWidget {
+  final String label;
+  final String? description;
+  final bool busy;
+  final VoidCallback onPick;
+
+  const _PerkOptionCard({
+    required this.label,
+    required this.description,
+    required this.busy,
+    required this.onPick,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: busy ? null : onPick,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.navy.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.navy.withValues(alpha: 0.15)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: AppTextStyles.body(context)
+                        .copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  if (description != null && description!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      description!,
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(
+                    PhosphorIconsRegular.caretRight,
+                    color: AppColors.navy,
+                    size: 18,
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Stream of unredeemed perk slots for the family. Two shapes per row:
+///   * Picked  → perk_id + code + expires_at set; render the existing card
+///   * Unchosen → perk_id is NULL; render a "pick one of N rewards" card.
+/// RLS scopes by family.
 final unredeemedHeroPerksProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   final familyId = ref.watch(currentFamilyIdProvider);
   if (familyId == null) return const [];
+  // LEFT JOIN on stage_perks (no `!inner`) so unchosen slots come
+  // through. Unchosen slots have no expires_at yet — don't filter by it.
   final rows = await Supabase.instance.client
       .from('stage_perk_grants')
       .select(
-        'id, code, stage, trait, granted_at, expires_at, '
+        'id, code, stage, trait, granted_at, expires_at, perk_id, '
         'children!inner(name), '
-        'stage_perks!inner(perk_label, perk_description)',
+        'stage_perks(perk_label, perk_description)',
       )
       .eq('family_id', familyId)
       .isFilter('redeemed_at', null)
-      .gte('expires_at', DateTime.now().toUtc().toIso8601String())
       .order('granted_at', ascending: false);
+  final nowIso = DateTime.now().toUtc().toIso8601String();
   return (rows as List).map((r) {
     final m = Map<String, dynamic>.from(r as Map);
     final children = m['children'] as Map?;
@@ -519,7 +748,26 @@ final unredeemedHeroPerksProvider =
       'perk_label': perk?['perk_label'],
       'perk_description': perk?['perk_description'],
     };
+  }).where((m) {
+    // Hide expired chosen slots; keep all unchosen ones (they don't
+    // expire until picked).
+    final exp = m['expires_at'] as String?;
+    if (exp == null) return true;
+    return exp.compareTo(nowIso) >= 0;
   }).toList();
+});
+
+/// The live admin-configured options for a stage. Used to render the
+/// pick UI when a customer opens an unchosen perk slot.
+final stagePerkOptionsProvider = FutureProvider.family<
+    List<Map<String, dynamic>>, String>((ref, stage) async {
+  final rows = await Supabase.instance.client
+      .from('stage_perks')
+      .select('id, perk_label, perk_description, validity_days')
+      .eq('stage', stage)
+      .eq('is_active', true)
+      .order('perk_label');
+  return List<Map<String, dynamic>>.from(rows);
 });
 
 // ---------------------------------------------------------------------------
