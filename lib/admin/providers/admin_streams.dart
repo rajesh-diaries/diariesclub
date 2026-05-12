@@ -42,6 +42,19 @@ final adminAllRefundsProvider =
   }
 });
 
+/// Enriched detail for a single reservation — joins family, child,
+/// package, wallet + lifetime spend via the admin_birthday_reservation_detail
+/// RPC. Powers the right-hand drawer in the Birthday CRM so the admin
+/// has all the customer context without four separate fetches.
+final adminReservationDetailProvider = FutureProvider.family<
+    Map<String, dynamic>, String>((ref, reservationId) async {
+  final raw = await Supabase.instance.client.rpc<dynamic>(
+    'admin_birthday_reservation_detail',
+    params: {'p_reservation_id': reservationId},
+  );
+  return raw is Map ? Map<String, dynamic>.from(raw) : const {};
+});
+
 /// Birthday reservations for the CRM kanban.
 ///
 /// Switched from .stream() to a polling .select() because the realtime

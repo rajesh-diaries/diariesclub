@@ -140,15 +140,25 @@ class _BirthdayCrmScreenState extends ConsumerState<BirthdayCrmScreen> {
             _DetailDrawer(
               reservation: _selected!,
               onClose: () => setState(() => _selected = null),
-              onAction: () {
-                // refresh selection from latest stream after RPC call
-                final fresh = reservations.firstWhere(
+              onAction: () async {
+                // After any RPC action (contact/confirm/cancel/edit/
+                // complete), force-refresh both providers so the kanban
+                // and the drawer immediately reflect the new state. The
+                // adminBirthdayReservationsProvider was switched from
+                // a realtime stream to a polling FutureProvider — without
+                // this explicit invalidate, the drawer keeps showing the
+                // old status and re-tapping the action throws invalid_state.
+                ref.invalidate(adminBirthdayReservationsProvider);
+                ref.invalidate(adminBirthdayDashboardProvider);
+                final fresh =
+                    await ref.read(adminBirthdayReservationsProvider.future);
+                if (!mounted) return;
+                final match = fresh.firstWhere(
                   (r) => r['id'] == _selected!['id'],
                   orElse: () => const <String, dynamic>{},
                 );
-                if (fresh.isNotEmpty) {
-                  setState(() => _selected = fresh);
-                }
+                setState(() =>
+                    _selected = match.isEmpty ? null : match);
               },
             ),
         ],
@@ -498,6 +508,10 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _ContextHeader(reservationId: r['id'] as String),
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 8),
                   _row(context, 'Status', status),
                   _row(context, 'Inquiry ID',
                       (r['id'] as String).substring(0, 12)),
@@ -1304,6 +1318,206 @@ class _BirthdayRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Top of the detail drawer — shows the family, kid, and wallet
+/// context that lives outside the birthday_reservations row itself.
+/// Powered by the admin_birthday_reservation_detail RPC which joins
+/// families + children + wallets + lifetime-spend in one round trip.
+class _ContextHeader extends ConsumerWidget {
+  final String reservationId;
+  const _ContextHeader({required this.reservationId});
+
+  static const _months = [
+    'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
+  ];
+
+  String _formatDob(String? iso) {
+    if (iso == null || iso.isEmpty) return '—';
+    try {
+      final d = DateTime.parse(iso);
+      return '${d.day} ${_months[d.month - 1]} ${d.year}';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  String _ageFromDob(String? iso) {
+    if (iso == null || iso.isEmpty) return '';
+    try {
+      final dob = DateTime.parse(iso);
+      final now = DateTime.now();
+      var years = now.year - dob.year;
+      if (now.month < dob.month ||
+          (now.month == dob.month && now.day < dob.day)) {
+        years--;
+      }
+      return years >= 0 ? '$years yrs' : '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Future<void> _whatsApp(String? phone) async {
+    if (phone == null || phone.isEmpty) return;
+    final num = phone.replaceAll(RegExp(r'[^\d]'), '');
+    await launchUrl(Uri.parse('https://wa.me/$num'));
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(adminReservationDetailProvider(reservationId));
+    return async.when(
+      loading: () => const SizedBox(
+        height: 80,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (d) {
+        final family = (d['family'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
+        final child = (d['child'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
+        final wallet = (d['wallet'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
+        final pkg = (d['package'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
+        final lifetime = (d['lifetime_spend_paise'] as num?)?.toInt() ?? 0;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              (child['name'] as String?) ?? '—',
+              style: AppTextStyles.h3(context),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              [
+                _formatDob(child['date_of_birth'] as String?),
+                _ageFromDob(child['date_of_birth'] as String?),
+              ].where((s) => s.isNotEmpty).join(' · '),
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _kv(context, 'Customer', (family['name'] as String?) ?? '—'),
+            Row(
+              children: [
+                Expanded(
+                  child: _kv(
+                    context,
+                    'Phone',
+                    (family['phone'] as String?) ?? '—',
+                  ),
+                ),
+                if ((family['phone'] as String?)?.isNotEmpty ?? false)
+                  IconButton(
+                    tooltip: 'WhatsApp',
+                    icon: const Icon(
+                      PhosphorIconsRegular.whatsappLogo,
+                      color: AppColors.activeGreen,
+                    ),
+                    onPressed: () =>
+                        _whatsApp(family['phone'] as String?),
+                  ),
+              ],
+            ),
+            _kv(
+              context,
+              'Package',
+              (pkg['name'] as String?) ?? '—',
+              suffix: (pkg['hall_name'] as String?),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: 0.30),
+                ),
+              ),
+              child: Column(
+                children: [
+                  _statRow(context, 'Lifetime spend',
+                      Money.fromPaise(lifetime)),
+                  _statRow(
+                    context,
+                    'Wallet balance',
+                    Money.fromPaise(
+                        (wallet['balance_paise'] as num?)?.toInt() ?? 0),
+                  ),
+                  _statRow(
+                    context,
+                    'Diaries Coins',
+                    '${(wallet['coins_balance'] as num?)?.toInt() ?? 0}'
+                    ' · lifetime '
+                    '${(wallet['coins_lifetime'] as num?)?.toInt() ?? 0}',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _kv(BuildContext context, String k, String v, {String? suffix}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 90,
+            child: Text(
+              k,
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              suffix == null || suffix.isEmpty ? v : '$v · $suffix',
+              style: AppTextStyles.body(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statRow(BuildContext context, String k, String v) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              k,
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+          ),
+          Text(
+            v,
+            style: AppTextStyles.body(context).copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
