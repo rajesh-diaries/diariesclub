@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,26 +8,21 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../data/parent_log_moments_data.dart';
 
-/// Bottom sheet flow for "My kid did this":
-///   Step 1 — pick a hero (Rafi / Ellie / Gerry / Zena)
-///   Step 2 — pick a moment (top 6 + "See more" + "+ My own moment")
-///   Step 3 — confirmation toast handled by the caller via onLogged.
+/// Standalone parent-log sheet on the Adventure tab — "My kid did this".
 ///
-/// The XP credit + diary insertion happen server-side via the
-/// `log_parent_moment` RPC. The sheet only routes the choices.
+/// Model mirrors the post-session reflection: ONE pool of XP gets split
+/// across whatever the parent picks. Multi-select chips per character,
+/// optional free-text per character, "Log it" submits the whole pool in
+/// one server call (log_parent_moments_pool RPC).
+///
+/// Daily cap is 1 pool submission per kid per day.
 class ParentLogMomentSheet extends ConsumerStatefulWidget {
   final String childId;
   final String childName;
-  /// When set, skips the hero picker step and opens directly to the moment
-  /// list for this hero. The "Change character" back button is hidden in
-  /// this mode — callers (e.g. the reflection screen's "+ More moments"
-  /// tile) want a single-character flow.
-  final String? initialHero;
   const ParentLogMomentSheet({
     super.key,
     required this.childId,
     required this.childName,
-    this.initialHero,
   });
 
   @override
@@ -34,74 +30,119 @@ class ParentLogMomentSheet extends ConsumerStatefulWidget {
       _ParentLogMomentSheetState();
 }
 
-class _ParentLogMomentSheetState extends ConsumerState<ParentLogMomentSheet> {
-  String? _hero;
-  bool _showAll = false;
-  bool _customMode = false;
-  final _customCtrl = TextEditingController();
+class _ParentLogMomentSheetState
+    extends ConsumerState<ParentLogMomentSheet> {
+  // Selections per trait: preset texts that are ticked + free-text adds
+  final Map<String, Set<String>> _selected = {
+    'rafi': <String>{},
+    'ellie': <String>{},
+    'gerry': <String>{},
+    'zena': <String>{},
+  };
+  final Map<String, TextEditingController> _customCtrls = {
+    'rafi': TextEditingController(),
+    'ellie': TextEditingController(),
+    'gerry': TextEditingController(),
+    'zena': TextEditingController(),
+  };
+  final Map<String, bool> _expanded = {
+    'rafi': true,
+    'ellie': true,
+    'gerry': true,
+    'zena': true,
+  };
   bool _submitting = false;
   String? _error;
 
-  @override
-  void initState() {
-    super.initState();
-    if (widget.initialHero != null) {
-      _hero = widget.initialHero;
-    }
-  }
+  static const _traits = ['rafi', 'ellie', 'gerry', 'zena'];
 
   @override
   void dispose() {
-    _customCtrl.dispose();
+    for (final c in _customCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _submit({required String text, required String source}) async {
+  int get _totalSelected =>
+      _selected.values.fold<int>(0, (s, e) => s + e.length);
+
+  void _toggle(String trait, String text) {
+    HapticFeedback.lightImpact();
+    setState(() {
+      final set = _selected[trait]!;
+      if (!set.add(text)) set.remove(text);
+      _error = null;
+    });
+  }
+
+  void _addCustom(String trait) {
+    final txt = _customCtrls[trait]!.text.trim();
+    if (txt.isEmpty || txt.length > 280) return;
+    HapticFeedback.lightImpact();
+    setState(() {
+      _selected[trait]!.add(txt);
+      _customCtrls[trait]!.clear();
+    });
+  }
+
+  Future<void> _submit() async {
     if (_submitting) return;
+    if (_totalSelected == 0) {
+      setState(() => _error = 'Tap a moment first, or write your own.');
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;
     });
+    final payload = <Map<String, String>>[];
+    _selected.forEach((trait, texts) {
+      for (final t in texts) {
+        payload.add({'trait': trait, 'text': t, 'source': 'pool'});
+      }
+    });
+
     try {
       final res = await Supabase.instance.client
-          .rpc<Map<String, dynamic>>('log_parent_moment', params: {
+          .rpc<Map<String, dynamic>>('log_parent_moments_pool', params: {
         'p_child_id': widget.childId,
-        'p_hero': _hero,
-        'p_moment_text': text,
-        'p_source': source,
+        'p_moments': payload,
       });
       if (!mounted) return;
-      final remaining = res['logs_remaining_today'] as int? ?? 0;
+      final split = (res['split'] as Map?)?.cast<String, dynamic>() ?? const {};
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Logged for ${_heroEmoji(_hero!)} ${_heroName(_hero!)} — +5 XP'
-            '${remaining > 0 ? '. $remaining more today.' : '.'}',
-          ),
           backgroundColor: AppColors.activeGreen,
+          content: Text(
+            'Logged ${payload.length} moment${payload.length == 1 ? '' : 's'} · '
+            '+${split['rafi'] ?? 0} Rafi · +${split['ellie'] ?? 0} Ellie · '
+            '+${split['gerry'] ?? 0} Gerry · +${split['zena'] ?? 0} Zena',
+          ),
         ),
       );
     } on PostgrestException catch (e) {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        if (e.message.contains('daily_cap_reached')) {
+        if (e.message.contains('daily_pool_cap_reached')) {
           _error =
-              'You\'ve logged 3 moments today. Come back tomorrow or visit Diaries Club for more XP.';
-        } else if (e.message.contains('moment_text_too_long')) {
-          _error = 'Moment is too long — keep it under 280 characters.';
-        } else if (e.message.contains('empty_moment_text')) {
-          _error = 'Please write something.';
+              "You've already logged today's pool. Come back tomorrow or "
+              'visit Diaries Club for more XP.';
+        } else if (e.message.contains('invalid_text_length')) {
+          _error = 'One of the moments is too long (max 280 chars).';
+        } else if (e.message.contains('empty_submission')) {
+          _error = 'Tap a moment first, or write your own.';
         } else {
-          _error = "Couldn't log this moment: ${e.message}";
+          _error = "Couldn't log: ${e.message}";
         }
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = "Couldn't log this moment: $e";
+        _error = "Couldn't log: $e";
       });
     }
   }
@@ -110,7 +151,7 @@ class _ParentLogMomentSheetState extends ConsumerState<ParentLogMomentSheet> {
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.75,
+      initialChildSize: 0.9,
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (_, controller) => Container(
@@ -135,7 +176,7 @@ class _ParentLogMomentSheetState extends ConsumerState<ParentLogMomentSheet> {
               ),
               const SizedBox(height: 12),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 0, 8, 0),
                 child: Row(
                   children: [
                     Expanded(
@@ -143,16 +184,13 @@ class _ParentLogMomentSheetState extends ConsumerState<ParentLogMomentSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _hero == null
-                                ? 'What did ${widget.childName} do?'
-                                : 'Tap the moment',
+                            'What did ${widget.childName} do today?',
                             style: AppTextStyles.h2(context),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            _hero == null
-                                ? 'Pick the character that grows from this moment.'
-                                : 'Or write your own at the bottom.',
+                            'Tap moments across all 4 characters. We split '
+                            '50 XP across whatever you pick.',
                             style: AppTextStyles.caption(
                               context,
                               color: AppColors.lightTextSecondary,
@@ -162,7 +200,9 @@ class _ParentLogMomentSheetState extends ConsumerState<ParentLogMomentSheet> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _submitting
+                          ? null
+                          : () => Navigator.of(context).pop(),
                       icon: const Icon(Icons.close),
                     ),
                   ],
@@ -170,33 +210,81 @@ class _ParentLogMomentSheetState extends ConsumerState<ParentLogMomentSheet> {
               ),
               const SizedBox(height: 8),
               Expanded(
-                child: _hero == null
-                    ? _HeroPicker(
-                        onPick: (h) =>
-                            setState(() { _hero = h; _showAll = false; _customMode = false; }),
-                        controller: controller,
-                      )
-                    : _MomentPicker(
-                        hero: _hero!,
-                        showAll: _showAll,
-                        customMode: _customMode,
-                        customCtrl: _customCtrl,
-                        controller: controller,
-                        submitting: _submitting,
-                        error: _error,
-                        lockedToHero: widget.initialHero != null,
-                        onPickPreset: (text) =>
-                            _submit(text: text, source: 'preset'),
-                        onSeeMore: () => setState(() => _showAll = true),
-                        onEnterCustom: () =>
-                            setState(() => _customMode = true),
-                        onSubmitCustom: () => _submit(
-                          text: _customCtrl.text.trim(),
-                          source: 'custom',
-                        ),
-                        onBack: () =>
-                            setState(() { _hero = null; _customMode = false; _error = null; }),
+                child: ListView(
+                  controller: controller,
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                  children: [
+                    for (final trait in _traits)
+                      _TraitGroup(
+                        trait: trait,
+                        selected: _selected[trait]!,
+                        onToggle: (text) => _toggle(trait, text),
+                        customCtrl: _customCtrls[trait]!,
+                        onAddCustom: () => _addCustom(trait),
+                        expanded: _expanded[trait] ?? true,
+                        onToggleExpanded: () => setState(() {
+                          _expanded[trait] = !(_expanded[trait] ?? true);
+                        }),
                       ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.adminRed.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          _error!,
+                          style: AppTextStyles.body(
+                            context,
+                            color: AppColors.adminRed,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Text(
+                      "One pool per kid per day. The pool's 50 XP, split "
+                      'proportionally across the characters you tapped.',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _submitting ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.navy,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: _submitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
+                        : Text(
+                            _totalSelected == 0
+                                ? 'Log it · 50 XP pool'
+                                : 'Log it · $_totalSelected moment'
+                                    '${_totalSelected == 1 ? '' : 's'} '
+                                    '· 50 XP split',
+                          ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -206,228 +294,162 @@ class _ParentLogMomentSheetState extends ConsumerState<ParentLogMomentSheet> {
   }
 }
 
-// ---------------------------------------------------------------------------
-//  Step 1 — hero picker
-// ---------------------------------------------------------------------------
-
-class _HeroPicker extends StatelessWidget {
-  final ValueChanged<String> onPick;
-  final ScrollController controller;
-  const _HeroPicker({required this.onPick, required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    const heroes = [
-      ('rafi', '🛡️', 'Rafi the Brave', 'Pushing past hesitation', AppColors.rafiCoral),
-      ('ellie', '❤️', 'Ellie the Kind', 'Caring about other humans', AppColors.ellieBlue),
-      ('gerry', '🔍', 'Gerry the Curious', 'Wanting to understand the world', AppColors.gerryAmber),
-      ('zena', '🎨', 'Zena the Creative', 'Making something new exist', AppColors.zenaGreen),
-    ];
-    return ListView(
-      controller: controller,
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-      children: [
-        for (final h in heroes) ...[
-          InkWell(
-            onTap: () => onPick(h.$1),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.lightSurface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: h.$5.withValues(alpha: 0.35),
-                  width: 1.5,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: h.$5.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(h.$2, style: const TextStyle(fontSize: 24)),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          h.$3,
-                          style: AppTextStyles.bodyLarge(context, color: h.$5)
-                              .copyWith(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          h.$4,
-                          style: AppTextStyles.caption(
-                            context,
-                            color: AppColors.lightTextSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right,
-                      color: AppColors.lightTextSecondary),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-//  Step 2 — moment picker (top picks → see more → free text)
-// ---------------------------------------------------------------------------
-
-class _MomentPicker extends StatelessWidget {
-  final String hero;
-  final bool showAll;
-  final bool customMode;
+class _TraitGroup extends StatelessWidget {
+  final String trait;
+  final Set<String> selected;
+  final ValueChanged<String> onToggle;
   final TextEditingController customCtrl;
-  final ScrollController controller;
-  final bool submitting;
-  final String? error;
-  final bool lockedToHero;
-  final ValueChanged<String> onPickPreset;
-  final VoidCallback onSeeMore;
-  final VoidCallback onEnterCustom;
-  final VoidCallback onSubmitCustom;
-  final VoidCallback onBack;
+  final VoidCallback onAddCustom;
+  final bool expanded;
+  final VoidCallback onToggleExpanded;
 
-  const _MomentPicker({
-    required this.hero,
-    required this.showAll,
-    required this.customMode,
+  const _TraitGroup({
+    required this.trait,
+    required this.selected,
+    required this.onToggle,
     required this.customCtrl,
-    required this.controller,
-    required this.submitting,
-    required this.error,
-    required this.lockedToHero,
-    required this.onPickPreset,
-    required this.onSeeMore,
-    required this.onEnterCustom,
-    required this.onSubmitCustom,
-    required this.onBack,
+    required this.onAddCustom,
+    required this.expanded,
+    required this.onToggleExpanded,
   });
 
   @override
   Widget build(BuildContext context) {
-    final accent = _heroColor(hero);
-    final moments = showAll
-        ? HeroMomentPool.allFor(hero)
-        : HeroMomentPool.topPicks[hero] ?? const [];
+    final accent = _traitColor(trait);
+    final pool = HeroMomentPool.topPicks[trait] ?? const [];
+    final extras = HeroMomentPool.allFor(trait).where((m) => !pool.contains(m)).toList();
+    final customs = selected.where((s) => !pool.contains(s) && !extras.contains(s)).toList();
 
-    return Column(
-      children: [
-        Expanded(
-          child: ListView(
-            controller: controller,
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-            children: [
-              Row(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: onToggleExpanded,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
                 children: [
-                  if (!lockedToHero)
-                    TextButton.icon(
-                      onPressed: onBack,
-                      icon: const Icon(Icons.arrow_back_ios_new, size: 14),
-                      label: const Text('Change character'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.lightTextSecondary,
-                        padding: EdgeInsets.zero,
+                  Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: accent.withValues(alpha: 0.18),
+                    ),
+                    child: Icon(_traitIcon(trait), color: accent, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    _traitName(trait).toUpperCase(),
+                    style: AppTextStyles.caption(context, color: accent)
+                        .copyWith(
+                            letterSpacing: 1.4, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '· ${_traitLabel(trait)}',
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (selected.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${selected.length}',
+                        style: AppTextStyles.caption(context, color: accent)
+                            .copyWith(fontWeight: FontWeight.w800),
                       ),
                     ),
-                  const Spacer(),
-                  _HeroChip(hero: hero, accent: accent),
+                  const SizedBox(width: 6),
+                  Icon(
+                    expanded
+                        ? PhosphorIconsRegular.caretUp
+                        : PhosphorIconsRegular.caretDown,
+                    color: AppColors.lightTextSecondary,
+                    size: 16,
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              for (final m in moments)
-                _MomentTile(
+            ),
+          ),
+          if (expanded) ...[
+            const SizedBox(height: 8),
+            for (final m in pool)
+              _Tile(
+                text: m,
+                accent: accent,
+                selected: selected.contains(m),
+                onTap: () => onToggle(m),
+              ),
+            ...[
+              for (final m in extras)
+                _Tile(
                   text: m,
                   accent: accent,
-                  onTap: submitting ? null : () => onPickPreset(m),
+                  selected: selected.contains(m),
+                  onTap: () => onToggle(m),
                 ),
-              if (!showAll) ...[
-                const SizedBox(height: 6),
-                Center(
-                  child: TextButton.icon(
-                    onPressed: onSeeMore,
-                    icon: const Icon(PhosphorIconsRegular.caretDown),
-                    label: const Text('See more moments'),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 14),
-              if (customMode)
-                _CustomEntry(
-                  controller: customCtrl,
-                  accent: accent,
-                  submitting: submitting,
-                  onSubmit: onSubmitCustom,
-                )
-              else
-                OutlinedButton.icon(
-                  onPressed: submitting ? null : onEnterCustom,
-                  icon: const Icon(PhosphorIconsRegular.pencilSimple),
-                  label: const Text('Write our own moment'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.navy,
-                    side: const BorderSide(color: AppColors.lightBorder),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              if (error != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.adminRed.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    error!,
-                    style: AppTextStyles.body(
-                      context,
-                      color: AppColors.adminRed,
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              Text(
-                'Each logged moment is +5 XP for that character, and 3 logs per kid per day.',
-                style: AppTextStyles.caption(
-                  context,
-                  color: AppColors.lightTextSecondary,
-                ),
-              ),
             ],
-          ),
-        ),
-      ],
+            for (final c in customs)
+              _Tile(
+                text: c,
+                accent: accent,
+                selected: true,
+                onTap: () => onToggle(c),
+              ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.lightSurface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.lightBorder),
+              ),
+              child: TextField(
+                controller: customCtrl,
+                maxLength: 280,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  hintText: 'Or write your own ${_traitName(trait)} moment',
+                  border: InputBorder.none,
+                  counterText: '',
+                  suffixIcon: IconButton(
+                    tooltip: 'Add',
+                    icon: const Icon(PhosphorIconsRegular.plusCircle),
+                    onPressed: onAddCustom,
+                  ),
+                ),
+                onSubmitted: (_) => onAddCustom(),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
 
-class _MomentTile extends StatelessWidget {
+class _Tile extends StatelessWidget {
   final String text;
   final Color accent;
-  final VoidCallback? onTap;
-  const _MomentTile({
+  final bool selected;
+  final VoidCallback onTap;
+  const _Tile({
     required this.text,
     required this.accent,
+    required this.selected,
     required this.onTap,
   });
 
@@ -438,27 +460,47 @@ class _MomentTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: AppColors.lightSurface,
+            color: selected
+                ? accent.withValues(alpha: 0.14)
+                : AppColors.lightSurface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.lightBorder),
+            border: Border.all(
+              color: selected ? accent : AppColors.lightBorder,
+              width: selected ? 2 : 1,
+            ),
           ),
           child: Row(
             children: [
               Container(
-                width: 6,
-                height: 6,
-                margin: const EdgeInsets.only(right: 12),
+                width: 22,
+                height: 22,
                 decoration: BoxDecoration(
-                  color: accent,
+                  color: selected ? accent : Colors.transparent,
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected ? accent : AppColors.lightBorder,
+                    width: 1.5,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: selected
+                    ? const Icon(Icons.check, color: Colors.white, size: 14)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  text,
+                  style: AppTextStyles.body(context).copyWith(
+                    fontWeight:
+                        selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
                 ),
               ),
-              Expanded(child: Text(text, style: AppTextStyles.body(context))),
-              const Icon(Icons.add_circle_outline,
-                  color: AppColors.lightTextSecondary, size: 20),
             ],
           ),
         ),
@@ -467,119 +509,36 @@ class _MomentTile extends StatelessWidget {
   }
 }
 
-class _CustomEntry extends StatelessWidget {
-  final TextEditingController controller;
-  final Color accent;
-  final bool submitting;
-  final VoidCallback onSubmit;
-  const _CustomEntry({
-    required this.controller,
-    required this.accent,
-    required this.submitting,
-    required this.onSubmit,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: controller,
-          maxLength: 280,
-          minLines: 2,
-          maxLines: 4,
-          autofocus: true,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: InputDecoration(
-            hintText: 'What did they do? In your own words.',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: accent, width: 2),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        FilledButton(
-          onPressed: submitting ? null : onSubmit,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.navy,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-          ),
-          child: submitting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(Colors.white),
-                  ),
-                )
-              : const Text('Log it'),
-        ),
-      ],
-    );
-  }
-}
-
-class _HeroChip extends StatelessWidget {
-  final String hero;
-  final Color accent;
-  const _HeroChip({required this.hero, required this.accent});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(_heroEmoji(hero), style: const TextStyle(fontSize: 14)),
-          const SizedBox(width: 6),
-          Text(
-            _heroName(hero),
-            style: AppTextStyles.caption(context, color: accent).copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-//  Helpers
 // ---------------------------------------------------------------------------
 
-String _heroEmoji(String hero) => switch (hero) {
-      'rafi' => '🛡️',
-      'ellie' => '❤️',
-      'gerry' => '🔍',
-      'zena' => '🎨',
-      _ => '✨',
-    };
-
-String _heroName(String hero) => switch (hero) {
+String _traitName(String t) => switch (t) {
       'rafi' => 'Rafi',
       'ellie' => 'Ellie',
       'gerry' => 'Gerry',
       'zena' => 'Zena',
-      _ => 'Hero',
+      _ => '',
     };
 
-Color _heroColor(String hero) => switch (hero) {
+String _traitLabel(String t) => switch (t) {
+      'rafi' => 'Brave',
+      'ellie' => 'Kind',
+      'gerry' => 'Curious',
+      'zena' => 'Creative',
+      _ => '',
+    };
+
+Color _traitColor(String t) => switch (t) {
       'rafi' => AppColors.rafiCoral,
       'ellie' => AppColors.ellieBlue,
       'gerry' => AppColors.gerryAmber,
       'zena' => AppColors.zenaGreen,
-      _ => AppColors.navy,
+      _ => AppColors.gold,
+    };
+
+IconData _traitIcon(String t) => switch (t) {
+      'rafi' => PhosphorIconsFill.shieldStar,
+      'ellie' => PhosphorIconsFill.heart,
+      'gerry' => PhosphorIconsFill.magnifyingGlass,
+      'zena' => PhosphorIconsFill.palette,
+      _ => PhosphorIconsFill.star,
     };
