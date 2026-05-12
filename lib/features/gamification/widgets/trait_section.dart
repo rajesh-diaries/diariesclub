@@ -4,8 +4,8 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/reflection_moments_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../adventure/widgets/parent_log_moment_sheet.dart';
 import 'reflection_card.dart';
+import 'reflection_more_moments_sheet.dart';
 
 /// Trait header + grid of preset moments on the reflection screen.
 ///
@@ -20,6 +20,8 @@ class TraitSection extends StatelessWidget {
   final ValueChanged<String> onToggle;
   final String childId;
   final String childName;
+  final Set<String> customMoments;
+  final ValueChanged<Set<String>> onCustomMomentsChanged;
 
   const TraitSection({
     super.key,
@@ -29,6 +31,8 @@ class TraitSection extends StatelessWidget {
     required this.onToggle,
     required this.childId,
     required this.childName,
+    required this.customMoments,
+    required this.onCustomMomentsChanged,
   });
 
   static const _presetSlots = 5;
@@ -135,18 +139,20 @@ class TraitSection extends StatelessWidget {
     );
   }
 
-  void _openMoreSheet(BuildContext context) {
-    showModalBottomSheet<void>(
+  Future<void> _openMoreSheet(BuildContext context) async {
+    final result = await showModalBottomSheet<Set<String>?>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       useRootNavigator: true,
-      builder: (_) => ParentLogMomentSheet(
-        childId: childId,
-        childName: childName,
-        initialHero: trait,
+      builder: (_) => ReflectionMoreMomentsSheet(
+        trait: trait,
+        initialSelections: customMoments,
       ),
     );
+    if (result != null) {
+      onCustomMomentsChanged(result);
+    }
   }
 
   static String _heroName(String t) => switch (t) {

@@ -26,8 +26,18 @@ class ReflectionScreen extends ConsumerStatefulWidget {
 
 class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
   final Set<String> _selected = <String>{};
+  final Map<String, Set<String>> _customByTrait = {
+    'rafi': <String>{},
+    'ellie': <String>{},
+    'gerry': <String>{},
+    'zena': <String>{},
+  };
   bool _submitting = false;
   String? _errorText;
+
+  int get _totalSelected =>
+      _selected.length +
+      _customByTrait.values.fold<int>(0, (s, e) => s + e.length);
 
   @override
   void initState() {
@@ -50,13 +60,13 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
   }
 
   Future<bool> _confirmDiscard() async {
-    if (_selected.isEmpty) return true;
+    if (_totalSelected == 0) return true;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Save your reflection?'),
         content: Text(
-          "You've tapped ${_selected.length} moment${_selected.length == 1 ? '' : 's'}. "
+          "You've tapped $_totalSelected moment${_totalSelected == 1 ? '' : 's'}. "
           'Leave without saving?',
         ),
         actions: [
@@ -90,6 +100,13 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
       _errorText = null;
     });
 
+    final customList = <Map<String, String>>[];
+    _customByTrait.forEach((trait, texts) {
+      for (final t in texts) {
+        customList.add({'trait': trait, 'text': t});
+      }
+    });
+
     Map<String, dynamic> result;
     try {
       result = await Supabase.instance.client.rpc<Map<String, dynamic>>(
@@ -97,6 +114,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
         params: {
           'p_session_id': widget.sessionId,
           'p_moment_tags': _selected.toList(),
+          'p_custom_moments': customList,
         },
       );
     } on PostgrestException catch (e) {
@@ -228,9 +246,16 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                 moments: moments,
                 selected: _selected,
                 onToggle: _toggle,
+                customByTrait: _customByTrait,
+                onCustomChanged: (trait, set) {
+                  setState(() {
+                    _customByTrait[trait] = set;
+                    _errorText = null;
+                  });
+                },
                 errorText: _errorText,
                 bottomBar: _BottomBar(
-                  selectedCount: _selected.length,
+                  selectedCount: _totalSelected,
                   submitting: _submitting,
                   onSubmit: () => _submit(
                     childName: childName,
@@ -253,6 +278,8 @@ class _Body extends StatelessWidget {
   final List<dynamic> moments;
   final Set<String> selected;
   final ValueChanged<String> onToggle;
+  final Map<String, Set<String>> customByTrait;
+  final void Function(String trait, Set<String> texts) onCustomChanged;
   final String? errorText;
   final Widget bottomBar;
 
@@ -262,6 +289,8 @@ class _Body extends StatelessWidget {
     required this.moments,
     required this.selected,
     required this.onToggle,
+    required this.customByTrait,
+    required this.onCustomChanged,
     required this.errorText,
     required this.bottomBar,
   });
@@ -314,6 +343,9 @@ class _Body extends StatelessWidget {
                     onToggle: onToggle,
                     childId: childId,
                     childName: childName,
+                    customMoments: customByTrait[trait] ?? const {},
+                    onCustomMomentsChanged: (set) =>
+                        onCustomChanged(trait, set),
                   ),
                 if (errorText != null)
                   Padding(
