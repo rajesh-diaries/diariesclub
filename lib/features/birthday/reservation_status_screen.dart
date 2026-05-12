@@ -455,10 +455,24 @@ class _PipelineTimeline extends StatelessWidget {
       ('A little memory', 'A small keepsake from us, after the party'),
     ];
 
+    // If the confirmed slot_date is today or in the past, the party is
+    // happening (or has happened) — advance the timeline to "Party day"
+    // even before admin manually marks the reservation as completed.
+    bool slotIsTodayOrPast = false;
+    if (status == 'confirmed' && reservation['slot_date'] != null) {
+      try {
+        final slot = DateTime.parse(reservation['slot_date'] as String);
+        final slotDay = DateTime(slot.year, slot.month, slot.day);
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        slotIsTodayOrPast = !slotDay.isAfter(today);
+      } catch (_) {/* leave false */}
+    }
+
     final currentIndex = switch (status) {
       'interested' => 0,
       'admin_contacted' => 1,
-      'confirmed' => 2,
+      'confirmed' => slotIsTodayOrPast ? 3 : 2,
       'completed' => hasAlbum ? 4 : 3,
       _ => -1,
     };
