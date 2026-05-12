@@ -14,16 +14,24 @@ class StageTransition {
   final String trait;
   final String fromStage;
   final String toStage;
+
+  /// Admin-uploaded artwork for the stage card (Adventure cards). Same
+  /// asset doubles as the cinematic image, the card-collection art, and
+  /// the physical sticker. Null until admin uploads → cinematic falls
+  /// back to a Phosphor icon for the trait.
+  final String? cardImageUrl;
   const StageTransition({
     required this.trait,
     required this.fromStage,
     required this.toStage,
+    this.cardImageUrl,
   });
 
   factory StageTransition.fromJson(Map<String, dynamic> j) => StageTransition(
         trait: j['trait'] as String,
         fromStage: j['from'] as String,
         toStage: j['to'] as String,
+        cardImageUrl: j['card_image_url'] as String?,
       );
 }
 
@@ -114,6 +122,7 @@ class _StageTransitionOverlayState extends State<StageTransitionOverlay>
                 trait: t.trait,
                 color: color,
                 controller: _controller,
+                imageUrl: t.cardImageUrl,
               ),
               const SizedBox(height: 32),
               FadeTransition(
@@ -200,10 +209,12 @@ class _HeroReveal extends StatelessWidget {
   final String trait;
   final Color color;
   final AnimationController controller;
+  final String? imageUrl;
   const _HeroReveal({
     required this.trait,
     required this.color,
     required this.controller,
+    this.imageUrl,
   });
 
   @override
@@ -220,8 +231,8 @@ class _HeroReveal extends StatelessWidget {
                 : 1.0;
         final glow = (1 - (t - 0.55).abs() * 2).clamp(0.0, 1.0);
         return Container(
-          width: 160,
-          height: 160,
+          width: 200,
+          height: 200,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
@@ -236,12 +247,32 @@ class _HeroReveal extends StatelessWidget {
           ),
           child: Transform.scale(
             scale: scale,
-            child: Icon(_heroIcon(trait), color: color, size: 92),
+            child: _revealChild(),
           ),
         );
       },
     );
   }
+
+  Widget _revealChild() {
+    final url = imageUrl;
+    if (url != null && url.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          url,
+          width: 160,
+          height: 160,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _iconFallback(),
+          loadingBuilder: (ctx, child, prog) =>
+              prog == null ? child : _iconFallback(),
+        ),
+      );
+    }
+    return _iconFallback();
+  }
+
+  Widget _iconFallback() => Icon(_heroIcon(trait), color: color, size: 92);
 
   static IconData _heroIcon(String t) => switch (t) {
         'rafi' => PhosphorIconsFill.shieldStar,
