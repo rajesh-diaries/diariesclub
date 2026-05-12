@@ -172,8 +172,255 @@ class _UnassignedGroup extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          for (final p in perks) _PerkTile(row: p, allowEdit: true),
+          for (final p in perks) _UnassignedPerkTile(row: p),
         ],
+      ),
+    );
+  }
+}
+
+class _UnassignedPerkTile extends ConsumerStatefulWidget {
+  final Map<String, dynamic> row;
+  const _UnassignedPerkTile({required this.row});
+
+  @override
+  ConsumerState<_UnassignedPerkTile> createState() =>
+      _UnassignedPerkTileState();
+}
+
+class _UnassignedPerkTileState extends ConsumerState<_UnassignedPerkTile> {
+  bool _busy = false;
+
+  Future<void> _assignTo(String trait) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'admin_stage_perk_upsert',
+        params: {
+          'p_id': widget.row['id'],
+          'p_venue_id': null,
+          'p_stage': widget.row['stage'],
+          'p_trait': trait,
+          'p_perk_label': widget.row['perk_label'],
+          'p_perk_description': widget.row['perk_description'],
+          'p_validity_days': widget.row['validity_days'],
+          'p_is_active': widget.row['is_active'],
+        },
+      );
+      ref.invalidate(stagePerksAdminProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Assigned "${widget.row['perk_label']}" to '
+            '${_traitLabels[trait]}.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't assign: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _cloneToAll() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'admin_stage_perk_clone_to_all_traits',
+        params: {'p_id': widget.row['id']},
+      );
+      ref.invalidate(stagePerksAdminProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Created 4 copies of "${widget.row['perk_label']}" — '
+            'one per character. Delete or edit the original below.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't clone: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = (widget.row['is_active'] as bool?) ?? true;
+    final label = (widget.row['perk_label'] as String?) ?? '—';
+    final description = widget.row['perk_description'] as String?;
+    final stage = widget.row['stage'] as String;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.lightSurface,
+        border: Border.all(
+          color: isActive
+              ? AppColors.activeGreen.withValues(alpha: 0.40)
+              : AppColors.lightBorder,
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: AppTextStyles.body(context)
+                          .copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      _stageLabels[stage] ?? stage,
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    if (description != null && description.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          description,
+                          style: AppTextStyles.caption(
+                            context,
+                            color: AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Valid ${widget.row['validity_days']}d · '
+                      '${isActive ? 'Active' : 'Inactive'}',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              AdminIconButton(
+                icon: PhosphorIconsRegular.pencilSimple,
+                tooltip: 'Edit',
+                onPressed: _busy
+                    ? null
+                    : () async {
+                        final saved = await showDialog<bool>(
+                          context: context,
+                          useRootNavigator: true,
+                          builder: (_) => _PerkEditor(
+                            stage: stage,
+                            trait: widget.row['trait'] as String?,
+                            row: widget.row,
+                          ),
+                        );
+                        if (saved == true) {
+                          ref.invalidate(stagePerksAdminProvider);
+                        }
+                      },
+              ),
+              AdminIconButton(
+                icon: PhosphorIconsRegular.trash,
+                tooltip: 'Delete',
+                onPressed: _busy
+                    ? null
+                    : () => _confirmDeletePerk(context, ref, widget.row),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Text(
+                  'Assign to:',
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.lightTextSecondary,
+                  ).copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final t in _traits)
+                      _AssignChip(
+                        label: _traitLabels[t]!.split(' · ').first,
+                        busy: _busy,
+                        onTap: () => _assignTo(t),
+                      ),
+                    _AssignChip(
+                      label: 'Clone to all 4',
+                      busy: _busy,
+                      primary: true,
+                      onTap: _cloneToAll,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AssignChip extends StatelessWidget {
+  final String label;
+  final bool busy;
+  final bool primary;
+  final VoidCallback onTap;
+  const _AssignChip({
+    required this.label,
+    required this.busy,
+    required this.onTap,
+    this.primary = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = primary
+        ? AppColors.navy
+        : AppColors.navy.withValues(alpha: 0.06);
+    final fg = primary ? Colors.white : AppColors.navy;
+    return InkWell(
+      onTap: busy ? null : onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.navy.withValues(alpha: 0.25)),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.caption(context, color: fg)
+              .copyWith(fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }
@@ -357,10 +604,68 @@ class _CharacterSection extends ConsumerWidget {
   }
 }
 
+Future<void> _confirmDeletePerk(
+  BuildContext context,
+  WidgetRef ref,
+  Map<String, dynamic> row,
+) async {
+  final label = (row['perk_label'] as String?) ?? 'this perk';
+  final ok = await showDialog<bool>(
+    context: context,
+    useRootNavigator: true,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Delete perk?'),
+      content: Text(
+        'Delete "$label"? If any kids have already received this perk '
+        "code, it'll be archived (deactivated) instead of fully deleted, "
+        'so their existing codes keep working at the counter.',
+      ),
+      actions: [
+        AdminSecondaryButton(
+          label: 'Cancel',
+          ghost: true,
+          onPressed: () => Navigator.of(ctx).pop(false),
+        ),
+        const SizedBox(width: 8),
+        AdminPrimaryButton(
+          label: 'Delete',
+          onPressed: () => Navigator.of(ctx).pop(true),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  try {
+    final res = await Supabase.instance.client.rpc<dynamic>(
+      'admin_stage_perk_delete',
+      params: {'p_id': row['id']},
+    );
+    ref.invalidate(stagePerksAdminProvider);
+    if (!context.mounted) return;
+    final map = res is Map
+        ? Map<String, dynamic>.from(res)
+        : <String, dynamic>{};
+    final archived = (map['archived'] as bool?) ?? false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          archived
+              ? 'Archived "$label" — existing codes still work.'
+              : 'Deleted "$label".',
+        ),
+      ),
+    );
+  } catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Couldn't delete: $e")),
+    );
+  }
+}
+
 class _PerkTile extends ConsumerWidget {
   final Map<String, dynamic> row;
-  final bool allowEdit;
-  const _PerkTile({required this.row, this.allowEdit = true});
+  const _PerkTile({required this.row});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -413,25 +718,29 @@ class _PerkTile extends ConsumerWidget {
               ],
             ),
           ),
-          if (allowEdit)
-            AdminIconButton(
-              icon: PhosphorIconsRegular.pencilSimple,
-              tooltip: 'Edit',
-              onPressed: () async {
-                final saved = await showDialog<bool>(
-                  context: context,
-                  useRootNavigator: true,
-                  builder: (_) => _PerkEditor(
-                    stage: row['stage'] as String,
-                    trait: row['trait'] as String?,
-                    row: row,
-                  ),
-                );
-                if (saved == true) {
-                  ref.invalidate(stagePerksAdminProvider);
-                }
-              },
-            ),
+          AdminIconButton(
+            icon: PhosphorIconsRegular.pencilSimple,
+            tooltip: 'Edit',
+            onPressed: () async {
+              final saved = await showDialog<bool>(
+                context: context,
+                useRootNavigator: true,
+                builder: (_) => _PerkEditor(
+                  stage: row['stage'] as String,
+                  trait: row['trait'] as String?,
+                  row: row,
+                ),
+              );
+              if (saved == true) {
+                ref.invalidate(stagePerksAdminProvider);
+              }
+            },
+          ),
+          AdminIconButton(
+            icon: PhosphorIconsRegular.trash,
+            tooltip: 'Delete',
+            onPressed: () => _confirmDeletePerk(context, ref, row),
+          ),
         ],
       ),
     );
