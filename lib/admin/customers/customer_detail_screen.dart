@@ -632,7 +632,14 @@ class _ChildrenTable extends StatelessWidget {
       DataCell(Text('$reflections')),
       DataCell(Text(streak == 0 ? '—' : '${streak}w')),
       DataCell(Text(lastVisit ?? '—')),
-      DataCell(_GrantCardAction(child: c)),
+      DataCell(Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _GrantCardAction(child: c),
+          const SizedBox(width: 6),
+          _GrantXpAction(child: c),
+        ],
+      )),
     ]);
   }
 }
@@ -1294,6 +1301,193 @@ class _ManualAdjustDialogState extends State<_ManualAdjustDialog> {
             final paise = (rupees * 100) * (_isCredit ? 1 : -1);
             Navigator.of(context).pop((paise: paise, reason: reason));
           },
+        ),
+      ],
+    );
+  }
+}
+
+class _GrantXpAction extends StatelessWidget {
+  final Map<String, dynamic> child;
+  const _GrantXpAction({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return AdminSecondaryButton(
+      label: 'XP',
+      icon: PhosphorIconsRegular.lightning,
+      onPressed: () => showDialog<void>(
+        context: context,
+        useRootNavigator: true,
+        builder: (_) => _GrantXpDialog(child: child),
+      ),
+    );
+  }
+}
+
+class _GrantXpDialog extends ConsumerStatefulWidget {
+  final Map<String, dynamic> child;
+  const _GrantXpDialog({required this.child});
+
+  @override
+  ConsumerState<_GrantXpDialog> createState() => _GrantXpDialogState();
+}
+
+class _GrantXpDialogState extends ConsumerState<_GrantXpDialog> {
+  final _amountCtrl = TextEditingController(text: '25');
+  final _reasonCtrl = TextEditingController();
+  String _trait = 'rafi';
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _reasonCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final amount = int.tryParse(_amountCtrl.text.trim());
+    final reason = _reasonCtrl.text.trim();
+    if (amount == null || amount <= 0) {
+      setState(() => _error = 'Amount must be a positive number.');
+      return;
+    }
+    if (reason.length < 3) {
+      setState(() => _error = 'Add a short reason — at least 3 characters.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'admin_grant_xp',
+        params: {
+          'p_child_id': widget.child['id'],
+          'p_amount': amount,
+          'p_trait': _trait,
+          'p_reason': reason,
+        },
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '+$amount XP granted to ${widget.child['name']}.',
+          ),
+        ),
+      );
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e.message;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = '$e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (widget.child['name'] as String?) ?? 'this child';
+    return AlertDialog(
+      title: Text('Grant XP to $name'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _reasonCtrl,
+              maxLength: 140,
+              decoration: const InputDecoration(
+                labelText: 'Reason',
+                hintText: 'e.g. Helped a new family settle in',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _amountCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Amount (max 1000)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _trait,
+                    decoration: const InputDecoration(
+                      labelText: 'Goes to',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'rafi', child: Text('🛡  Rafi the Brave')),
+                      DropdownMenuItem(
+                          value: 'ellie', child: Text('❤️  Ellie the Kind')),
+                      DropdownMenuItem(
+                          value: 'gerry', child: Text('🔍  Gerry the Curious')),
+                      DropdownMenuItem(
+                          value: 'zena', child: Text('🎨  Zena the Creative')),
+                      DropdownMenuItem(
+                          value: 'split',
+                          child: Text('⚖  Split equally')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setState(() => _trait = v);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: AppTextStyles.caption(
+                  context,
+                  color: AppColors.adminRed,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _busy ? null : _submit,
+          child: _busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(Colors.white),
+                  ),
+                )
+              : const Text('Grant XP'),
         ),
       ],
     );
