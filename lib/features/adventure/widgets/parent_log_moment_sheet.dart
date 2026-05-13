@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/providers/reflection_moments_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../data/parent_log_moments_data.dart';
 
 /// Standalone parent-log sheet on the Adventure tab — "My kid did this".
 ///
@@ -294,7 +294,7 @@ class _ParentLogMomentSheetState
   }
 }
 
-class _TraitGroup extends StatelessWidget {
+class _TraitGroup extends ConsumerWidget {
   final String trait;
   final Set<String> selected;
   final ValueChanged<String> onToggle;
@@ -314,11 +314,23 @@ class _TraitGroup extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final accent = _traitColor(trait);
-    final pool = HeroMomentPool.topPicks[trait] ?? const [];
-    final extras = HeroMomentPool.allFor(trait).where((m) => !pool.contains(m)).toList();
-    final customs = selected.where((s) => !pool.contains(s) && !extras.contains(s)).toList();
+    // First 6 extended moments per character = "top picks" (above the
+    // fold). Remaining = "extras". Customs = parent's free-text adds
+    // that aren't in either preset list.
+    final asyncMoments = ref.watch(
+      extendedReflectionMomentsProvider(trait),
+    );
+    final all = asyncMoments.maybeWhen(
+      data: (rows) => rows.map((r) => r.displayText).toList(),
+      orElse: () => const <String>[],
+    );
+    final pool = all.take(6).toList();
+    final extras = all.skip(6).toList();
+    final customs = selected
+        .where((s) => !pool.contains(s) && !extras.contains(s))
+        .toList();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),

@@ -130,6 +130,8 @@ class _MomentRow extends StatelessWidget {
               ),
             ),
             _TraitChip(trait: trait),
+            const SizedBox(width: 8),
+            _TierChip(tier: (row['tier'] as String?) ?? 'primary'),
             const SizedBox(width: 16),
             SizedBox(
               width: 60,
@@ -143,6 +145,32 @@ class _MomentRow extends StatelessWidget {
             const Icon(PhosphorIconsRegular.caretRight,
                 size: 16, color: AppColors.lightTextSecondary),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TierChip extends StatelessWidget {
+  final String tier;
+  const _TierChip({required this.tier});
+
+  @override
+  Widget build(BuildContext context) {
+    final isPrimary = tier == 'primary';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: (isPrimary ? AppColors.activeGreen : AppColors.gold)
+            .withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        isPrimary ? 'primary' : 'extended',
+        style: TextStyle(
+          color: isPrimary ? AppColors.activeGreen : AppColors.gold,
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
         ),
       ),
     );
@@ -202,6 +230,7 @@ class _MomentEditorState extends State<_MomentEditor> {
     text: '${widget.row?['sort_order'] ?? 0}',
   );
   late String _trait = (widget.row?['primary_trait'] as String?) ?? 'rafi';
+  late String _tier = (widget.row?['tier'] as String?) ?? 'primary';
   late bool _isActive = (widget.row?['is_active'] as bool?) ?? true;
 
   bool _busy = false;
@@ -234,6 +263,7 @@ class _MomentEditorState extends State<_MomentEditor> {
           'p_xp_weight': double.tryParse(_xpWeight.text) ?? 1,
           'p_sort_order': int.tryParse(_sortOrder.text) ?? 0,
           'p_is_active': _isActive,
+          'p_tier': _tier,
         },
       );
       if (!mounted) return;
@@ -296,6 +326,29 @@ class _MomentEditorState extends State<_MomentEditor> {
                   DropdownMenuItem(value: 'zena', child: Text('Zena (creativity)')),
                 ],
                 onChanged: (v) => setState(() => _trait = v ?? 'rafi'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _tier,
+                decoration: const InputDecoration(
+                  labelText: 'Tier',
+                  helperText:
+                      'Primary = 6 inline chips on reflection screen.\n'
+                      'Extended = wider pool in "+ More moments" + Adventure-tab log.',
+                  helperMaxLines: 3,
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'primary',
+                    child: Text('Primary — inline chips'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'extended',
+                    child: Text('Extended — wider pool'),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _tier = v ?? 'primary'),
               ),
               const SizedBox(height: 12),
               Row(
@@ -366,7 +419,9 @@ final reflectionMomentsAdminProvider =
   final rows = await Supabase.instance.client
       .from('reflection_moments')
       .select()
+      // tier asc so primary rows surface above extended within each trait
       .order('primary_trait', ascending: true)
+      .order('tier', ascending: true)
       .order('sort_order', ascending: true);
   return List<Map<String, dynamic>>.from(rows);
 });

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../../core/providers/reflection_moments_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../adventure/data/parent_log_moments_data.dart';
 
 /// Multi-select sheet opened from the reflection screen's "+ More moments"
 /// tile. Lets the parent pick extra preset moments from the wider pool
@@ -15,7 +16,7 @@ import '../../adventure/data/parent_log_moments_data.dart';
 ///
 /// Visual model is multi-select: tap toggles selection, selected items
 /// fill with the trait color so the parent can see what's in.
-class ReflectionMoreMomentsSheet extends StatefulWidget {
+class ReflectionMoreMomentsSheet extends ConsumerStatefulWidget {
   final String trait;
   final Set<String> initialSelections;
   const ReflectionMoreMomentsSheet({
@@ -25,12 +26,12 @@ class ReflectionMoreMomentsSheet extends StatefulWidget {
   });
 
   @override
-  State<ReflectionMoreMomentsSheet> createState() =>
+  ConsumerState<ReflectionMoreMomentsSheet> createState() =>
       _ReflectionMoreMomentsSheetState();
 }
 
 class _ReflectionMoreMomentsSheetState
-    extends State<ReflectionMoreMomentsSheet> {
+    extends ConsumerState<ReflectionMoreMomentsSheet> {
   late final Set<String> _selected = {...widget.initialSelections};
   final _customCtrl = TextEditingController();
 
@@ -60,7 +61,13 @@ class _ReflectionMoreMomentsSheetState
   @override
   Widget build(BuildContext context) {
     final accent = _traitColor(widget.trait);
-    final pool = HeroMomentPool.allFor(widget.trait);
+    final asyncPool = ref.watch(
+      extendedReflectionMomentsProvider(widget.trait),
+    );
+    final pool = asyncPool.maybeWhen(
+      data: (rows) => rows.map((r) => r.displayText).toList(),
+      orElse: () => const <String>[],
+    );
 
     return DraggableScrollableSheet(
       expand: false,

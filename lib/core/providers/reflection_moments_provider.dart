@@ -55,3 +55,23 @@ final reflectionMomentsProvider = FutureProvider.family<
       .map((r) => ReflectionMoment.fromJson(Map<String, dynamic>.from(r as Map)))
       .toList();
 });
+
+/// Extended-tier moments per character — the wider pool shown via the
+/// "+ More moments" sheet on the reflection screen AND the standalone
+/// Adventure-tab "My kid did this" sheet. Admin-managed via the same
+/// Reflection moments screen (filter by tier='extended').
+final extendedReflectionMomentsProvider = FutureProvider.family<
+    List<ReflectionMoment>, String>((ref, trait) async {
+  final rows = await Supabase.instance.client
+      .from('reflection_moments')
+      .select(
+        'id, tag, display_text, primary_trait, icon, xp_weight, sort_order',
+      )
+      .eq('primary_trait', trait)
+      .eq('tier', 'extended')
+      .eq('is_active', true)
+      .order('sort_order');
+  return (rows as List)
+      .map((r) => ReflectionMoment.fromJson(Map<String, dynamic>.from(r as Map)))
+      .toList();
+});
