@@ -5,7 +5,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
+import '../core/utils/currency.dart';
 import 'providers/staff_auth_provider.dart';
+import 'providers/venue_streams_provider.dart';
 import 'widgets/staff_app_bar.dart';
 import 'widgets/staff_pin_sheet.dart';
 
@@ -26,10 +28,13 @@ class StaffHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: StaffAppBar(deviceLabel: deviceLabel),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const _TodayPanel(),
+            const SizedBox(height: 16),
             _ActionTile(
               icon: PhosphorIconsRegular.qrCode,
               label: 'Scan QR',
@@ -135,6 +140,184 @@ class _ActionTile extends StatelessWidget {
           side: const BorderSide(color: AppColors.lightBorder),
         ),
         onTap: onTap,
+      ),
+    );
+  }
+}
+
+/// Today-at-a-glance dashboard panel — 6 live stats so staff doesn't
+/// have to drill into 4 screens to see "how's the floor right now".
+class _TodayPanel extends ConsumerWidget {
+  const _TodayPanel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onFloor = ref.watch(venueActiveSessionsProvider).valueOrNull?.length ?? 0;
+    final sessionsToday = ref.watch(todaySessionsCountProvider).valueOrNull ?? 0;
+    final kidsToday = ref.watch(todayDistinctKidsCountProvider).valueOrNull ?? 0;
+    final bitesGiven =
+        ref.watch(venueDistributedHealthyBitesProvider).valueOrNull?.length ?? 0;
+    final bitesPending =
+        ref.watch(venuePendingHealthyBitesProvider).valueOrNull?.length ?? 0;
+    final cashPaise = ref.watch(todayCashCollectedProvider).valueOrNull ?? 0;
+    final ordersToday = ref.watch(todayOrdersCountProvider).valueOrNull ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.lightSurface,
+        border: Border.all(color: AppColors.lightBorder),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(PhosphorIconsRegular.gauge,
+                  color: AppColors.navy, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                "Today's pulse",
+                style: AppTextStyles.bodyLarge(context).copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 18),
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Refresh',
+                onPressed: () {
+                  ref.invalidate(venueActiveSessionsProvider);
+                  ref.invalidate(todaySessionsCountProvider);
+                  ref.invalidate(todayDistinctKidsCountProvider);
+                  ref.invalidate(venueDistributedHealthyBitesProvider);
+                  ref.invalidate(venuePendingHealthyBitesProvider);
+                  ref.invalidate(todayCashCollectedProvider);
+                  ref.invalidate(todayOrdersCountProvider);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 2.3,
+            children: [
+              _StatTile(
+                icon: PhosphorIconsFill.users,
+                label: 'On floor now',
+                value: '$onFloor',
+                accent: onFloor > 0 ? AppColors.fitGreen : AppColors.lightTextSecondary,
+                onTap: () => context.push('/staff/sessions'),
+              ),
+              _StatTile(
+                icon: PhosphorIconsFill.clock,
+                label: 'Sessions today',
+                value: '$sessionsToday',
+                accent: AppColors.navy,
+                onTap: () => context.push('/staff/sessions'),
+              ),
+              _StatTile(
+                icon: PhosphorIconsFill.smileyWink,
+                label: 'Kids today',
+                value: '$kidsToday',
+                accent: AppColors.navy,
+              ),
+              _StatTile(
+                icon: PhosphorIconsFill.cookingPot,
+                label: 'Orders today',
+                value: '$ordersToday',
+                accent: AppColors.navy,
+                onTap: () => context.push('/staff/kds'),
+              ),
+              _StatTile(
+                icon: PhosphorIconsFill.carrot,
+                label: bitesPending > 0
+                    ? 'Bites · $bitesPending pending'
+                    : 'Bites given',
+                value: '$bitesGiven',
+                accent: bitesPending > 0
+                    ? AppColors.gold
+                    : AppColors.fitGreen,
+                onTap: () => context.push('/staff/healthy-bite'),
+              ),
+              _StatTile(
+                icon: PhosphorIconsFill.currencyInr,
+                label: 'Cash today',
+                value: Money.fromPaise(cashPaise),
+                accent: AppColors.gold,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color accent;
+  final VoidCallback? onTap;
+  const _StatTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.accent,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: accent.withValues(alpha: 0.25),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: accent, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      value,
+                      style: AppTextStyles.h3(context, color: accent),
+                    ),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption(
+                        context, color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

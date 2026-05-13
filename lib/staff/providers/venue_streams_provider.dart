@@ -177,3 +177,43 @@ final todaySessionsCountProvider = FutureProvider<int>((ref) async {
       .gte('created_at', since);
   return (rows as List).length;
 });
+
+/// Distinct kids served at this venue in the last 24h. "Served" =
+/// session reached at least active (covers active/grace/completed/
+/// auto_closed), so pending-only walk-throughs don't inflate it.
+final todayDistinctKidsCountProvider = FutureProvider<int>((ref) async {
+  final venueId = ref.watch(currentTabletVenueIdProvider);
+  if (venueId == null) return 0;
+  final since = DateTime.now()
+      .toUtc()
+      .subtract(const Duration(hours: 24))
+      .toIso8601String();
+  final rows = await Supabase.instance.client
+      .from('sessions')
+      .select('child_id')
+      .eq('venue_id', venueId)
+      .inFilter('status', ['active', 'grace', 'completed', 'auto_closed'])
+      .gte('created_at', since);
+  final ids = (rows as List)
+      .map((r) => r['child_id'] as String?)
+      .where((id) => id != null)
+      .toSet();
+  return ids.length;
+});
+
+/// Today's order count (pending+preparing+ready+delivered+cancelled =
+/// every order created in the last 24h). Useful for cafe throughput.
+final todayOrdersCountProvider = FutureProvider<int>((ref) async {
+  final venueId = ref.watch(currentTabletVenueIdProvider);
+  if (venueId == null) return 0;
+  final since = DateTime.now()
+      .toUtc()
+      .subtract(const Duration(hours: 24))
+      .toIso8601String();
+  final rows = await Supabase.instance.client
+      .from('orders')
+      .select('id')
+      .eq('venue_id', venueId)
+      .gte('created_at', since);
+  return (rows as List).length;
+});
