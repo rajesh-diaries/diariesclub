@@ -104,35 +104,14 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
       _errorText = null;
     });
 
-    // Track whether the session_create step landed so a downstream
-    // order_place failure can be surfaced as "session created, food
-    // didn't" rather than a generic error that leaves the customer
-    // confused about whether they were charged.
-    bool sessionCreated = false;
     try {
-      // Step 1 — for with-session combos, create the session first so
-      // the kid has a valid pass to walk in with. The session hold goes
-      // against the wallet at the regular session price; the combo line
-      // covers the food + bundled price reconciliation at order_place.
-      if (withSession) {
-        final inclusions =
-            (combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
-                const <String, dynamic>{};
-        final sessionMinutes =
-            inclusions['session_minutes'] as int? ?? 60;
-        await Supabase.instance.client
-            .rpc<Map<String, dynamic>>('session_create', params: {
-          'p_venue_id': _venueId,
-          'p_family_id': familyId,
-          'p_child_id': _selectedChildId,
-          'p_duration_minutes': sessionMinutes,
-          'p_payment_method': 'wallet',
-          'p_idempotency_key': const Uuid().v4(),
-        });
-        sessionCreated = true;
-      }
-
-      // Step 2 — place the order for the food side of the combo.
+      // Single atomic call. order_place v2 (migration 0140) creates
+      // the sessions row internally when a combo line has
+      // `session_minutes` set, linked back to the order via
+      // sessions.paid_via_order_id. The wallet is debited exactly once
+      // for the full combo price — fixes BUG-050 double-charge where
+      // we previously called session_create + order_place separately
+      // and the session value was billed twice.
       final result = await Supabase.instance.client
           .rpc<Map<String, dynamic>>('order_place', params: {
         'p_venue_id': _venueId,
@@ -147,6 +126,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
         'p_fulfillment_mode': 'dine_in',
         'p_payment_method': 'wallet',
         'p_combo_id': null,
+        if (withSession) 'p_child_id': _selectedChildId,
         'p_idempotency_key': const Uuid().v4(),
         'p_customer_gstin': null,
       });
@@ -154,13 +134,10 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
 
       if (!mounted) return;
       // Refresh the active session stack on Home so the new pending
-      // session shows up immediately for with-session combos.
+      // session (emitted by order_place for combos with session_minutes)
+      // shows up immediately.
       if (withSession) ref.invalidate(activeSessionsProvider);
       Navigator.of(context).pop();
-      // Always land on the invoice/tracking screen so the customer sees
-      // the GST breakdown and invoice number. For session combos, the
-      // pending session still shows up on the home tab next time they
-      // visit it.
       if (orderId != null) {
         context.push('/club/order/$orderId');
       } else {
@@ -177,25 +154,6 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
       debugPrint('[COMBO_PURCHASE] PostgrestException: code=${e.code} '
           'message=${e.message} details=${e.details} hint=${e.hint}');
       if (!mounted) return;
-      // If session_create succeeded but order_place blew up, the
-      // customer has a play pass but no food line. Refresh active
-      // sessions, close the sheet, and route home with a clear ask to
-      // talk to staff so the food side gets resolved manually.
-      if (sessionCreated) {
-        ref.invalidate(activeSessionsProvider);
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: AppColors.warningYellow,
-            content: Text(
-              'Session created, but the food order didn\'t go through. '
-              'Please show this to staff at the desk.',
-            ),
-          ),
-        );
-        context.go('/home');
-        return;
-      }
       setState(() {
         _busy = false;
         _errorText = e.message.contains('insufficient_balance')
@@ -205,21 +163,6 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
     } catch (e) {
       debugPrint('[COMBO_PURCHASE] generic error: $e');
       if (!mounted) return;
-      if (sessionCreated) {
-        ref.invalidate(activeSessionsProvider);
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: AppColors.warningYellow,
-            content: Text(
-              'Session created, but the food order didn\'t go through. '
-              'Please show this to staff at the desk.',
-            ),
-          ),
-        );
-        context.go('/home');
-        return;
-      }
       setState(() {
         _busy = false;
         _errorText = "Couldn't purchase combo: $e";

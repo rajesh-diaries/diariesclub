@@ -161,11 +161,6 @@ class _WalletSection extends ConsumerWidget {
           route: '/profile/wallet-history',
           leading: PhosphorIconsRegular.clockCounterClockwise,
         ),
-        const ProfileNavRow(
-          label: 'Pre-book a session',
-          route: '/profile/pre-book',
-          leading: PhosphorIconsRegular.calendarPlus,
-        ),
       ],
     );
   }

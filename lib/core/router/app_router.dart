@@ -37,14 +37,12 @@ import '../../features/profile/past_orders_screen.dart';
 import '../../features/profile/past_session_detail_screen.dart';
 import '../../features/profile/past_sessions_screen.dart';
 import '../../features/profile/past_workshops_screen.dart';
-import '../../features/profile/pre_booking_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/profile/referral_details_screen.dart';
 import '../../features/profile/wallet_history_screen.dart';
 import '../../features/gamification/card_unboxing_screen.dart';
 import '../../features/gamification/reflection_screen.dart';
 import '../../features/reactivation/reactivation_screen.dart';
-import '../../features/session/pre_book_screen.dart';
 import '../../features/sessions/session_detail_screen.dart';
 import '../../features/sessions/session_qr_screen.dart';
 import '../../features/sessions/session_start_screen.dart';
@@ -213,12 +211,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const WalletHistoryScreen(),
       ),
       GoRoute(
-        path: '/profile/pre-book',
-        name: 'profile_pre_book',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const PreBookingScreen(),
-      ),
-      GoRoute(
         path: '/profile/sessions',
         name: 'profile_sessions',
         parentNavigatorKey: _rootNavigatorKey,
@@ -321,13 +313,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => BirthdayAlbumScreen(
           reservationId: state.pathParameters['reservationId']!,
         ),
-      ),
-
-      // ── Session pre-booking ───────────────────────────────────────────
-      GoRoute(
-        path: '/session/pre-book',
-        name: 'session_pre_book',
-        builder: (context, state) => const SessionPreBookScreen(),
       ),
 
       // ── Session lifecycle (Session 5) ─────────────────────────────────
