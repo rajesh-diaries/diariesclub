@@ -76,6 +76,10 @@ class MultiSessionHomeView extends ConsumerWidget {
               ),
             ],
           ),
+          // Announcements right after the greeting so promos / closures
+          // surface above the playing sessions list (self-margins;
+          // collapses when there's nothing live).
+          const AnnouncementsFeed(),
           const SizedBox(height: 12),
           for (final s in sessions) ...[
             ActiveSessionCard(session: s),
@@ -93,8 +97,6 @@ class MultiSessionHomeView extends ConsumerWidget {
           const HomeCombosStrip(),
           const SizedBox(height: 16),
           const BirthdayCardList(),
-          const SizedBox(height: 16),
-          const AnnouncementsFeed(),
           const MarketingConsentCard(),
           const SizedBox(height: 16),
           const MyUpcomingWorkshopsSection(),

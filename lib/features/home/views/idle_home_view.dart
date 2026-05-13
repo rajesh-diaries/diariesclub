@@ -58,6 +58,10 @@ class IdleHomeBody extends ConsumerWidget {
         ),
         const SizedBox(height: 4),
         Text('Ready for adventure?', style: AppTextStyles.body(context)),
+        // Announcements top-of-fold so time-sensitive promos / events
+        // / closures hit the customer before anything else. Self-
+        // margined: collapses cleanly when there are no active rows.
+        const AnnouncementsFeed(),
         const SizedBox(height: 20),
         const WalletCard(),
         const SizedBox(height: 16),
@@ -70,9 +74,8 @@ class IdleHomeBody extends ConsumerWidget {
         const HomeCombosStrip(),
         const SizedBox(height: 16),
         const BirthdayCardList(),
-        // The next 3 sections carry their own top:16 margin so they
+        // Two sections that carry their own top:16 margin so they
         // collapse cleanly when empty (no phantom gaps).
-        const AnnouncementsFeed(),
         const MarketingConsentCard(),
         const MyUpcomingWorkshopsSection(),
         const SizedBox(height: 16),
