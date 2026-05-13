@@ -242,6 +242,24 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
             ),
           const SizedBox(width: 8),
           OutlinedButton.icon(
+            onPressed: _family == null
+                ? null
+                : () {
+                    showDialog<void>(
+                      context: context,
+                      useRootNavigator: true,
+                      builder: (_) => _FamilyDiaryDialog(
+                        familyId: widget.familyId,
+                        familyName:
+                            (_family!['name'] as String?) ?? 'Family',
+                      ),
+                    );
+                  },
+            icon: const Icon(PhosphorIconsRegular.bookOpen),
+            label: const Text('Family diary'),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
             onPressed: _family == null ? null : _manualAdjust,
             icon: const Icon(Icons.payments),
             label: const Text('Manual wallet adjust'),
@@ -741,7 +759,8 @@ class _KidDiaryDialog extends ConsumerWidget {
 
 class _DiaryEntry extends StatelessWidget {
   final Map<String, dynamic> row;
-  const _DiaryEntry({required this.row});
+  final bool showChildName;
+  const _DiaryEntry({required this.row, this.showChildName = false});
 
   @override
   Widget build(BuildContext context) {
@@ -750,6 +769,7 @@ class _DiaryEntry extends StatelessWidget {
     final moments = (row['moments'] as List?) ?? const [];
     final split = (row['xp_split'] as Map?)?.cast<String, dynamic>() ?? {};
     final isReflection = kind == 'reflection';
+    final childName = (row['child_name'] as String?) ?? '';
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -772,9 +792,13 @@ class _DiaryEntry extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                isReflection
-                    ? 'Reflection · session'
-                    : 'Parent-log pool',
+                showChildName && childName.isNotEmpty
+                    ? (isReflection
+                        ? '$childName · Reflection'
+                        : '$childName · Parent-log')
+                    : (isReflection
+                        ? 'Reflection · session'
+                        : 'Parent-log pool'),
                 style: AppTextStyles.body(context).copyWith(
                   fontWeight: FontWeight.w800,
                 ),
@@ -932,6 +956,89 @@ final adminKidDiaryProvider = FutureProvider.autoDispose
   final res = await Supabase.instance.client.rpc<Map<String, dynamic>>(
     'admin_kid_diary',
     params: {'p_child_id': childId, 'p_limit': 20},
+  );
+  final rows = (res['rows'] as List?) ?? const [];
+  return rows
+      .map((r) => Map<String, dynamic>.from(r as Map))
+      .toList();
+});
+
+class _FamilyDiaryDialog extends ConsumerWidget {
+  final String familyId;
+  final String familyName;
+  const _FamilyDiaryDialog({required this.familyId, required this.familyName});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(adminFamilyDiaryProvider(familyId));
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 720),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('$familyName · family diary',
+                        style: AppTextStyles.h2(context)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              Text(
+                'Last 30 reflections + parent-log pool submissions across '
+                'all kids in the family, newest first.',
+                style: AppTextStyles.caption(
+                  context,
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: async.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text("Couldn't load: $e")),
+                  data: (rows) {
+                    if (rows.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No diary entries yet.',
+                          style: AppTextStyles.body(
+                            context,
+                            color: AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      itemCount: rows.length,
+                      separatorBuilder: (_, __) => const Divider(height: 16),
+                      itemBuilder: (_, i) =>
+                          _DiaryEntry(row: rows[i], showChildName: true),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+final adminFamilyDiaryProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, familyId) async {
+  final res = await Supabase.instance.client.rpc<Map<String, dynamic>>(
+    'admin_family_diary',
+    params: {'p_family_id': familyId, 'p_limit': 30},
   );
   final rows = (res['rows'] as List?) ?? const [];
   return rows
