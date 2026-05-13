@@ -158,11 +158,14 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
       // splash so there's no chance of timing weirdness between the
       // setStep write and the splash's read.
       if (family == null) {
+        // Skip the welcome manifesto on first signup — it was too much
+        // before they'd entered anything. The manifesto still lives at
+        // Adventure → About for parents who want to read it later.
         await ref
             .read(onboardingStepProvider.notifier)
-            .setStep(OnboardingStep.welcome);
+            .setStep(OnboardingStep.familyName);
         if (!mounted) return;
-        context.go('/onboarding/welcome');
+        context.go('/onboarding/family-name');
       } else if (family['has_children'] == true ||
           family['is_cafe_only'] == true) {
         await ref
