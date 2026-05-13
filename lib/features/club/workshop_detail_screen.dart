@@ -339,12 +339,17 @@ class _WorkshopDetailScreenState
   }
 
   String _meta(Map<String, dynamic> w) {
-    final scheduled = DateTime.parse(w['scheduled_at'] as String).toLocal();
+    final scheduledStr = w['scheduled_at'] as String?;
+    final scheduled =
+        scheduledStr == null ? null : DateTime.tryParse(scheduledStr)?.toLocal();
     final ageMin = w['age_group_min'] as int?;
     final ageMax = w['age_group_max'] as int?;
     final duration = (w['duration_minutes'] as int?) ?? 0;
     return [
-      DateFormat('EEEE MMM d · h:mm a').format(scheduled),
+      if (scheduled != null)
+        DateFormat('EEEE MMM d · h:mm a').format(scheduled)
+      else
+        'Date TBA',
       if (ageMin != null && ageMax != null) 'Ages $ageMin–$ageMax',
       '$duration min',
     ].join(' · ');

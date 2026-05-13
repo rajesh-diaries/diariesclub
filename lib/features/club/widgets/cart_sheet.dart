@@ -94,6 +94,9 @@ class _CartSheetState extends ConsumerState<CartSheet> {
       if (orderId == null) throw StateError('order_place returned no id');
 
       ref.read(cartProvider.notifier).clear();
+      // Wallet just got debited by order_place — invalidate so the next
+      // purchase sees the fresh balance instead of the pre-order one.
+      ref.invalidate(currentWalletProvider);
       if (!mounted) return;
       Navigator.of(context).pop();
       context.push('/club/order/$orderId');

@@ -106,6 +106,12 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
   // ---------------------------------------------------------------------
   Future<void> _initiatePayment() async {
     if (_selectedAmountPaise == null) return;
+    // Hard re-entrancy guard. Setting `_stage = processing` hides the
+    // Pay button on the next rebuild, but a fast double-tap can fire
+    // _initiatePayment twice in the same frame and create two Razorpay
+    // orders (with two distinct idempotency keys, so the server can't
+    // dedupe them). Bail immediately if we're already mid-flight.
+    if (_stage != _SheetStage.picking) return;
 
     setState(() {
       _stage = _SheetStage.processing;

@@ -80,7 +80,13 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
 
   void _selectChild(String? id, List<Map<String, dynamic>> children) {
     setState(() {
+      final isNewKid = id != _selectedChildId;
       _selectedChildId = id;
+      // Switching kids resets the "manually edited" sentinel — the
+      // prior edit was contextual to the previous kid's birthday, so
+      // we re-prefill from the new kid's DOB instead of carrying the
+      // stale date forward.
+      if (isNewKid) _dateManuallyEdited = false;
       if (id != null && !_dateManuallyEdited) {
         final child = children.firstWhere(
           (c) => c['id'] == id,

@@ -179,6 +179,7 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
         context.go('/onboarding/add-child');
       }
     } on AuthException catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorText = "Couldn't verify. Please try again. (${e.message})";
         _isVerifying = false;
@@ -192,6 +193,7 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
       // burned OTP after going back to the OTP screen (BUG-043 collateral).
       final body = (e.details as Map?)?.cast<String, dynamic>();
       final errCode = body?['error'] as String?;
+      if (!mounted) return;
       setState(() {
         _errorText = errCode != null
             ? _mapVerifyError(errCode)
@@ -201,6 +203,7 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
       });
       _clearBoxes();
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _errorText = "Couldn't verify. Please try again.";
         _isVerifying = false;

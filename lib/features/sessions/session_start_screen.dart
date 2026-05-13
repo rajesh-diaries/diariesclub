@@ -186,6 +186,10 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
 
     final children = _selectedChildIds.toList();
     String? firstSessionId;
+    // Track successes so a mid-batch failure can surface a "N of M
+    // started" message instead of silently leaving the user wondering
+    // which kids made it through.
+    final createdCount = <int>[0];
     try {
       for (var i = 0; i < children.length; i++) {
         final childId = children[i];
@@ -203,9 +207,14 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
           if (couponForCall != null) 'p_coupon_code': couponForCall,
         });
         firstSessionId ??= result['session_id'] as String?;
+        createdCount[0]++;
       }
 
       if (!mounted) return;
+      // Refresh active sessions so Home reflects the new batch on the
+      // next frame — without this the multi-session stack appears empty
+      // until the stream's next 15s tick.
+      ref.invalidate(activeSessionsProvider);
       // Multi-session → land on home with the new session stack.
       // Single-kid → straight to QR like before.
       if (children.length == 1 && firstSessionId != null) {
@@ -237,6 +246,14 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       }
       if (e.message.contains('insufficient_balance')) {
         if (!mounted) return;
+        // If some sessions already started before the wallet drained,
+        // bail to home with the partial-success message — opening the
+        // top-up sheet on a half-charged batch is more confusing than
+        // helpful.
+        if (createdCount[0] > 0) {
+          _handlePartialOrFullFailure(createdCount[0], children.length);
+          return;
+        }
         setState(() => _busy = false);
         showModalBottomSheet<void>(
           context: context,
@@ -254,17 +271,37 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         return;
       }
       if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _errorText = "Couldn't start session. Please try again.";
-      });
+      _handlePartialOrFullFailure(createdCount[0], children.length);
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _errorText = "Couldn't start session. Please try again.";
-      });
+      _handlePartialOrFullFailure(createdCount[0], children.length);
     }
+  }
+
+  /// Route after a session_create batch error. If some sessions started
+  /// before the failure, refresh active sessions and route home with a
+  /// snackbar — the user has been charged and needs to see what's live.
+  /// Full failures stay on the screen with the error text so the parent
+  /// can retry without losing their picks.
+  void _handlePartialOrFullFailure(int created, int total) {
+    if (created > 0) {
+      ref.invalidate(activeSessionsProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.warningYellow,
+          content: Text(
+            '$created of $total sessions started. The rest didn\'t go '
+            'through — please ask staff.',
+          ),
+        ),
+      );
+      context.go('/home');
+      return;
+    }
+    setState(() {
+      _busy = false;
+      _errorText = "Couldn't start session. Please try again.";
+    });
   }
 
   @override

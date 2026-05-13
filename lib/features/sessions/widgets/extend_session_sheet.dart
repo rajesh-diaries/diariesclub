@@ -52,6 +52,11 @@ class _ExtendSessionSheetState extends ConsumerState<ExtendSessionSheet> {
   String? _errorText;
 
   Future<void> _submit(int amountPaise) async {
+    // Hard re-entrancy guard — `canPay` already disables the button
+    // visually but a fast double-tap can land between states. Without
+    // this guard, two session_extend RPCs fire and the customer is
+    // charged twice.
+    if (_busy) return;
     setState(() {
       _busy = true;
       _errorText = null;

@@ -104,6 +104,11 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
       _errorText = null;
     });
 
+    // Track whether the session_create step landed so a downstream
+    // order_place failure can be surfaced as "session created, food
+    // didn't" rather than a generic error that leaves the customer
+    // confused about whether they were charged.
+    bool sessionCreated = false;
     try {
       // Step 1 — for with-session combos, create the session first so
       // the kid has a valid pass to walk in with. The session hold goes
@@ -124,6 +129,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
           'p_payment_method': 'wallet',
           'p_idempotency_key': const Uuid().v4(),
         });
+        sessionCreated = true;
       }
 
       // Step 2 — place the order for the food side of the combo.
@@ -147,6 +153,9 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
       final orderId = result['order_id'] as String?;
 
       if (!mounted) return;
+      // Refresh the active session stack on Home so the new pending
+      // session shows up immediately for with-session combos.
+      if (withSession) ref.invalidate(activeSessionsProvider);
       Navigator.of(context).pop();
       // Always land on the invoice/tracking screen so the customer sees
       // the GST breakdown and invoice number. For session combos, the
@@ -168,6 +177,25 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
       debugPrint('[COMBO_PURCHASE] PostgrestException: code=${e.code} '
           'message=${e.message} details=${e.details} hint=${e.hint}');
       if (!mounted) return;
+      // If session_create succeeded but order_place blew up, the
+      // customer has a play pass but no food line. Refresh active
+      // sessions, close the sheet, and route home with a clear ask to
+      // talk to staff so the food side gets resolved manually.
+      if (sessionCreated) {
+        ref.invalidate(activeSessionsProvider);
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: AppColors.warningYellow,
+            content: Text(
+              'Session created, but the food order didn\'t go through. '
+              'Please show this to staff at the desk.',
+            ),
+          ),
+        );
+        context.go('/home');
+        return;
+      }
       setState(() {
         _busy = false;
         _errorText = e.message.contains('insufficient_balance')
@@ -177,6 +205,21 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
     } catch (e) {
       debugPrint('[COMBO_PURCHASE] generic error: $e');
       if (!mounted) return;
+      if (sessionCreated) {
+        ref.invalidate(activeSessionsProvider);
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: AppColors.warningYellow,
+            content: Text(
+              'Session created, but the food order didn\'t go through. '
+              'Please show this to staff at the desk.',
+            ),
+          ),
+        );
+        context.go('/home');
+        return;
+      }
       setState(() {
         _busy = false;
         _errorText = "Couldn't purchase combo: $e";
@@ -226,8 +269,18 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
         .where((c) => !inSession.contains(c['id'] as String))
         .toList();
 
+    // Auto-select the only idle kid for single-kid families. Schedule
+    // the mutation post-frame so we never call setState() during build —
+    // Flutter throws in profile/release if we do, and even in debug it
+    // double-rebuilds the sheet which causes a visible flicker.
     if (hasSession && _selectedChildId == null && idleChildren.length == 1) {
-      _selectedChildId = idleChildren.first['id'] as String;
+      final onlyId = idleChildren.first['id'] as String;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_selectedChildId == null) {
+          setState(() => _selectedChildId = onlyId);
+        }
+      });
     }
 
     return DraggableScrollableSheet(

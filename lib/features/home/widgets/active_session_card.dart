@@ -51,9 +51,12 @@ class _ActiveSessionCardState extends ConsumerState<ActiveSessionCard> {
     final childName = (child['name'] as String?) ?? 'Your kid';
 
     final expiresAtStr = session['expires_at'] as String?;
-    final expiresAt = expiresAtStr != null
-        ? DateTime.parse(expiresAtStr).toLocal()
-        : null;
+    // tryParse so a malformed/null timestamp from a transient API state
+    // doesn't kill the Home tab with a FormatException — the timer just
+    // shows "—" until the next stream tick refreshes.
+    final expiresAt = expiresAtStr == null
+        ? null
+        : DateTime.tryParse(expiresAtStr)?.toLocal();
     final now = DateTime.now();
     final isPending = status == 'pending';
     final isGrace = expiresAt != null && expiresAt.isBefore(now);
