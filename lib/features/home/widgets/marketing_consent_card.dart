@@ -56,6 +56,9 @@ class _MarketingConsentCardState
     if (!visible) return const SizedBox.shrink();
 
     return Container(
+      // 16px top gap baked into the card so the parent layout doesn't
+      // leave a phantom gap when this widget auto-hides.
+      margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.lightSurface,

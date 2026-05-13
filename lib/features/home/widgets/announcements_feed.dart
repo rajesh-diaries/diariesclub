@@ -21,14 +21,20 @@ class AnnouncementsFeed extends ConsumerWidget {
     final rows = async.valueOrNull ?? const [];
     if (rows.isEmpty) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final r in rows) ...[
-          _AnnouncementCard(row: r),
-          const SizedBox(height: 12),
+    // Top margin baked in so this widget pulls its own 16px gap when
+    // it renders content; no phantom gap when it auto-hides. Internal
+    // cards stacked with 12px between them, no trailing space.
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            _AnnouncementCard(row: rows[i]),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

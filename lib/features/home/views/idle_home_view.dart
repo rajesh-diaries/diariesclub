@@ -45,6 +45,8 @@ class IdleHomeBody extends ConsumerWidget {
         .watch(referralRedeemEligibleProvider)
         .maybeWhen(data: (v) => v, orElse: () => false);
 
+    // Sections add their OWN top gap when they render content. Empty
+    // sections (auto-hide) return SizedBox.shrink — no phantom gap.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -64,16 +66,14 @@ class IdleHomeBody extends ConsumerWidget {
           const SizedBox(height: 16),
           const ReferralEntryCard(),
         ],
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         const HomeCombosStrip(),
         const SizedBox(height: 16),
         const BirthdayCardList(),
-        const SizedBox(height: 16),
-        // Module 2.3: announcements section between birthday card and
-        // recent activity. Renders nothing when no active rows.
+        // The next 3 sections carry their own top:16 margin so they
+        // collapse cleanly when empty (no phantom gaps).
         const AnnouncementsFeed(),
         const MarketingConsentCard(),
-        const SizedBox(height: 16),
         const MyUpcomingWorkshopsSection(),
         const SizedBox(height: 16),
         const RecentActivityList(),

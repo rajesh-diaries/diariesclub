@@ -61,9 +61,13 @@ class MyUpcomingWorkshopsSection extends ConsumerWidget {
     final workshops = async.valueOrNull ?? const [];
     if (workshops.isEmpty) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
+    return Padding(
+      // Self-margin so the parent doesn't leave a phantom gap when
+      // this widget auto-hides (no upcoming registrations).
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Row(
@@ -85,11 +89,12 @@ class MyUpcomingWorkshopsSection extends ConsumerWidget {
             ],
           ),
         ),
-        for (final w in workshops) ...[
-          _UpcomingWorkshopCard(workshop: w),
-          const SizedBox(height: 8),
+        for (var i = 0; i < workshops.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          _UpcomingWorkshopCard(workshop: workshops[i]),
         ],
-      ],
+        ],
+      ),
     );
   }
 }
