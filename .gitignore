@@ -70,3 +70,9 @@ ios/Runner/prod/GoogleService-Info.plist
 # Generated code — KEEP COMMITTED per Q7 (smoother onboarding)
 # (No exclusions for *.g.dart / *.freezed.dart / *.gr.dart)
 # ===========================================================================
+
+# Flutter run logs (local artifacts)
+flutter_*.log
+
+# Supabase CLI scratch dir
+supabase/.temp/
