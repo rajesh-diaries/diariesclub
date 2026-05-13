@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -241,6 +242,7 @@ class _HeroCardEditorState extends State<_HeroCardEditor> {
       widget.row?['unlock_stage'] as String?;
 
   bool _busy = false;
+  bool _uploading = false;
   String? _error;
 
   @override
@@ -249,6 +251,56 @@ class _HeroCardEditorState extends State<_HeroCardEditor> {
     _description.dispose();
     _imageUrl.dispose();
     super.dispose();
+  }
+
+  static const _bucket = 'hero-cards';
+
+  Future<void> _pickAndUpload() async {
+    if (_uploading) return;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      setState(() => _error = "Couldn't read that file.");
+      return;
+    }
+    setState(() {
+      _uploading = true;
+      _error = null;
+    });
+    try {
+      final ext = (file.extension ?? 'png').toLowerCase();
+      final contentType = switch (ext) {
+        'png' => 'image/png',
+        'jpg' || 'jpeg' => 'image/jpeg',
+        'webp' => 'image/webp',
+        _ => 'application/octet-stream',
+      };
+      // Path scoped by hero + timestamp so renames don't collide.
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final path = '$_hero/${ts}_${file.name}';
+      await Supabase.instance.client.storage.from(_bucket).uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(contentType: contentType),
+          );
+      final publicUrl =
+          Supabase.instance.client.storage.from(_bucket).getPublicUrl(path);
+      if (!mounted) return;
+      setState(() {
+        _imageUrl.text = publicUrl;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = "Couldn't upload image: $e");
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
   }
 
   Future<void> _save() async {
@@ -333,14 +385,59 @@ class _HeroCardEditorState extends State<_HeroCardEditor> {
                 ),
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _imageUrl,
-                decoration: const InputDecoration(
-                  labelText: 'Image URL (hero-cards bucket)',
-                  hintText: 'https://...',
-                  border: OutlineInputBorder(),
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _imageUrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Image URL',
+                        hintText: 'Pick a file →  or paste a URL',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 56,
+                    child: OutlinedButton.icon(
+                      onPressed: _uploading ? null : _pickAndUpload,
+                      icon: _uploading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(PhosphorIconsRegular.uploadSimple),
+                      label: Text(_uploading ? 'Uploading…' : 'Upload'),
+                    ),
+                  ),
+                ],
               ),
+              if (_imageUrl.text.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    _imageUrl.text,
+                    height: 120,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 120,
+                      alignment: Alignment.center,
+                      color: AppColors.lightBorder,
+                      child: Text(
+                        'Preview unavailable',
+                        style: AppTextStyles.caption(
+                          context,
+                          color: AppColors.lightTextSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               const Text('How is this card earned?',
                   style: TextStyle(fontWeight: FontWeight.w800)),
