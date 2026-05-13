@@ -102,11 +102,13 @@ class _OrderCard extends ConsumerStatefulWidget {
 class _OrderCardState extends ConsumerState<_OrderCard> {
   bool _busy = false;
   List<Map<String, dynamic>>? _items;
+  Map<String, dynamic>? _family;
 
   @override
   void initState() {
     super.initState();
     _loadItems();
+    _loadFamily();
   }
 
   Future<void> _loadItems() async {
@@ -123,13 +125,51 @@ class _OrderCardState extends ConsumerState<_OrderCard> {
     });
   }
 
+  Future<void> _loadFamily() async {
+    final familyId = widget.order['family_id'] as String?;
+    if (familyId == null) return;
+    try {
+      final row = await Supabase.instance.client
+          .from('families')
+          .select('id, name, phone')
+          .eq('id', familyId)
+          .maybeSingle();
+      if (!mounted) return;
+      setState(() => _family = row);
+    } catch (_) {
+      // Walk-in / synthetic family — leave _family null; card shows
+      // "Walk-in" as a fallback.
+    }
+  }
+
   Future<void> _advance() async {
+    if (_busy) return;
     setState(() => _busy = true);
     try {
-      await Supabase.instance.client
-          .from('orders')
-          .update({'status': widget.nextStatus})
-          .eq('id', widget.order['id'] as String);
+      await Supabase.instance.client.rpc<dynamic>(
+        'staff_order_advance_status',
+        params: {
+          'p_order_id': widget.order['id'] as String,
+          'p_new_status': widget.nextStatus,
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.activeGreen,
+          content: Text('Moved to ${widget.nextStatus}.'),
+        ),
+      );
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't advance: ${e.message}")),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't advance: $e")),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -148,6 +188,25 @@ class _OrderCardState extends ConsumerState<_OrderCard> {
     return AppColors.activeGreen;
   }
 
+  /// "3m" / "12m" / "1h 5m" / "2d ago" — better than raw minutes once
+  /// orders age past an hour.
+  String _ageLabel(int minutes) {
+    if (minutes < 60) return '${minutes}m';
+    if (minutes < 60 * 24) {
+      final h = minutes ~/ 60;
+      final m = minutes % 60;
+      return m == 0 ? '${h}h' : '${h}h ${m}m';
+    }
+    return '${minutes ~/ (60 * 24)}d ago';
+  }
+
+  String _modeLabel(String mode) => switch (mode) {
+        'table_service' => 'Table',
+        'pickup' => 'Pickup',
+        'dine_in' => 'Dine-in',
+        _ => mode.replaceAll('_', ' '),
+      };
+
   @override
   Widget build(BuildContext context) {
     final o = widget.order;
@@ -155,6 +214,9 @@ class _OrderCardState extends ConsumerState<_OrderCard> {
     final ageMin =
         created == null ? 0 : DateTime.now().difference(created).inMinutes;
     final isOld = ageMin >= 15;
+    final customerName = (_family?['name'] as String?) ?? 'Walk-in';
+    final shortId = (o['id'] as String).substring(0, 4).toUpperCase();
+    final mode = (o['fulfillment_mode'] as String?) ?? '';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -172,35 +234,43 @@ class _OrderCardState extends ConsumerState<_OrderCard> {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  '#${(o['id'] as String).substring(0, 4).toUpperCase()}',
-                  style: AppTextStyles.h3(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.bodyLarge(context).copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      '#$shortId · ${_modeLabel(mode)}',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 4),
+                    horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: _ageColor(ageMin).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
-                  '${ageMin}m',
+                  _ageLabel(ageMin),
                   style: AppTextStyles.caption(
                     context,
                     color: _ageColor(ageMin),
-                  ),
+                  ).copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            o['fulfillment_mode'] as String? ?? '',
-            style: AppTextStyles.caption(
-              context,
-              color: AppColors.lightTextSecondary,
-            ),
           ),
           const SizedBox(height: 12),
           Expanded(
