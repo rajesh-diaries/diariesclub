@@ -76,7 +76,7 @@ final venuePendingHealthyBitesProvider =
       .from('sessions')
       .select(
         'id, child_id, venue_id, family_id, status, started_at, '
-        'expires_at, duration_minutes, healthy_bite_earned, '
+        'expires_at, completed_at, duration_minutes, healthy_bite_earned, '
         'healthy_bite_distributed, healthy_bite_declined_at, '
         'children(name)',
       )
@@ -84,8 +84,8 @@ final venuePendingHealthyBitesProvider =
       .eq('healthy_bite_distributed', false)
       .isFilter('healthy_bite_declined_at', null)
       .inFilter('status', ['active', 'grace', 'completed', 'auto_closed'])
-      .gte('started_at', since)
-      .order('started_at', ascending: true);
+      .gte('started_at', since);
+  // Client sorts each section separately in the screen — keep raw rows here.
   return List<Map<String, dynamic>>.from(rows);
 });
 

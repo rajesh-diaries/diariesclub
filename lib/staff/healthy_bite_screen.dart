@@ -126,6 +126,31 @@ class _PendingTab extends ConsumerWidget {
                 (s) => s['status'] == 'active' || s['status'] == 'grace')
             .toList();
 
+        DateTime? completedAt(Map<String, dynamic> s) => DateTime.tryParse(
+            (s['completed_at'] ?? s['started_at']) as String? ?? '');
+        DateTime? expiresAt(Map<String, dynamic> s) =>
+            DateTime.tryParse(s['expires_at'] as String? ?? '');
+
+        // Most recently ended on top (staff hands bites to people who
+        // just walked off the floor).
+        completed.sort((a, b) {
+          final ca = completedAt(a);
+          final cb = completedAt(b);
+          if (ca == null && cb == null) return 0;
+          if (ca == null) return 1;
+          if (cb == null) return -1;
+          return cb.compareTo(ca);
+        });
+        // Active sessions closest to ending on top (next to walk out).
+        live.sort((a, b) {
+          final ea = expiresAt(a);
+          final eb = expiresAt(b);
+          if (ea == null && eb == null) return 0;
+          if (ea == null) return 1;
+          if (eb == null) return -1;
+          return ea.compareTo(eb);
+        });
+
         return ListView(
           padding: const EdgeInsets.all(12),
           children: [
@@ -588,6 +613,11 @@ class _DecisionTileState extends ConsumerState<_DecisionTile> {
         (s['id'] as String).substring(0, 6).toUpperCase();
     final status = s['status'] as String? ?? '?';
     final duration = s['duration_minutes'];
+    final completedAt =
+        DateTime.tryParse(s['completed_at'] as String? ?? '')?.toLocal();
+    final endedLine = completedAt == null
+        ? 'started ${_started(s)}'
+        : 'ended ${_relative(completedAt)} · ${_hhmm(completedAt)}';
 
     return Container(
       decoration: BoxDecoration(
@@ -608,12 +638,27 @@ class _DecisionTileState extends ConsumerState<_DecisionTile> {
               childName,
               style: AppTextStyles.bodyLarge(context),
             ),
-            subtitle: Text(
-              'Session $sessionShort · $duration-min · $status · '
-              'started ${_started(s)}',
-              style: AppTextStyles.caption(
-                context,
-                color: AppColors.lightTextSecondary,
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Session $sessionShort · $duration-min · $status',
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    endedLine,
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.navy,
+                    ).copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ],
               ),
             ),
           ),
@@ -674,4 +719,17 @@ String _hhmm(DateTime dt) {
   final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
   return '$hour:${dt.minute.toString().padLeft(2, '0')}'
       ' ${dt.hour >= 12 ? 'PM' : 'AM'}';
+}
+
+/// "just now" / "5 min ago" / "2 h ago" — staff-friendly short form.
+String _relative(DateTime dt) {
+  final diff = DateTime.now().difference(dt);
+  if (diff.inMinutes < 1) return 'just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+  if (diff.inHours < 4) {
+    final h = diff.inHours;
+    final m = diff.inMinutes.remainder(60);
+    return m == 0 ? '$h h ago' : '${h}h ${m}m ago';
+  }
+  return '${diff.inHours} h ago';
 }
