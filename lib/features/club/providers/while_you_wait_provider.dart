@@ -19,12 +19,16 @@ final shouldShowWhileYouWaitProvider =
   final prefs = await SharedPreferences.getInstance();
   if (prefs.getBool('wyw_dismissed_$sessionId') == true) return false;
 
-  final completed = await Supabase.instance.client
+  // Use head+count so the result is an exact integer rather than a
+  // .limit(2) probe that's brittle if PostgREST pagination ever
+  // changes. We just need "did the family complete >= 2 sessions?".
+  final res = await Supabase.instance.client
       .from('sessions')
       .select('id')
       .eq('family_id', familyId)
-      .inFilter('status', ['completed', 'auto_closed']).limit(2);
-  return (completed as List).length >= 2;
+      .inFilter('status', ['completed', 'auto_closed']).count(
+          CountOption.exact);
+  return res.count >= 2;
 });
 
 /// Persists the per-session dismissal. The active-session card on Home

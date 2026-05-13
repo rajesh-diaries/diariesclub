@@ -74,6 +74,11 @@ class StaffHomeScreen extends ConsumerWidget {
               onTap: () => context.push('/staff/redeem-perk'),
             ),
             _ActionTile(
+              icon: PhosphorIconsRegular.graduationCap,
+              label: 'Workshops · attendance',
+              onTap: () => context.push('/staff/workshops'),
+            ),
+            _ActionTile(
               icon: PhosphorIconsRegular.arrowUUpLeft,
               label: 'Refund',
               onTap: () => _withPin(

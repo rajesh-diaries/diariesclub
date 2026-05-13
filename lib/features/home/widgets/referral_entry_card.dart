@@ -5,8 +5,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/current_family_provider.dart';
 import '../../../core/providers/referral_eligibility_provider.dart';
+import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/currency.dart';
 
 /// Home-tab card that lets a new family enter a friend's referral code
 /// before their first session.
@@ -21,6 +23,12 @@ class ReferralEntryCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Pull the actual credit amount from venue_config so the copy stays
+    // honest if admin changes referral_new_family_credit_paise.
+    final cfg = ref.watch(venueConfigProvider).valueOrNull ?? const {};
+    final creditPaise =
+        (cfg['referral_new_family_credit_paise'] as int?) ?? 10000;
+    final creditLabel = Money.fromPaise(creditPaise);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _showEntryDialog(context, ref),
@@ -48,7 +56,7 @@ class ReferralEntryCard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Get ₹100 in your wallet after your first session.',
+                    'Get $creditLabel in your wallet after your first session.',
                     style: AppTextStyles.body(
                       context,
                       color: Colors.white70,

@@ -25,7 +25,12 @@ class _HydrationReminderBannerState
     extends ConsumerState<HydrationReminderBanner> {
   bool _dismissed = false;
 
+  // Show between 20m–30m of session elapsed. After 30m the banner
+  // auto-hides — by then either the kid has had a sip, the staff
+  // delivered one, or the reminder has done its job. Lingering longer
+  // just clutters the Home tab for the rest of the session.
   static const _hydrationThreshold = Duration(minutes: 20);
+  static const _hydrationCutoff = Duration(minutes: 30);
 
   @override
   Widget build(BuildContext context) {
@@ -37,8 +42,9 @@ class _HydrationReminderBannerState
     if (startedAt == null) return const SizedBox.shrink();
     final elapsed = DateTime.now().difference(startedAt);
 
-    // Only show after 20 minutes have elapsed.
+    // 10-minute visibility window: 20m → 30m of elapsed session time.
     if (elapsed < _hydrationThreshold) return const SizedBox.shrink();
+    if (elapsed >= _hydrationCutoff) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),

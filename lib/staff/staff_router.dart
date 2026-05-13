@@ -20,6 +20,7 @@ import 'staff_home_screen.dart';
 import 'staff_pin_change_screen.dart';
 import 'tablet_login_screen.dart';
 import 'walkin_pos_screen.dart';
+import 'workshop_attendance_screen.dart';
 
 /// Router for the staff flavor. Listens to tabletAuthStateProvider so the
 /// login redirect runs whenever the tablet signs out (or its device row
@@ -126,6 +127,22 @@ final staffRouterProvider = Provider<GoRouter>((ref) {
           final extra = state.extra as Map<String, dynamic>?;
           return ShiftCloseScreen(
             staffId: extra?['staffId'] as String? ?? '',
+          );
+        },
+      ),
+      GoRoute(
+        path: '/staff/workshops',
+        builder: (_, __) => const WorkshopAttendanceScreen(),
+      ),
+      GoRoute(
+        path: '/staff/workshops/:workshopId/attendance',
+        builder: (_, state) {
+          final extra = state.extra is Map
+              ? Map<String, dynamic>.from(state.extra! as Map)
+              : <String, dynamic>{};
+          return WorkshopRegistrationsScreen(
+            workshopId: state.pathParameters['workshopId']!,
+            title: extra['title'] as String?,
           );
         },
       ),

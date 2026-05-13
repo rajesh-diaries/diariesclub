@@ -14,8 +14,6 @@ class CoffeeMenuTab extends StatelessWidget {
       brand: 'coffee',
       title: 'Coffee Diaries',
       tagline: 'Slow brews, fast smiles.',
-      heroImage:
-          'https://placehold.co/1200x600/D4A473/FFFFFF.png?text=Coffee+Diaries',
       brandColor: AppColors.coffeeBrown,
       brandIcon: PhosphorIconsFill.coffee,
     );

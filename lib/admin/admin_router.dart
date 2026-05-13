@@ -28,6 +28,7 @@ import 'customers/customer_detail_screen.dart';
 import 'customers/customers_screen.dart';
 import 'live_ops/live_ops_screen.dart';
 import 'login_screen.dart';
+import 'notifications/broadcast_screen.dart';
 import 'packages/package_edit_screen.dart';
 import 'packages/packages_list_screen.dart';
 import 'providers/admin_auth_provider.dart';
@@ -199,6 +200,10 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             path: '/admin/announcements/:id/edit',
             builder: (_, state) =>
                 AnnouncementEditScreen(id: state.pathParameters['id']),
+          ),
+          GoRoute(
+            path: '/admin/notifications',
+            builder: (_, __) => const BroadcastNotificationScreen(),
           ),
           GoRoute(
             path: '/admin/coupons',

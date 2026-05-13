@@ -748,51 +748,70 @@ class _PerkOptionCard extends StatelessWidget {
   }
 }
 
-/// Stream of unredeemed perk slots for the family. Two shapes per row:
+/// Live stream of unredeemed perk slots for the family. Two shapes per row:
 ///   * Picked  → perk_id + code + expires_at set; render the existing card
 ///   * Unchosen → perk_id is NULL; render a "pick one of N rewards" card.
 /// RLS scopes by family.
+///
+/// Realtime: stage_perk_grants is in the supabase_realtime publication
+/// (added in migration 0141), so when staff calls stage_perk_redeem the
+/// redeemed_at flip flows here within ~1s and the card disappears
+/// without needing an app restart. PostgREST's `.stream()` doesn't
+/// support joins, so we use the realtime change as a trigger to re-run
+/// the joined SELECT.
 final unredeemedHeroPerksProvider =
-    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) async* {
   final familyId = ref.watch(currentFamilyIdProvider);
-  if (familyId == null) return const [];
-  // LEFT JOIN on stage_perks (no `!inner`) so unchosen slots come
-  // through. Unchosen slots have no expires_at yet — don't filter by it.
-  final rows = await Supabase.instance.client
+  if (familyId == null) {
+    yield const [];
+    return;
+  }
+
+  Future<List<Map<String, dynamic>>> fetchJoined() async {
+    final rows = await Supabase.instance.client
+        .from('stage_perk_grants')
+        .select(
+          'id, code, stage, trait, granted_at, expires_at, perk_id, '
+          'children!inner(name), '
+          'stage_perks(perk_label, perk_description, is_active)',
+        )
+        .eq('family_id', familyId)
+        .isFilter('redeemed_at', null)
+        .order('granted_at', ascending: false);
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    return (rows as List).map((r) {
+      final m = Map<String, dynamic>.from(r as Map);
+      final children = m['children'] as Map?;
+      final perk = m['stage_perks'] as Map?;
+      return {
+        ...m,
+        'child_name': children?['name'],
+        'perk_label': perk?['perk_label'],
+        'perk_description': perk?['perk_description'],
+        'perk_is_active': perk?['is_active'],
+      };
+    }).where((m) {
+      if (m['perk_id'] != null && m['perk_is_active'] == false) {
+        return false;
+      }
+      final exp = m['expires_at'] as String?;
+      if (exp == null) return true;
+      return exp.compareTo(nowIso) >= 0;
+    }).toList();
+  }
+
+  // Initial emission so the card renders on first build.
+  yield await fetchJoined();
+
+  // Realtime trigger: any insert/update/delete on this family's
+  // stage_perk_grants rows re-runs the joined select.
+  final stream = Supabase.instance.client
       .from('stage_perk_grants')
-      .select(
-        'id, code, stage, trait, granted_at, expires_at, perk_id, '
-        'children!inner(name), '
-        'stage_perks(perk_label, perk_description, is_active)',
-      )
-      .eq('family_id', familyId)
-      .isFilter('redeemed_at', null)
-      .order('granted_at', ascending: false);
-  final nowIso = DateTime.now().toUtc().toIso8601String();
-  return (rows as List).map((r) {
-    final m = Map<String, dynamic>.from(r as Map);
-    final children = m['children'] as Map?;
-    final perk = m['stage_perks'] as Map?;
-    return {
-      ...m,
-      'child_name': children?['name'],
-      'perk_label': perk?['perk_label'],
-      'perk_description': perk?['perk_description'],
-      'perk_is_active': perk?['is_active'],
-    };
-  }).where((m) {
-    // Live admin state: if a chosen perk has been archived (is_active
-    // = false), drop the grant from the customer view — admin's intent
-    // is to retire it, and the kid should see the latest live options.
-    // Unchosen slots (perk_id NULL) always stay; their picker reads
-    // from the live stagePerkOptionsProvider so it follows admin too.
-    if (m['perk_id'] != null && m['perk_is_active'] == false) {
-      return false;
-    }
-    final exp = m['expires_at'] as String?;
-    if (exp == null) return true;
-    return exp.compareTo(nowIso) >= 0;
-  }).toList();
+      .stream(primaryKey: ['id'])
+      .eq('family_id', familyId);
+  await for (final _ in stream) {
+    yield await fetchJoined();
+  }
 });
 
 /// The live admin-configured options for a (stage, trait). Used to

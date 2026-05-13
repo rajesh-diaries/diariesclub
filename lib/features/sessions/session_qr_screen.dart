@@ -51,7 +51,7 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
   String? _qrPayload;
   String? _error;
 
-  Timer? _statusPoll;
+  StreamSubscription<List<Map<String, dynamic>>>? _statusSub;
   Timer? _countdownTick;
   Duration _remaining = Duration.zero;
   DateTime? _deadline;
@@ -67,7 +67,7 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
 
   @override
   void dispose() {
-    _statusPoll?.cancel();
+    _statusSub?.cancel();
     _countdownTick?.cancel();
     WakelockPlus.disable();
     ScreenBrightness().resetApplicationScreenBrightness().catchError((_) {});
@@ -134,18 +134,42 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
 
   void _startTickers() {
     _countdownTick?.cancel();
-    _statusPoll?.cancel();
+    _statusSub?.cancel();
     _countdownTick =
         Timer.periodic(const Duration(seconds: 1), (_) => _tickCountdown());
-    _statusPoll =
-        Timer.periodic(const Duration(seconds: 2), (_) => _pollStatus());
+    // `sessions` is in supabase_realtime — subscribe to this row so the
+    // pending → active / cancelled_pre_scan transition arrives within a
+    // second of staff scanning or the autocancel cron firing, with no
+    // 2s polling overhead.
+    _statusSub = Supabase.instance.client
+        .from('sessions')
+        .stream(primaryKey: ['id'])
+        .eq('id', widget.sessionId)
+        .listen(_onStatusRows);
   }
 
   void _stopTickers() {
     _countdownTick?.cancel();
-    _statusPoll?.cancel();
+    _statusSub?.cancel();
     _countdownTick = null;
-    _statusPoll = null;
+    _statusSub = null;
+  }
+
+  void _onStatusRows(List<Map<String, dynamic>> rows) {
+    if (!mounted || _session == null || rows.isEmpty) return;
+    final row = rows.first;
+    final newStatus = row['status'] as String?;
+    final oldStatus = _session?['status'] as String?;
+    if (newStatus == oldStatus) return;
+    setState(() {
+      _session = {..._session!, ...Map<String, dynamic>.from(row)};
+    });
+    if (newStatus != 'pending') {
+      _stopTickers();
+      if (oldStatus == 'pending') {
+        _autoDismissTo(newStatus);
+      }
+    }
   }
 
   void _tickCountdown() {
@@ -157,37 +181,7 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
     });
   }
 
-  Future<void> _pollStatus() async {
-    if (!mounted || _session == null) return;
-    try {
-      final row = await Supabase.instance.client
-          .from('sessions')
-          .select('status, started_at, expires_at, grace_force_close_at')
-          .eq('id', widget.sessionId)
-          .maybeSingle();
-      if (!mounted || row == null) return;
-      final newStatus = row['status'] as String?;
-      final oldStatus = _session?['status'] as String?;
-      if (newStatus != oldStatus) {
-        setState(() {
-          _session = {..._session!, ...Map<String, dynamic>.from(row)};
-        });
-        if (newStatus != 'pending') {
-          _stopTickers();
-          // BUG-016: when the server transitions us out of 'pending' (staff
-          // scan → 'active', or autocancel cron → 'cancelled_pre_scan'),
-          // celebrate briefly then send the customer to /home so they see
-          // the running session / refunded wallet without needing to back
-          // out manually.
-          if (oldStatus == 'pending') {
-            _autoDismissTo(newStatus);
-          }
-        }
-      }
-    } catch (_) {
-      // Transient error — next tick retries.
-    }
-  }
+  // _pollStatus removed — replaced by realtime stream in _startTickers.
 
   Future<void> _autoDismissTo(String? newStatus) async {
     final messenger = ScaffoldMessenger.of(context);

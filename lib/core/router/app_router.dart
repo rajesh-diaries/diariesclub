@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/adventure/adventure_screen.dart';
 import '../../features/adventure/per_trait_detail_screen.dart';
-import '../../features/adventure/wall_of_legends_screen.dart';
 import '../../features/auth/otp_verify_screen.dart';
 import '../../features/auth/phone_entry_screen.dart';
 import '../../features/auth/splash_screen.dart';
@@ -210,6 +209,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const WalletHistoryScreen(),
       ),
+      // Notification deep-link aliases. Server-pushed notifications
+      // (referral conversions, top-up confirmations) embed '/wallet' as
+      // their deep_link; this redirect lands the customer on the real
+      // wallet history screen.
+      GoRoute(
+        path: '/wallet',
+        redirect: (_, __) => '/profile/wallet-history',
+      ),
+      // Workshop-published notifications embed '/club/workshops' —
+      // there's no dedicated workshops route, the workshops list lives
+      // inside the Club tab. Redirect there so the tap doesn't 404.
+      GoRoute(
+        path: '/club/workshops',
+        redirect: (_, __) => '/club',
+      ),
       GoRoute(
         path: '/profile/sessions',
         name: 'profile_sessions',
@@ -368,13 +382,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           hero: state.pathParameters['hero']!,
         ),
       ),
-      GoRoute(
-        path: '/adventure/wall-of-legends',
-        name: 'adventure_wall_of_legends',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const WallOfLegendsScreen(),
-      ),
-
       // ── Club: order tracking + workshop detail (Session 7) ────────────
       GoRoute(
         path: '/club/order/:orderId',

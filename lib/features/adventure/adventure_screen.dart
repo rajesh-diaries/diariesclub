@@ -51,14 +51,6 @@ class AdventureScreen extends ConsumerWidget {
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             ),
           ),
-          IconButton(
-            tooltip: 'Wall of Legends',
-            icon: const Icon(
-              PhosphorIconsRegular.trophy,
-              color: AppColors.gold,
-            ),
-            onPressed: () => context.push('/adventure/wall-of-legends'),
-          ),
           const SizedBox(width: 8),
         ],
       ),

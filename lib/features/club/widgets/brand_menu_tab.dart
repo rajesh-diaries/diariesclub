@@ -14,7 +14,9 @@ class BrandMenuTab extends ConsumerWidget {
   final String brand; // 'coffee' | 'fit'
   final String title;
   final String tagline;
-  final String heroImage;
+  /// Optional remote hero image. When null/empty the hero falls back to a
+  /// brand-colored gradient — no placeholder URL is ever shown.
+  final String? heroImage;
   final Color brandColor;
   final IconData brandIcon;
 
@@ -23,7 +25,7 @@ class BrandMenuTab extends ConsumerWidget {
     required this.brand,
     required this.title,
     required this.tagline,
-    required this.heroImage,
+    this.heroImage,
     required this.brandColor,
     required this.brandIcon,
   });
@@ -107,7 +109,8 @@ class BrandMenuTab extends ConsumerWidget {
 class _Hero extends StatelessWidget {
   final String title;
   final String tagline;
-  final String image;
+  /// Null/empty → no network call; just renders a brand-colored gradient.
+  final String? image;
   final Color color;
   final IconData icon;
   const _Hero({
@@ -120,31 +123,47 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasImage = image != null && image!.isNotEmpty;
     return SizedBox(
       height: 140,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          CachedNetworkImage(
-            imageUrl: image,
-            fit: BoxFit.cover,
-            placeholder: (_, __) =>
-                Container(color: color.withValues(alpha: 0.20)),
-            errorWidget: (_, __, ___) =>
-                Container(color: color.withValues(alpha: 0.30)),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.black.withValues(alpha: 0.45),
-                  Colors.black.withValues(alpha: 0.10),
-                ],
-                begin: Alignment.bottomLeft,
-                end: Alignment.topRight,
+          if (hasImage)
+            CachedNetworkImage(
+              imageUrl: image!,
+              fit: BoxFit.cover,
+              placeholder: (_, __) =>
+                  Container(color: color.withValues(alpha: 0.20)),
+              errorWidget: (_, __, ___) =>
+                  Container(color: color.withValues(alpha: 0.30)),
+            )
+          else
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    color.withValues(alpha: 0.55),
+                    color.withValues(alpha: 0.20),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
             ),
-          ),
+          if (hasImage)
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withValues(alpha: 0.45),
+                    Colors.black.withValues(alpha: 0.10),
+                  ],
+                  begin: Alignment.bottomLeft,
+                  end: Alignment.topRight,
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(

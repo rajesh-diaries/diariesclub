@@ -120,7 +120,8 @@ class _ActivityRow extends StatelessWidget {
 
   String _relativeTime(String? iso) {
     if (iso == null) return '';
-    final t = DateTime.parse(iso).toLocal();
+    final t = DateTime.tryParse(iso)?.toLocal();
+    if (t == null) return '';
     final diff = DateTime.now().difference(t);
     if (diff.inMinutes < 1) return 'just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
