@@ -10,7 +10,6 @@ import '../../../core/theme/app_text_styles.dart';
 import '../widgets/active_session_card.dart';
 import '../widgets/announcements_feed.dart';
 import '../widgets/birthday_card.dart';
-import '../widgets/healthy_bite_widget.dart';
 import '../widgets/home_combos_strip.dart';
 import '../widgets/marketing_consent_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
@@ -97,8 +96,6 @@ class MultiSessionHomeView extends ConsumerWidget {
           const SizedBox(height: 16),
           const AnnouncementsFeed(),
           const MarketingConsentCard(),
-          const SizedBox(height: 16),
-          const HealthyBiteWidget(),
           const SizedBox(height: 16),
           const MyUpcomingWorkshopsSection(),
           const SizedBox(height: 16),

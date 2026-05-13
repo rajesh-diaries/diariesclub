@@ -14,7 +14,6 @@ import '../../club/widgets/while_you_wait_card.dart';
 import '../../sessions/widgets/extend_session_sheet.dart';
 import '../widgets/birthday_card.dart';
 import '../widgets/healthy_bite_reminder_banner.dart';
-import '../widgets/healthy_bite_widget.dart';
 import '../widgets/hydration_reminder_banner.dart';
 import '../widgets/wallet_card.dart';
 
@@ -172,7 +171,6 @@ class _DominantLayout extends StatelessWidget {
         const SizedBox(height: 16),
         if (!isGrace) WhileYouWaitCard(session: session),
         const BirthdayCardList(),
-        const HealthyBiteWidget(),
         const SizedBox(height: 32),
       ],
     );
@@ -230,7 +228,6 @@ class _CompactLayout extends StatelessWidget {
         const SizedBox(height: 16),
         if (!isGrace) WhileYouWaitCard(session: session),
         const BirthdayCardList(),
-        const HealthyBiteWidget(),
         const SizedBox(height: 12),
         const WalletCard(compact: true),
         const SizedBox(height: 16),

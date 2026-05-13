@@ -6,7 +6,6 @@ import '../../../core/providers/referral_eligibility_provider.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../widgets/announcements_feed.dart';
 import '../widgets/birthday_card.dart';
-import '../widgets/healthy_bite_widget.dart';
 import '../widgets/home_combos_strip.dart';
 import '../widgets/marketing_consent_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
@@ -74,8 +73,6 @@ class IdleHomeBody extends ConsumerWidget {
         // recent activity. Renders nothing when no active rows.
         const AnnouncementsFeed(),
         const MarketingConsentCard(),
-        const SizedBox(height: 16),
-        const HealthyBiteWidget(),
         const SizedBox(height: 16),
         const MyUpcomingWorkshopsSection(),
         const SizedBox(height: 16),
