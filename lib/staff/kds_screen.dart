@@ -237,16 +237,34 @@ class _OrderCardState extends ConsumerState<_OrderCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      customerName,
+                    // ID first + customer — two orders from the same
+                    // family stay visually distinct ("#08CE Rajesh"
+                    // vs "#7D67 Rajesh").
+                    RichText(
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.bodyLarge(context).copyWith(
-                        fontWeight: FontWeight.w800,
+                      text: TextSpan(
+                        style: AppTextStyles.bodyLarge(context),
+                        children: [
+                          TextSpan(
+                            text: '#$shortId  ',
+                            style: const TextStyle(
+                              color: AppColors.navy,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                          TextSpan(
+                            text: customerName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Text(
-                      '#$shortId · ${_modeLabel(mode)}',
+                      _modeLabel(mode),
                       style: AppTextStyles.caption(
                         context,
                         color: AppColors.lightTextSecondary,
