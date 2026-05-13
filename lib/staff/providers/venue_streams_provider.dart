@@ -3,8 +3,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'staff_auth_provider.dart';
 
-/// Realtime stream of all sessions at this venue in active or grace state.
-/// Used by the staff home dashboard count and the active sessions screen.
+/// Active + grace sessions at this venue, with embedded kid + guardian
+/// names. Polled every 15s (instead of .stream(), which doesn't support
+/// embedded selects) so the staff screen can show "kid · guardian"
+/// alongside time-remaining/extended/healthy-bite without N+1 fetches.
 final venueActiveSessionsProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) async* {
   final venueId = ref.watch(currentTabletVenueIdProvider);
@@ -12,15 +14,23 @@ final venueActiveSessionsProvider =
     yield const [];
     return;
   }
-  final stream = Supabase.instance.client
-      .from('sessions')
-      .stream(primaryKey: ['id'])
-      .eq('venue_id', venueId)
-      .order('started_at', ascending: true);
-  await for (final rows in stream) {
-    yield rows
-        .where((r) => r['status'] == 'active' || r['status'] == 'grace')
-        .toList();
+  // Yield once immediately, then poll every 15s. Cancellation-safe via
+  // the async generator — when the screen disposes the loop ends.
+  while (true) {
+    final rows = await Supabase.instance.client
+        .from('sessions')
+        .select(
+          'id, child_id, family_id, venue_id, status, '
+          'started_at, expires_at, completed_at, duration_minutes, '
+          'payment_method, healthy_bite_earned, healthy_bite_distributed, '
+          'healthy_bite_claimed_at, '
+          'children(name), families(name)',
+        )
+        .eq('venue_id', venueId)
+        .inFilter('status', ['active', 'grace'])
+        .order('expires_at', ascending: true);
+    yield List<Map<String, dynamic>>.from(rows);
+    await Future<void>.delayed(const Duration(seconds: 15));
   }
 });
 

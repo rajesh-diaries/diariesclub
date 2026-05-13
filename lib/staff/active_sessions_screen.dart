@@ -134,6 +134,30 @@ class _SectionHeader extends StatelessWidget {
       );
 }
 
+class _MetaLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _MetaLine({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: AppColors.lightTextSecondary),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: AppTextStyles.caption(
+            context,
+            color: AppColors.lightTextSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SessionTile extends ConsumerWidget {
   final Map<String, dynamic> session;
   const _SessionTile({required this.session});
@@ -141,10 +165,30 @@ class _SessionTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = session['status'] as String?;
+    final startedAt =
+        DateTime.tryParse(session['started_at'] as String? ?? '')?.toLocal();
     final expiresAt =
         DateTime.tryParse(session['expires_at'] as String? ?? '')?.toLocal();
     final isGrace = status == 'grace';
     final remaining = expiresAt?.difference(DateTime.now());
+
+    final kidName =
+        ((session['children'] as Map?)?['name'] as String?) ?? '—';
+    final guardianName =
+        ((session['families'] as Map?)?['name'] as String?) ?? '—';
+    final sessionShort =
+        (session['id'] as String).substring(0, 6).toUpperCase();
+    final durationMin = session['duration_minutes'] as int?;
+    final paymentMethod = session['payment_method'] as String?;
+
+    // Was the session extended? Compare actual window to booked duration.
+    int extendedMin = 0;
+    if (startedAt != null && expiresAt != null && durationMin != null) {
+      final actualMin = expiresAt.difference(startedAt).inMinutes;
+      if (actualMin > durationMin) {
+        extendedMin = actualMin - durationMin;
+      }
+    }
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -163,11 +207,25 @@ class _SessionTile extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  'Session ${(session['id'] as String).substring(0, 6).toUpperCase()}',
-                  style: AppTextStyles.bodyLarge(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      kidName,
+                      style: AppTextStyles.bodyLarge(context).copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Guardian: $guardianName',
+                      style: AppTextStyles.caption(
+                        context, color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Text(
@@ -176,17 +234,53 @@ class _SessionTile extends ConsumerWidget {
                   context,
                   color:
                       isGrace ? AppColors.adminRed : AppColors.lightTextPrimary,
-                ),
+                ).copyWith(fontWeight: FontWeight.w700),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            '${session['duration_minutes']}-min · ${session['payment_method']}',
-            style: AppTextStyles.caption(
-              context,
-              color: AppColors.lightTextSecondary,
-            ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              _MetaLine(
+                icon: PhosphorIconsRegular.timer,
+                text: '${durationMin ?? '—'}-min · ${paymentMethod ?? '—'}',
+              ),
+              if (startedAt != null)
+                _MetaLine(
+                  icon: PhosphorIconsRegular.play,
+                  text: 'Started ${_hhmm(startedAt)}',
+                ),
+              if (expiresAt != null)
+                _MetaLine(
+                  icon: PhosphorIconsRegular.flagCheckered,
+                  text: 'Ends ${_hhmm(expiresAt)}',
+                ),
+              if (extendedMin > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Extended +${extendedMin}m',
+                    style: const TextStyle(
+                      color: AppColors.gold,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              Text(
+                'ID $sessionShort',
+                style: AppTextStyles.caption(
+                  context, color: AppColors.lightTextSecondary,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -248,6 +342,12 @@ class _SessionTile extends ConsumerWidget {
     );
   }
 
+  static String _hhmm(DateTime dt) {
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    return '$hour:${dt.minute.toString().padLeft(2, '0')}'
+        ' ${dt.hour >= 12 ? 'PM' : 'AM'}';
+  }
+
   String _remainingLabel(Duration? r, {required bool isGrace}) {
     if (r == null) return '—';
     if (isGrace) {
@@ -296,9 +396,10 @@ class _SessionTile extends ConsumerWidget {
     );
     if (staff == null) return;
     try {
+      // RPC signature: p_duration_minutes (not p_extra_minutes).
       await Supabase.instance.client.rpc<dynamic>('session_extend', params: {
         'p_session_id': session['id'],
-        'p_extra_minutes': mins,
+        'p_duration_minutes': mins,
         'p_payment_method': 'cash',
         'p_initiated_by': 'staff_on_behalf',
         'p_staff_pin_id': staff.staffId,
