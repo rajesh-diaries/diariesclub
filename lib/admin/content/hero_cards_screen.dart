@@ -9,12 +9,36 @@ import '../../core/theme/app_text_styles.dart';
 import '../widgets/admin_buttons.dart';
 import '../widgets/admin_list_scaffold.dart';
 
-/// Module 2.8 — hero cards admin CRUD. Card grid grouped by hero.
-class HeroCardsScreen extends ConsumerWidget {
+/// Module 2.8 — hero cards admin CRUD. Card grid grouped by hero,
+/// with filters across the top so admin can drill into a specific
+/// (character × stage) or just see all surprises etc.
+class HeroCardsScreen extends ConsumerStatefulWidget {
   const HeroCardsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HeroCardsScreen> createState() => _HeroCardsScreenState();
+}
+
+class _HeroCardsScreenState extends ConsumerState<HeroCardsScreen> {
+  // null = "All"; otherwise specific value.
+  String? _heroFilter;
+  String? _methodFilter; // 'stage' | 'surprise' | 'birthday' | 'random_drop'
+  String? _stageFilter;
+
+  bool _matches(Map<String, dynamic> r) {
+    if (_heroFilter != null && r['hero'] != _heroFilter) return false;
+    if (_methodFilter != null && r['unlock_method'] != _methodFilter) {
+      return false;
+    }
+    if (_stageFilter != null) {
+      if (r['unlock_method'] != 'stage') return false;
+      if (r['unlock_stage'] != _stageFilter) return false;
+    }
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final async = ref.watch(heroCardsAdminProvider);
     return AdminListScaffold(
       title: 'Hero cards',
@@ -26,43 +50,61 @@ class HeroCardsScreen extends ConsumerWidget {
           child: AdminPrimaryButton(
             icon: PhosphorIconsRegular.plus,
             label: 'New card',
-            onPressed: () => _openEditor(context, ref, null),
+            onPressed: () => _openEditor(null),
           ),
         ),
       ],
       isEmpty: async.maybeWhen(
-        data: (rows) => rows.isEmpty,
+        data: (rows) => rows.where(_matches).isEmpty,
         orElse: () => false,
       ),
       emptyState: const AdminListEmptyState(
         icon: PhosphorIconsRegular.shieldCheck,
-        message: 'No hero cards yet.',
+        message: 'No cards match these filters.',
       ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (rows) => SingleChildScrollView(
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              for (final r in rows)
-                _HeroCardTile(
-                  row: r,
-                  onTap: () => _openEditor(context, ref, r),
+        data: (rows) {
+          final filtered = rows.where(_matches).toList();
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _FiltersBar(
+                  hero: _heroFilter,
+                  method: _methodFilter,
+                  stage: _stageFilter,
+                  onHero: (v) => setState(() => _heroFilter = v),
+                  onMethod: (v) => setState(() {
+                    _methodFilter = v;
+                    if (v != 'stage') _stageFilter = null;
+                  }),
+                  onStage: (v) => setState(() => _stageFilter = v),
+                  total: rows.length,
+                  showing: filtered.length,
                 ),
-            ],
-          ),
-        ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: [
+                    for (final r in filtered)
+                      _HeroCardTile(
+                        row: r,
+                        onTap: () => _openEditor(r),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  Future<void> _openEditor(
-    BuildContext context,
-    WidgetRef ref,
-    Map<String, dynamic>? row,
-  ) async {
+  Future<void> _openEditor(Map<String, dynamic>? row) async {
     final saved = await showDialog<bool>(
       context: context,
       builder: (_) => _HeroCardEditor(row: row),
@@ -70,6 +112,138 @@ class HeroCardsScreen extends ConsumerWidget {
     if (saved == true) {
       ref.invalidate(heroCardsAdminProvider);
     }
+  }
+}
+
+class _FiltersBar extends StatelessWidget {
+  final String? hero;
+  final String? method;
+  final String? stage;
+  final ValueChanged<String?> onHero;
+  final ValueChanged<String?> onMethod;
+  final ValueChanged<String?> onStage;
+  final int total;
+  final int showing;
+  const _FiltersBar({
+    required this.hero,
+    required this.method,
+    required this.stage,
+    required this.onHero,
+    required this.onMethod,
+    required this.onStage,
+    required this.total,
+    required this.showing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.lightSurface,
+        border: Border.all(color: AppColors.lightBorder),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _FilterRow(
+            label: 'Character',
+            options: const [
+              (null, 'All'),
+              ('rafi', 'Rafi'),
+              ('ellie', 'Ellie'),
+              ('gerry', 'Gerry'),
+              ('zena', 'Zena'),
+            ],
+            value: hero,
+            onPick: onHero,
+          ),
+          const SizedBox(height: 8),
+          _FilterRow(
+            label: 'How earned',
+            options: const [
+              (null, 'All'),
+              ('stage', 'Stage'),
+              ('surprise', 'Surprise'),
+              ('birthday', 'Birthday'),
+              ('random_drop', 'Random drop'),
+            ],
+            value: method,
+            onPick: onMethod,
+          ),
+          if (method == 'stage') ...[
+            const SizedBox(height: 8),
+            _FilterRow(
+              label: 'Stage',
+              options: const [
+                (null, 'All'),
+                ('welcome', 'Welcome'),
+                ('seedling', 'Seedling'),
+                ('explorer', 'Explorer'),
+                ('adventurer', 'Adventurer'),
+                ('champion', 'Champion'),
+                ('legend', 'Legend'),
+              ],
+              value: stage,
+              onPick: onStage,
+            ),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            'Showing $showing of $total',
+            style: AppTextStyles.caption(
+              context, color: AppColors.lightTextSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterRow extends StatelessWidget {
+  final String label;
+  final List<(String?, String)> options;
+  final String? value;
+  final ValueChanged<String?> onPick;
+  const _FilterRow({
+    required this.label,
+    required this.options,
+    required this.value,
+    required this.onPick,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 110,
+          child: Text(
+            label,
+            style: AppTextStyles.caption(context).copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final opt in options)
+                ChoiceChip(
+                  label: Text(opt.$2),
+                  selected: value == opt.$1,
+                  onSelected: (_) => onPick(opt.$1),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
