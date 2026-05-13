@@ -5,13 +5,11 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../providers/hero_cards_providers.dart';
 
-/// One tile in the hero card grid. Earned cards render in full color with
-/// a small "rare" star or a "birthday" cake corner badge. Uncollected
-/// stage / random / birthday cards get a greyscale silhouette + lock
-/// icon (preserves "this exists, you'll earn it" tease). Ungranted
-/// SURPRISE cards get a fully-mystery '???' tile — admin/staff hand
-/// these out for live moments, so spoiling the art ahead would ruin
-/// the surprise.
+/// One tile in the hero card grid. Earned cards render in full color
+/// with a small "rare" star or a "birthday" cake corner badge.
+/// Anything NOT yet earned gets the fully-sealed `???` tile so the
+/// artwork stays a surprise across stage / birthday / surprise /
+/// random_drop — no silhouette leaks.
 class CardGridItem extends StatelessWidget {
   final HeroCardRow row;
   final VoidCallback? onTap;
@@ -21,7 +19,6 @@ class CardGridItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final earned = row.isEarned;
     final isRare = row.isRare;
-    final isSurprise = row.isSurprise;
     final imageUrl = row.imageUrl ?? '';
 
     final image = imageUrl.isEmpty
@@ -64,10 +61,9 @@ class CardGridItem extends StatelessWidget {
             children: [
               if (earned)
                 image
-              else if (isSurprise)
-                // Full mystery — no art preview, no name, just a sealed
-                // gold-foil square with '???'. Granted manually by
-                // admin/staff for real-world moments.
+              else
+                // Sealed mystery for every unearned card — no silhouette
+                // leak across stage / birthday / surprise / random_drop.
                 Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -87,28 +83,6 @@ class CardGridItem extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
                       letterSpacing: 4,
-                    ),
-                  ),
-                )
-              else
-                ColorFiltered(
-                  colorFilter: const ColorFilter.matrix([
-                    0.2126, 0.7152, 0.0722, 0, -40,
-                    0.2126, 0.7152, 0.0722, 0, -40,
-                    0.2126, 0.7152, 0.0722, 0, -20,
-                    0,      0,      0,      1, 0,
-                  ]),
-                  child: image,
-                ),
-              if (!earned && !isSurprise)
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      PhosphorIconsFill.lockSimple,
-                      color: Colors.white60,
-                      size: 28,
                     ),
                   ),
                 ),
