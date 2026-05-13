@@ -178,7 +178,6 @@ class _FiltersBar extends StatelessWidget {
               label: 'Stage',
               options: const [
                 (null, 'All'),
-                ('welcome', 'Welcome'),
                 ('seedling', 'Seedling'),
                 ('explorer', 'Explorer'),
                 ('adventurer', 'Adventurer'),
@@ -654,12 +653,14 @@ class _HeroCardEditorState extends State<_HeroCardEditor> {
                     border: OutlineInputBorder(),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'welcome',     child: Text('Welcome (signup)')),
+                    // Welcome stage retired — no on-app moment exists
+                    // to grant it (no transition INTO welcome; first-
+                    // session auto-grant was rolled back).
                     DropdownMenuItem(value: 'seedling',    child: Text('Seedling (1 XP)')),
-                    DropdownMenuItem(value: 'explorer',    child: Text('Explorer (50 XP)')),
-                    DropdownMenuItem(value: 'adventurer',  child: Text('Adventurer (150 XP)')),
-                    DropdownMenuItem(value: 'champion',    child: Text('Champion (350 XP)')),
-                    DropdownMenuItem(value: 'legend',      child: Text('Legend (700 XP)')),
+                    DropdownMenuItem(value: 'explorer',    child: Text('Explorer (200 XP)')),
+                    DropdownMenuItem(value: 'adventurer',  child: Text('Adventurer (400 XP)')),
+                    DropdownMenuItem(value: 'champion',    child: Text('Champion (800 XP)')),
+                    DropdownMenuItem(value: 'legend',      child: Text('Legend (1500 XP)')),
                   ],
                   onChanged: (v) => setState(() => _unlockStage = v),
                 ),
