@@ -74,10 +74,24 @@ class BirthdayCardList extends ConsumerWidget {
       );
 
       if (activeReservation.isNotEmpty) {
+        // After a completed party, hide the Home card 7 days past the
+        // slot_date so old keepsakes don't linger on Home forever.
+        // Keepsake still accessible via Profile → Past birthdays.
+        int daysSincePartySlot = -1;
+        final slotDateStr = activeReservation['slot_date'] as String?;
+        if (slotDateStr != null) {
+          final slotDate = DateTime.tryParse(slotDateStr);
+          if (slotDate != null) {
+            daysSincePartySlot =
+                DateTime.now().difference(slotDate).inDays;
+          }
+        }
+
         final variant = _resolveActiveVariant(
           status: activeReservation['status'] as String? ?? '',
           albumReady: activeReservation['album_ready_at'] != null,
           daysUntil: daysUntil,
+          daysSincePartySlot: daysSincePartySlot,
         );
         if (variant != _Variant.hidden) {
           reservationEntries.add(_CardEntry(
@@ -133,20 +147,31 @@ class BirthdayCardList extends ConsumerWidget {
     );
   }
 
+  /// Hide post-party cards (Thank you / A little memory) on Home once
+  /// the party is 7+ days in the past. Keepsake stays accessible via
+  /// Profile → Past birthdays — Home should reflect what's *current*.
+  static const _postPartyHomeDays = 7;
+
   static _Variant _resolveActiveVariant({
     required String status,
     required bool albumReady,
     required int daysUntil,
-  }) =>
-      switch (status) {
-        'interested' => _Variant.interestSubmitted,
-        'admin_contacted' => _Variant.adminContacted,
-        'confirmed' =>
-          daysUntil <= 1 ? _Variant.tomorrow : _Variant.confirmed,
-        'completed' =>
-          albumReady ? _Variant.albumReady : _Variant.albumPending,
-        _ => _Variant.hidden,
-      };
+    required int daysSincePartySlot,
+  }) {
+    if (status == 'completed' &&
+        daysSincePartySlot > _postPartyHomeDays) {
+      return _Variant.hidden;
+    }
+    return switch (status) {
+      'interested' => _Variant.interestSubmitted,
+      'admin_contacted' => _Variant.adminContacted,
+      'confirmed' =>
+        daysUntil <= 1 ? _Variant.tomorrow : _Variant.confirmed,
+      'completed' =>
+        albumReady ? _Variant.albumReady : _Variant.albumPending,
+      _ => _Variant.hidden,
+    };
+  }
 }
 
 enum _Variant {
