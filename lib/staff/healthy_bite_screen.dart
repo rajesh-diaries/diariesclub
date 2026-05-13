@@ -10,19 +10,14 @@ import 'providers/staff_auth_provider.dart';
 import 'providers/venue_streams_provider.dart';
 import 'widgets/staff_pin_sheet.dart';
 
-/// Healthy Bite decision screen (BUG-049 redesign).
+/// Healthy Bite decisions for the staff at this venue.
 ///
-/// One row per undecided session in the last 4 hours. Two buttons:
-///   * Gave bite  → healthy_bite_distribute RPC (+25 XP, card unlock)
-///   * Didn't give → healthy_bite_decline RPC (just records the decision)
-///
-/// Both flows go through StaffPinSheet so every action is attributable.
-/// Once a session has a decision, it drops off the list automatically
-/// after the next refresh (provider invalidate).
-///
-/// Implementation deliberately uses plain ListTile rows + FilledButtons
-/// to avoid any fancy hit-test widgets after BUG-048's tap-reliability
-/// problems on Android.
+/// Two tabs:
+///   * Pending — undecided sessions in the last 4h. Give / Didn't give
+///     buttons go through StaffPinSheet, then drop off the list.
+///   * Given today — sessions where a bite was already handed out in
+///     the last 24h. Read-only review so staff can see their own
+///     throughput and reconcile with the queue.
 class HealthyBiteScreen extends ConsumerWidget {
   const HealthyBiteScreen({super.key});
 
@@ -36,88 +31,217 @@ class HealthyBiteScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pendingAsync = ref.watch(venuePendingHealthyBitesProvider);
-    final venueId = ref.watch(currentTabletVenueIdProvider);
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
         backgroundColor: Colors.white,
-        foregroundColor: AppColors.navy,
-        elevation: 0,
-        title: const Text('Healthy Bite'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          tooltip: 'Back',
-          onPressed: () => _back(context),
-        ),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-            onPressed: () =>
-                ref.invalidate(venuePendingHealthyBitesProvider),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.navy,
+          elevation: 0,
+          title: const Text('Healthy Bite'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Back',
+            onPressed: () => _back(context),
           ),
-        ],
-      ),
-      body: pendingAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline,
-                    size: 56, color: AppColors.adminRed),
-                const SizedBox(height: 12),
-                Text("Couldn't load pending list",
-                    style: AppTextStyles.bodyLarge(context)),
-                const SizedBox(height: 8),
-                Text('$e',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.caption(
-                      context,
-                      color: AppColors.lightTextSecondary,
-                    )),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: () =>
-                      ref.invalidate(venuePendingHealthyBitesProvider),
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => _back(context),
-                  child: const Text('Back to staff home'),
-                ),
-              ],
+          automaticallyImplyLeading: false,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh',
+              onPressed: () {
+                ref.invalidate(venuePendingHealthyBitesProvider);
+                ref.invalidate(venueDistributedHealthyBitesProvider);
+              },
             ),
+          ],
+          bottom: const TabBar(
+            labelColor: AppColors.navy,
+            unselectedLabelColor: AppColors.lightTextSecondary,
+            indicatorColor: AppColors.navy,
+            tabs: [
+              Tab(icon: Icon(PhosphorIconsRegular.clock), text: 'Pending'),
+              Tab(
+                icon: Icon(PhosphorIconsRegular.checkCircle),
+                text: 'Given today',
+              ),
+            ],
           ),
         ),
-        data: (pending) => pending.isEmpty
-            ? _Empty(venueId: venueId, onBack: () => _back(context))
-            : ListView.separated(
-                padding: const EdgeInsets.all(12),
-                itemCount: pending.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (_, i) => _DecisionTile(
-                  session: pending[i],
-                  onDone: () =>
-                      ref.invalidate(venuePendingHealthyBitesProvider),
-                ),
-              ),
+        body: TabBarView(
+          children: [
+            _PendingTab(onBack: () => _back(context)),
+            _DistributedTab(onBack: () => _back(context)),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _Empty extends StatelessWidget {
+// =========================================================================
+//  Pending tab — give / didn't-give decisions
+// =========================================================================
+
+class _PendingTab extends ConsumerWidget {
+  final VoidCallback onBack;
+  const _PendingTab({required this.onBack});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(venuePendingHealthyBitesProvider);
+    final venueId = ref.watch(currentTabletVenueIdProvider);
+
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => _ErrorView(
+        e: '$e',
+        onRetry: () => ref.invalidate(venuePendingHealthyBitesProvider),
+        onBack: onBack,
+      ),
+      data: (rows) => rows.isEmpty
+          ? _EmptyState(
+              icon: PhosphorIconsRegular.carrot,
+              title: 'No pending Healthy Bite decisions',
+              body:
+                  'Sessions appear here while running + for 4 hours after. '
+                  'Tap refresh to check.',
+              venueId: venueId,
+              onBack: onBack,
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(12),
+              itemCount: rows.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (_, i) => _DecisionTile(
+                session: rows[i],
+                onDone: () =>
+                    ref.invalidate(venuePendingHealthyBitesProvider),
+              ),
+            ),
+    );
+  }
+}
+
+// =========================================================================
+//  Given-today tab — read-only review of distributed bites
+// =========================================================================
+
+class _DistributedTab extends ConsumerWidget {
+  final VoidCallback onBack;
+  const _DistributedTab({required this.onBack});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(venueDistributedHealthyBitesProvider);
+    final venueId = ref.watch(currentTabletVenueIdProvider);
+
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => _ErrorView(
+        e: '$e',
+        onRetry: () =>
+            ref.invalidate(venueDistributedHealthyBitesProvider),
+        onBack: onBack,
+      ),
+      data: (rows) => rows.isEmpty
+          ? _EmptyState(
+              icon: PhosphorIconsRegular.checkCircle,
+              title: 'Nothing given yet today',
+              body:
+                  "Sessions you mark as 'Gave bite' in the Pending tab "
+                  'land here for the next 24h.',
+              venueId: venueId,
+              onBack: onBack,
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(12),
+              itemCount: rows.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (_, i) => _GivenTile(session: rows[i]),
+            ),
+    );
+  }
+}
+
+class _GivenTile extends StatelessWidget {
+  final Map<String, dynamic> session;
+  const _GivenTile({required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final childName =
+        ((session['children'] as Map?)?['name'] as String?) ?? 'Child';
+    final sessionShort =
+        (session['id'] as String).substring(0, 6).toUpperCase();
+    final duration = session['duration_minutes'];
+    final claimed =
+        DateTime.tryParse(session['healthy_bite_claimed_at'] as String? ?? '');
+    final givenStr = claimed == null ? '—' : _hhmm(claimed.toLocal());
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.lightSurface,
+        border: Border.all(color: AppColors.fitGreen.withValues(alpha: 0.40)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: const CircleAvatar(
+          backgroundColor: AppColors.fitGreen,
+          child: Icon(
+            PhosphorIconsFill.checkCircle,
+            color: Colors.white,
+          ),
+        ),
+        title: Text(childName, style: AppTextStyles.bodyLarge(context)),
+        subtitle: Text(
+          'Session $sessionShort · $duration-min · given at $givenStr',
+          style: AppTextStyles.caption(
+            context,
+            color: AppColors.lightTextSecondary,
+          ),
+        ),
+        trailing: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.fitGreen.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Text(
+            'Given',
+            style: TextStyle(
+              color: AppColors.fitGreen,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =========================================================================
+//  Shared widgets — empty state, error view, decision tile, time helper
+// =========================================================================
+
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
   final String? venueId;
   final VoidCallback onBack;
-  const _Empty({required this.venueId, required this.onBack});
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.venueId,
+    required this.onBack,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -127,16 +251,14 @@ class _Empty extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(PhosphorIconsRegular.carrot,
-                size: 56, color: AppColors.lightTextSecondary),
+            Icon(icon, size: 56, color: AppColors.lightTextSecondary),
             const SizedBox(height: 12),
-            Text('No pending Healthy Bite decisions',
+            Text(title,
                 textAlign: TextAlign.center,
                 style: AppTextStyles.bodyLarge(context)),
             const SizedBox(height: 4),
             Text(
-              'Sessions appear here while they are running and for 4 hours '
-              'after they end. Tap refresh to check.',
+              body,
               textAlign: TextAlign.center,
               style: AppTextStyles.caption(
                 context,
@@ -158,6 +280,54 @@ class _Empty extends StatelessWidget {
               onPressed: onBack,
               icon: const Icon(Icons.arrow_back, size: 18),
               label: const Text('Back to staff home'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final String e;
+  final VoidCallback onRetry;
+  final VoidCallback onBack;
+  const _ErrorView({
+    required this.e,
+    required this.onRetry,
+    required this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline,
+                size: 56, color: AppColors.adminRed),
+            const SizedBox(height: 12),
+            Text("Couldn't load list",
+                style: AppTextStyles.bodyLarge(context)),
+            const SizedBox(height: 8),
+            Text(e,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.caption(
+                  context,
+                  color: AppColors.lightTextSecondary,
+                )),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: onBack,
+              child: const Text('Back to staff home'),
             ),
           ],
         ),
@@ -209,6 +379,8 @@ class _DecisionTileState extends ConsumerState<_DecisionTile> {
           ),
         ),
       );
+      // Refresh BOTH tabs so the row moves from Pending → Given today.
+      ref.invalidate(venueDistributedHealthyBitesProvider);
       widget.onDone();
     } on PostgrestException catch (e) {
       if (!mounted) return;
@@ -337,8 +509,12 @@ class _DecisionTileState extends ConsumerState<_DecisionTile> {
   String _started(Map<String, dynamic> s) {
     final dt = DateTime.tryParse(s['started_at'] as String? ?? '')?.toLocal();
     if (dt == null) return '—';
-    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
-    return '$hour:${dt.minute.toString().padLeft(2, '0')}'
-        ' ${dt.hour >= 12 ? 'PM' : 'AM'}';
+    return _hhmm(dt);
   }
+}
+
+String _hhmm(DateTime dt) {
+  final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+  return '$hour:${dt.minute.toString().padLeft(2, '0')}'
+      ' ${dt.hour >= 12 ? 'PM' : 'AM'}';
 }

@@ -89,6 +89,33 @@ final venuePendingHealthyBitesProvider =
   return List<Map<String, dynamic>>.from(rows);
 });
 
+/// Healthy Bites already distributed in the last 24 hours at this venue.
+/// Drives the "Given today" tab on the staff screen so staff can see
+/// their own throughput + reconcile with the queue.
+final venueDistributedHealthyBitesProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final venueId = ref.watch(currentTabletVenueIdProvider);
+  if (venueId == null) return const [];
+
+  final since = DateTime.now()
+      .toUtc()
+      .subtract(const Duration(hours: 24))
+      .toIso8601String();
+
+  final rows = await Supabase.instance.client
+      .from('sessions')
+      .select(
+        'id, child_id, venue_id, status, started_at, completed_at, '
+        'duration_minutes, healthy_bite_distributed, '
+        'healthy_bite_claimed_at, children(name)',
+      )
+      .eq('venue_id', venueId)
+      .eq('healthy_bite_distributed', true)
+      .gte('healthy_bite_claimed_at', since)
+      .order('healthy_bite_claimed_at', ascending: false);
+  return List<Map<String, dynamic>>.from(rows);
+});
+
 /// Today's cash collected (cash + cash_walkin) — sessions + orders combined.
 /// Pulled fresh each invalidation; not Realtime because it's a sum.
 final todayCashCollectedProvider = FutureProvider<int>((ref) async {
