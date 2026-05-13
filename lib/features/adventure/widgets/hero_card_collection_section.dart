@@ -163,6 +163,13 @@ class _HeroGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Earned first, sealed ??? last — keeps the row tidy: you scan
+    // your collection at the top, the "still to earn" trail below.
+    // Stable within each group so card order doesn't jump on reorder.
+    final ordered = [
+      ...cards.where((c) => c.isEarned),
+      ...cards.where((c) => !c.isEarned),
+    ];
     return GridView.count(
       crossAxisCount: 3,
       shrinkWrap: true,
@@ -171,7 +178,7 @@ class _HeroGrid extends StatelessWidget {
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
       children: [
-        for (final c in cards)
+        for (final c in ordered)
           CardGridItem(
             row: c,
             onTap: () => showModalBottomSheet<void>(
