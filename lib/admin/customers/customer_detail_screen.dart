@@ -638,11 +638,306 @@ class _ChildrenTable extends StatelessWidget {
           _GrantCardAction(child: c),
           const SizedBox(width: 6),
           _GrantXpAction(child: c),
+          const SizedBox(width: 6),
+          _OpenDiaryAction(child: c),
         ],
       )),
     ]);
   }
 }
+
+class _OpenDiaryAction extends StatelessWidget {
+  final Map<String, dynamic> child;
+  const _OpenDiaryAction({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: const Icon(PhosphorIconsRegular.bookOpen, size: 18),
+      tooltip: 'Diary — reflections + parent logs',
+      onPressed: () {
+        showDialog<void>(
+          context: context,
+          useRootNavigator: true,
+          builder: (_) => _KidDiaryDialog(
+            childId: child['id'] as String,
+            childName: (child['name'] as String?) ?? 'Kid',
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _KidDiaryDialog extends ConsumerWidget {
+  final String childId;
+  final String childName;
+  const _KidDiaryDialog({required this.childId, required this.childName});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(adminKidDiaryProvider(childId));
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 720),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text("$childName's diary",
+                        style: AppTextStyles.h2(context)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              Text(
+                'Last 20 reflections + parent-log pool submissions, '
+                'newest first.',
+                style: AppTextStyles.caption(
+                  context,
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: async.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text("Couldn't load: $e")),
+                  data: (rows) {
+                    if (rows.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No diary entries yet.',
+                          style: AppTextStyles.body(
+                            context,
+                            color: AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      itemCount: rows.length,
+                      separatorBuilder: (_, __) => const Divider(height: 16),
+                      itemBuilder: (_, i) => _DiaryEntry(row: rows[i]),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DiaryEntry extends StatelessWidget {
+  final Map<String, dynamic> row;
+  const _DiaryEntry({required this.row});
+
+  @override
+  Widget build(BuildContext context) {
+    final kind = (row['kind'] as String?) ?? '';
+    final eventAt = DateTime.tryParse((row['event_at'] as String?) ?? '');
+    final moments = (row['moments'] as List?) ?? const [];
+    final split = (row['xp_split'] as Map?)?.cast<String, dynamic>() ?? {};
+    final isReflection = kind == 'reflection';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.lightBackground,
+        border: Border.all(color: AppColors.lightBorder),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isReflection
+                    ? PhosphorIconsFill.sparkle
+                    : PhosphorIconsFill.bookOpen,
+                size: 16,
+                color: isReflection ? AppColors.gold : AppColors.navy,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                isReflection
+                    ? 'Reflection · session'
+                    : 'Parent-log pool',
+                style: AppTextStyles.body(context).copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                eventAt == null ? '—' : _shortDateTime(eventAt),
+                style: AppTextStyles.caption(
+                  context,
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (moments.isEmpty)
+            Text(
+              'No moments recorded.',
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            )
+          else
+            for (final m in moments)
+              _MomentLine(moment: Map<String, dynamic>.from(m as Map)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              for (final t in const ['rafi', 'ellie', 'gerry', 'zena'])
+                if (((split[t] as num?) ?? 0) > 0)
+                  _XpPill(trait: t, xp: (split[t] as num).toInt()),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _shortDateTime(DateTime d) {
+    final dl = d.toLocal();
+    final mm = dl.month.toString().padLeft(2, '0');
+    final dd = dl.day.toString().padLeft(2, '0');
+    final hh = dl.hour.toString().padLeft(2, '0');
+    final mi = dl.minute.toString().padLeft(2, '0');
+    return '${dl.year}-$mm-$dd · $hh:$mi';
+  }
+}
+
+class _MomentLine extends StatelessWidget {
+  final Map<String, dynamic> moment;
+  const _MomentLine({required this.moment});
+
+  static const _traitColors = <String, Color>{
+    'rafi': Color(0xFFFF6B6B),
+    'ellie': Color(0xFFFFB84D),
+    'gerry': Color(0xFF4ECDC4),
+    'zena': Color(0xFFA66BFF),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final trait = (moment['trait'] as String?) ?? '';
+    final text = (moment['text'] as String?) ?? '';
+    final source = (moment['source'] as String?) ?? 'preset';
+    final color = _traitColors[trait] ?? AppColors.lightTextSecondary;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 5, right: 8),
+            width: 6, height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: AppTextStyles.body(context),
+                children: [
+                  TextSpan(
+                    text: '${_capitalize(trait)} · ',
+                    style: TextStyle(color: color, fontWeight: FontWeight.w700),
+                  ),
+                  TextSpan(text: text),
+                  if (source == 'custom') ...[
+                    const TextSpan(text: '  '),
+                    const TextSpan(
+                      text: '✎ written by parent',
+                      style: TextStyle(
+                        color: AppColors.lightTextSecondary,
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _capitalize(String s) =>
+      s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
+}
+
+class _XpPill extends StatelessWidget {
+  final String trait;
+  final int xp;
+  const _XpPill({required this.trait, required this.xp});
+
+  static const _colors = <String, Color>{
+    'rafi': Color(0xFFFF6B6B),
+    'ellie': Color(0xFFFFB84D),
+    'gerry': Color(0xFF4ECDC4),
+    'zena': Color(0xFFA66BFF),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _colors[trait] ?? AppColors.lightTextSecondary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        '+$xp ${_label(trait)}',
+        style: TextStyle(
+          color: color, fontWeight: FontWeight.w800, fontSize: 11,
+        ),
+      ),
+    );
+  }
+
+  static String _label(String t) => switch (t) {
+        'rafi' => 'Rafi',
+        'ellie' => 'Ellie',
+        'gerry' => 'Gerry',
+        'zena' => 'Zena',
+        _ => t,
+      };
+}
+
+final adminKidDiaryProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, childId) async {
+  final res = await Supabase.instance.client.rpc<Map<String, dynamic>>(
+    'admin_kid_diary',
+    params: {'p_child_id': childId, 'p_limit': 20},
+  );
+  final rows = (res['rows'] as List?) ?? const [];
+  return rows
+      .map((r) => Map<String, dynamic>.from(r as Map))
+      .toList();
+});
 
 class _AggTile extends StatelessWidget {
   final IconData icon;
