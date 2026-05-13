@@ -42,7 +42,10 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   cached_network_image: ^3.3.1
   qr_flutter: ^4.1.0
-  mobile_scanner: ^5.1.1
+  # 5.x pulled GoogleMLKit 6.x which pinned GoogleDataTransport <10,
+  # conflicting with firebase_messaging 15.x. 7.x uses GoogleMLKit 7+
+  # which is GoogleDataTransport 10.x-compatible.
+  mobile_scanner: ^7.0.0
   url_launcher: ^6.2.5
   share_plus: ^10.1.0  # bumped from spec's 9.0 — needed for compat with firebase_messaging_web ^3.10
   package_info_plus: ^8.0.0
