@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/primary_button.dart';
 import 'providers/cart_provider.dart';
 
@@ -154,7 +155,15 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+      error: (e, _) => Scaffold(
+        body: FriendlyErrorScreen(
+          code: 'E-FIT-1',
+          userMessage: "Couldn't load this meal",
+          technicalDetails: e.toString(),
+          onRetry: () =>
+              ref.invalidate(fitTemplateDetailProvider(widget.templateId)),
+        ),
+      ),
       data: (data) => _buildLoaded(context, data),
     );
   }
@@ -189,11 +198,11 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
             child: ListView(
               padding: const EdgeInsets.only(bottom: 24),
               children: [
-                if ((tpl['photo_url'] as String?)?.isNotEmpty ?? false)
+                if (((tpl['photo_url'] as String?) ?? '').isNotEmpty)
                   AspectRatio(
                     aspectRatio: 16 / 9,
                     child: Image.network(
-                      tpl['photo_url'] as String,
+                      (tpl['photo_url'] as String?) ?? '',
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: AppColors.fitGreen.withValues(alpha: 0.15),

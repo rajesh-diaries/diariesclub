@@ -52,7 +52,11 @@ class _SessionHomeViewState extends ConsumerState<SessionHomeView> {
   }
 
   bool get _isGrace {
-    final expiresAt = DateTime.parse(widget.session['expires_at'] as String);
+    final expiresStr = widget.session['expires_at'] as String?;
+    final expiresAt = expiresStr == null
+        ? null
+        : DateTime.tryParse(expiresStr);
+    if (expiresAt == null) return false;
     final serverNow = ref.read(serverClockProvider.notifier).serverNow;
     return expiresAt.isBefore(serverNow);
   }
@@ -123,7 +127,20 @@ class _DominantLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final expiresAt = DateTime.parse(session['expires_at'] as String);
+    final expiresStr = session['expires_at'] as String?;
+    final expiresAt =
+        expiresStr == null ? null : DateTime.tryParse(expiresStr);
+    if (expiresAt == null) {
+      // Briefly null between session_create and the next stream tick.
+      // Render a non-crashing placeholder; the realtime stream will
+      // refresh the row within a second and this rebuilds correctly.
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -195,7 +212,17 @@ class _CompactLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final expiresAt = DateTime.parse(session['expires_at'] as String);
+    final expiresStr = session['expires_at'] as String?;
+    final expiresAt =
+        expiresStr == null ? null : DateTime.tryParse(expiresStr);
+    if (expiresAt == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

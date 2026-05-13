@@ -14,11 +14,12 @@ import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/utils/venues.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../sessions/widgets/insufficient_balance_sheet.dart';
 import '../providers/cart_provider.dart';
 
-const _venueId = '00000000-0000-0000-0000-000000000001';
+const _venueId = Venues.kondapurId;
 
 /// The bag bottom sheet. Brand-grouped line items, fulfillment + payment
 /// pickers, GST-inclusive total, sticky place-order button. Place-order

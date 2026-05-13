@@ -13,9 +13,10 @@ import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/utils/venues.dart';
 import '../../club/providers/cart_provider.dart';
 
-const _venueId = '00000000-0000-0000-0000-000000000001';
+const _venueId = Venues.kondapurId;
 
 /// Modal sheet that handles a combo purchase straight from the home tab.
 ///

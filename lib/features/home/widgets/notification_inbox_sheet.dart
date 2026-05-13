@@ -36,8 +36,20 @@ class NotificationInboxSheet extends ConsumerWidget {
     if (!context.mounted) return;
     Navigator.of(context).pop();
     final link = n['deep_link'] as String?;
-    if (link != null && link.isNotEmpty) {
+    if (link == null || link.isEmpty) return;
+    // Wrap the navigation so a stale/typo deep_link (e.g. an older
+    // schema's route) doesn't leave the customer on a blank 404 page.
+    // Falls back to Home with a non-blocking snackbar.
+    try {
       context.push(link);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('That link is no longer available.'),
+        ),
+      );
+      context.go('/home');
     }
   }
 

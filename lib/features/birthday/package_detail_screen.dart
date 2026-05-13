@@ -13,11 +13,12 @@ import '../../core/providers/family_children_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import '../../core/utils/venues.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/primary_button.dart';
 import 'providers/birthday_packages_provider.dart';
 
-const _venueId = '00000000-0000-0000-0000-000000000001';
+const _venueId = Venues.kondapurId;
 
 /// Package detail + reserve interest screen — the conversion screen.
 /// Layout: hero carousel → price bar → inclusions → not-included →

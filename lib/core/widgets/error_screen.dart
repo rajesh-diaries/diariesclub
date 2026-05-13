@@ -14,12 +14,17 @@ class FriendlyErrorScreen extends StatelessWidget {
   final String code; // e.g. 'E-247'
   final String userMessage;
   final String? technicalDetails;
+  /// Optional retry callback. When provided, renders a "Retry" button
+  /// above the "Copy code & contact support" CTA so transient errors
+  /// (network blip, slow Supabase) recover with one tap.
+  final VoidCallback? onRetry;
 
   const FriendlyErrorScreen({
     super.key,
     required this.code,
     required this.userMessage,
     this.technicalDetails,
+    this.onRetry,
   });
 
   @override
@@ -45,6 +50,13 @@ class FriendlyErrorScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Text('Error $code', style: AppTextStyles.caption(context)),
               const SizedBox(height: 32),
+              if (onRetry != null) ...[
+                PrimaryButton(
+                  label: 'Retry',
+                  onPressed: onRetry!,
+                ),
+                const SizedBox(height: 12),
+              ],
               PrimaryButton(
                 label: 'Copy code & contact support',
                 onPressed: () async {

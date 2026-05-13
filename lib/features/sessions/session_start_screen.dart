@@ -15,12 +15,12 @@ import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import '../../core/utils/venues.dart';
+import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/primary_button.dart';
 import 'widgets/insufficient_balance_sheet.dart';
 
-/// Single venue id for v1 (Hyderabad). Replace with venue resolution when
-/// multi-venue arrives — same constant used by venueConfigProvider.
-const _venueId = '00000000-0000-0000-0000-000000000001';
+const _venueId = Venues.kondapurId;
 
 /// Step 1 of the session lifecycle: pick child (if multi), pick duration
 /// (1hr / 2hr — prices from venue_config), pick payment method, then call
@@ -49,7 +49,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   String? _appliedCouponCode;
   String? _couponError;
 
-  late final Future<List<Map<String, dynamic>>> _childrenFuture;
+  late Future<List<Map<String, dynamic>>> _childrenFuture;
 
   @override
   void initState() {
@@ -296,6 +296,18 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _childrenFuture,
         builder: (context, snap) {
+          if (snap.hasError) {
+            return FriendlyErrorScreen(
+              code: 'E-SES-1',
+              userMessage: "Couldn't load your kids",
+              technicalDetails: snap.error.toString(),
+              onRetry: () {
+                setState(() {
+                  _childrenFuture = _loadChildren();
+                });
+              },
+            );
+          }
           if (!snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
