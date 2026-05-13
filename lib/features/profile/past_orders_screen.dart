@@ -72,9 +72,11 @@ class _OrderRow extends StatelessWidget {
     final amount = (order['total_paise'] as int?) ?? 0;
     final coins = (order['coins_earned'] as int?) ?? 0;
     final created = order['created_at'] as String?;
-    final dateStr = created == null
+    final parsedCreated =
+        created == null ? null : DateTime.tryParse(created)?.toLocal();
+    final dateStr = parsedCreated == null
         ? '—'
-        : DateFormat('MMM d').format(DateTime.parse(created).toLocal());
+        : DateFormat('MMM d').format(parsedCreated);
 
     return ListTile(
       leading: Icon(

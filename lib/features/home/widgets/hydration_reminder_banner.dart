@@ -33,7 +33,8 @@ class _HydrationReminderBannerState
 
     final startedAtStr = widget.session['started_at'] as String?;
     if (startedAtStr == null) return const SizedBox.shrink();
-    final startedAt = DateTime.parse(startedAtStr);
+    final startedAt = DateTime.tryParse(startedAtStr);
+    if (startedAt == null) return const SizedBox.shrink();
     final elapsed = DateTime.now().difference(startedAt);
 
     // Only show after 20 minutes have elapsed.

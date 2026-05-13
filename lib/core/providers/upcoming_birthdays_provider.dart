@@ -40,7 +40,8 @@ final upcomingBirthdaysProvider =
     final dobRaw = child['date_of_birth'] as String?;
     if (dobRaw == null) continue;
 
-    final dob = DateTime.parse(dobRaw);
+    final dob = DateTime.tryParse(dobRaw);
+    if (dob == null) continue;
 
     // Compute "next birthday" — this year's, or next year's if it already
     // passed (with a +1-day grace so today counts as 0 days, not 364).

@@ -65,6 +65,7 @@ class _HeroPickScreenState extends ConsumerState<HeroPickScreen> {
       if (!mounted) return;
       context.go('/home');
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _errorText = "Couldn't save. Please try again.";
         _isLoading = false;

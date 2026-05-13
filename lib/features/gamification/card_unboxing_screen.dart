@@ -68,6 +68,10 @@ class _CardUnboxingScreenState extends ConsumerState<CardUnboxingScreen>
     } else {
       HapticFeedback.lightImpact();
     }
+    // mounted-guard the AnimationController calls — if the user closes
+    // the sheet during the 80ms haptic delay the controller is disposed
+    // and .forward() / value= throw an AssertionError.
+    if (!mounted) return;
     if (reduceMotion) {
       _flip.value = 1.0;
       return;

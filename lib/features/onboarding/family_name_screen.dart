@@ -64,6 +64,7 @@ class _FamilyNameScreenState extends ConsumerState<FamilyNameScreen> {
       if (!mounted) return;
       context.go('/onboarding/add-child');
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _errorText = "Couldn't save. Please try again.";
         _isLoading = false;

@@ -101,7 +101,8 @@ class _HealthyBiteReminderBannerState
 
     final expiresAtStr = widget.session['expires_at'] as String?;
     if (expiresAtStr == null) return const SizedBox.shrink();
-    final expiresAt = DateTime.parse(expiresAtStr);
+    final expiresAt = DateTime.tryParse(expiresAtStr);
+    if (expiresAt == null) return const SizedBox.shrink();
     final remaining = expiresAt.difference(DateTime.now());
 
     // Show only when within the last 10 minutes (and session hasn't ended).

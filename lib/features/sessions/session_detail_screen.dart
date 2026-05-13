@@ -132,9 +132,10 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
     final childName = (child['name'] as String?) ?? 'Your kid';
 
     final expiresAtStr = session['expires_at'] as String?;
-    final expiresAt = expiresAtStr != null
-        ? DateTime.parse(expiresAtStr)
-        : null;
+    // tryParse so a malformed/transient row from Realtime doesn't blow up
+    // the screen — the timer just hides until the next refresh fixes it.
+    final expiresAt =
+        expiresAtStr == null ? null : DateTime.tryParse(expiresAtStr);
     final now = DateTime.now();
     final isGrace = expiresAt != null && expiresAt.isBefore(now);
 

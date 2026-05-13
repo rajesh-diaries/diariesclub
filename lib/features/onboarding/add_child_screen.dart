@@ -54,6 +54,7 @@ class _AddChildScreenState extends ConsumerState<AddChildScreen> {
       if (!mounted) return;
       context.go('/home');
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _errorText = "Couldn't continue. Please try again.";
         _isSkipping = false;

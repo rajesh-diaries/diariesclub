@@ -4,8 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Realtime stream of a single order row. `orders` is in supabase_realtime
 /// (added in 0008), so status flips (pending → preparing → ready → served)
 /// land on the device within a couple of seconds of the staff app updating.
-final orderStreamProvider =
-    StreamProvider.family<Map<String, dynamic>?, String>((ref, orderId) async* {
+///
+/// `.autoDispose` so the realtime subscription is torn down when the user
+/// leaves the tracking screen — otherwise opening multiple orders during
+/// a visit piles up listeners until the app restarts.
+final orderStreamProvider = StreamProvider.autoDispose
+    .family<Map<String, dynamic>?, String>((ref, orderId) async* {
   final stream = Supabase.instance.client
       .from('orders')
       .stream(primaryKey: ['id'])
@@ -20,7 +24,7 @@ final orderStreamProvider =
 /// One-shot fetch of order_items for an order. Used by the tracking
 /// screen line items list. order_items are immutable post-insert so a
 /// stream isn't needed.
-final orderItemsProvider = FutureProvider.family<
+final orderItemsProvider = FutureProvider.autoDispose.family<
     List<Map<String, dynamic>>, String>((ref, orderId) async {
   final rows = await Supabase.instance.client
       .from('order_items')

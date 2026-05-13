@@ -80,8 +80,10 @@ class _Row extends StatelessWidget {
     final xp = session['total_xp_earned'] as int? ?? 0;
     final childName =
         ((session['children'] as Map?)?['name'] as String?) ?? 'Your child';
-    final createdAt =
-        DateTime.parse(session['created_at'] as String).toLocal();
+    final createdAtRaw = session['created_at'] as String?;
+    final createdAt = createdAtRaw == null
+        ? null
+        : DateTime.tryParse(createdAtRaw)?.toLocal();
 
     return ListTile(
       leading: const Icon(
@@ -96,7 +98,9 @@ class _Row extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            DateFormat('MMM d · EEEE').format(createdAt),
+            createdAt == null
+                ? '—'
+                : DateFormat('MMM d · EEEE').format(createdAt),
             style: AppTextStyles.caption(
               context,
               color: AppColors.lightTextSecondary,

@@ -55,7 +55,7 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
     _hero = (child['favourite_hero'] as String?) ?? 'ellie';
     _existingPhotoPath = child['photo_url'] as String?;
     final dob = child['date_of_birth'] as String?;
-    if (dob != null) _dob = DateTime.parse(dob);
+    if (dob != null) _dob = DateTime.tryParse(dob);
   }
 
   Future<void> _pickDob() async {
@@ -136,6 +136,7 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
       );
       context.pop();
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _busy = false;
         _errorText = "Couldn't save. Please try again.";
@@ -180,6 +181,7 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
       );
       context.pop();
     } on PostgrestException catch (e) {
+      if (!mounted) return;
       setState(() {
         _busy = false;
         _errorText = e.message.contains('cannot_remove_only_child')
@@ -188,6 +190,7 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
             : "Couldn't remove. Please try again.";
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _busy = false;
         _errorText = "Couldn't remove. Please try again.";

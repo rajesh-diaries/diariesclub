@@ -61,7 +61,13 @@ class NotificationInboxSheet extends ConsumerWidget {
     final earlier = <Map<String, dynamic>>[];
     final cutoff = DateTime.now().subtract(const Duration(hours: 24));
     for (final n in list) {
-      final t = DateTime.parse(n['created_at'] as String);
+      // Skip malformed timestamps rather than crashing the whole sheet.
+      final raw = n['created_at'] as String?;
+      final t = raw == null ? null : DateTime.tryParse(raw);
+      if (t == null) {
+        earlier.add(n);
+        continue;
+      }
       if (t.isAfter(cutoff)) {
         today.add(n);
       } else {
@@ -173,7 +179,8 @@ class _NotificationTile extends StatelessWidget {
   const _NotificationTile({required this.n, required this.onTap});
 
   String _timeAgo(String iso) {
-    final t = DateTime.parse(iso).toLocal();
+    final t = DateTime.tryParse(iso)?.toLocal();
+    if (t == null) return '—';
     final diff = DateTime.now().difference(t);
     if (diff.inMinutes < 1) return 'just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
@@ -223,7 +230,7 @@ class _NotificationTile extends StatelessWidget {
                   ],
                   const SizedBox(height: 4),
                   Text(
-                    _timeAgo(n['created_at'] as String),
+                    _timeAgo((n['created_at'] as String?) ?? ''),
                     style: AppTextStyles.caption(
                       context,
                       color: AppColors.lightTextSecondary,

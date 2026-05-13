@@ -101,10 +101,11 @@ class _PreBookingScreenState extends ConsumerState<PreBookingScreen> {
       // doesn't land back on the booking form.
       if (mounted) context.go('/profile');
     } on PostgrestException catch (e) {
+      if (!mounted) return;
       setState(() {
         _busy = false;
       });
-      if (e.message.contains('insufficient_balance') && mounted) {
+      if (e.message.contains('insufficient_balance')) {
         showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,
@@ -118,6 +119,7 @@ class _PreBookingScreenState extends ConsumerState<PreBookingScreen> {
         setState(() => _errorText = "Couldn't reserve. Please try again.");
       }
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _busy = false;
         _errorText = "Couldn't reserve. Please try again.";

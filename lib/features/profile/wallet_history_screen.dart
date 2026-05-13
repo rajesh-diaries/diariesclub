@@ -29,6 +29,10 @@ class _WalletHistoryScreenState
   int _page = 0;
   bool _exhausted = false;
   bool _loading = false;
+  // When a page-fetch throws we surface a retry tile at the bottom of
+  // the list instead of silently stalling pagination. Reset on _refresh
+  // and after a successful retry.
+  bool _pageError = false;
 
   @override
   void initState() {
@@ -45,7 +49,10 @@ class _WalletHistoryScreenState
 
   Future<void> _loadNext() async {
     if (_loading || _exhausted) return;
-    _loading = true;
+    setState(() {
+      _loading = true;
+      _pageError = false;
+    });
     try {
       final rows =
           await ref.read(walletHistoryPageProvider(_page).future);
@@ -54,13 +61,21 @@ class _WalletHistoryScreenState
         _loaded.addAll(rows);
         _exhausted = rows.length < walletHistoryPageSize;
         _page++;
+        _loading = false;
       });
-    } finally {
-      _loading = false;
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _pageError = true;
+      });
     }
   }
 
   void _maybeLoadMore() {
+    // Don't auto-retry when the last page errored — user has to tap the
+    // retry tile so we don't quietly hammer a failing endpoint.
+    if (_pageError) return;
     if (_scroll.position.pixels > _scroll.position.maxScrollExtent - 200) {
       _loadNext();
     }
@@ -71,6 +86,7 @@ class _WalletHistoryScreenState
       _loaded.clear();
       _page = 0;
       _exhausted = false;
+      _pageError = false;
     });
     // Invalidate any pages cached so far so the filter change is picked up.
     ref.invalidate(walletHistoryPageProvider);
@@ -161,6 +177,31 @@ class _WalletHistoryScreenState
                     padding: EdgeInsets.symmetric(vertical: 16),
                     child: Center(child: CircularProgressIndicator()),
                   ),
+                )
+              else if (_pageError)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "Couldn't load more transactions.",
+                            style: AppTextStyles.body(
+                              context,
+                              color: AppColors.lightTextSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: _loadNext,
+                            child: const Text('Try again'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               const SliverToBoxAdapter(child: SizedBox(height: 32)),
             ],
@@ -177,7 +218,8 @@ class _WalletHistoryScreenState
     for (final r in rows) {
       final iso = r['created_at'] as String?;
       if (iso == null) continue;
-      final t = DateTime.parse(iso).toLocal();
+      final t = DateTime.tryParse(iso)?.toLocal();
+      if (t == null) continue;
       final label = _labelFor(t);
       if (label != currentLabel) {
         if (bucket.isNotEmpty) out.add(_DayGroup(currentLabel!, bucket));
@@ -339,8 +381,9 @@ class _TransactionDetailSheet extends StatelessWidget {
     final idemKey = tx['idempotency_key'] as String?;
     final createdAt = tx['created_at'] as String?;
 
-    final iso =
-        createdAt == null ? '—' : DateTime.parse(createdAt).toLocal().toString();
+    final parsedCreatedAt =
+        createdAt == null ? null : DateTime.tryParse(createdAt)?.toLocal();
+    final iso = parsedCreatedAt == null ? '—' : parsedCreatedAt.toString();
 
     return Container(
       decoration: BoxDecoration(

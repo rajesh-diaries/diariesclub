@@ -122,6 +122,7 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
       if (!mounted) return;
       context.go('/onboarding/hero-pick');
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _errorText = "Couldn't save. Please try again.";
         _isLoading = false;

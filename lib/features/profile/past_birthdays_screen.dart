@@ -72,9 +72,10 @@ class _Row extends StatelessWidget {
     final timeStr = reservation['slot_start_time'] as String?;
     final status = reservation['status'] as String? ?? 'reserved';
 
-    final dateLabel = dateStr == null
+    final parsedDate = dateStr == null ? null : DateTime.tryParse(dateStr);
+    final dateLabel = parsedDate == null
         ? '—'
-        : DateFormat('EEE MMM d, yyyy').format(DateTime.parse(dateStr));
+        : DateFormat('EEE MMM d, yyyy').format(parsedDate);
 
     return ListTile(
       leading: const Icon(

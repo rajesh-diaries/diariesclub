@@ -74,10 +74,14 @@ class _Body extends StatelessWidget {
     final paymentMethod =
         (session['payment_method'] as String?) ?? '—';
     final status = session['status'] as String? ?? 'completed';
-    final startedAt = DateTime.parse(session['started_at'] as String).toLocal();
-    final completedAt = session['completed_at'] != null
-        ? DateTime.parse(session['completed_at'] as String).toLocal()
-        : null;
+    final startedAtRaw = session['started_at'] as String?;
+    final startedAt = startedAtRaw == null
+        ? null
+        : DateTime.tryParse(startedAtRaw)?.toLocal();
+    final completedAtRaw = session['completed_at'] as String?;
+    final completedAt = completedAtRaw == null
+        ? null
+        : DateTime.tryParse(completedAtRaw)?.toLocal();
     final reflectionStatus =
         (session['reflection_status'] as String?) ?? 'pending';
     final isGuest = session['is_guest'] == true;
@@ -93,7 +97,9 @@ class _Body extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            DateFormat('EEEE, MMM d · h:mm a').format(startedAt),
+            startedAt == null
+                ? '—'
+                : DateFormat('EEEE, MMM d · h:mm a').format(startedAt),
             style: AppTextStyles.body(
               context,
               color: AppColors.lightTextSecondary,
