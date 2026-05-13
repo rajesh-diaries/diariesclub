@@ -49,7 +49,6 @@ class HeroCardCollectionSection extends ConsumerWidget {
       );
     }
 
-    final birthdayCards = rows.where((r) => r.isBirthdayExclusive).toList();
     final earnedCount = rows.where((r) => r.isEarned).length;
 
     return Padding(
@@ -62,14 +61,9 @@ class HeroCardCollectionSection extends ConsumerWidget {
             trailing: '$earnedCount of ${rows.length} earned',
           ),
           const SizedBox(height: 12),
-          if (earnedCount == 0)
-            _CollectionEmpty()
-          else if (birthdayCards.isNotEmpty || _hasBirthdayEarned(rows)) ...[
-            _BirthdayMemoriesSection(
-              rows: birthdayCards.isEmpty ? rows : birthdayCards,
-            ),
-            const SizedBox(height: 16),
-          ],
+          // Birthday Memories shelf is parked — birthday cards still
+          // earn + appear under each character's section below.
+          if (earnedCount == 0) _CollectionEmpty(),
           for (final hero in _heroOrder) ...[
             _PerHeroSection(
               hero: hero,
@@ -81,9 +75,6 @@ class HeroCardCollectionSection extends ConsumerWidget {
       ),
     );
   }
-
-  bool _hasBirthdayEarned(List<HeroCardRow> rows) =>
-      rows.any((r) => r.isBirthdayExclusive && r.isEarned);
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -190,55 +181,6 @@ class _HeroGrid extends StatelessWidget {
               builder: (_) => CardDetailSheet(row: c),
             ),
           ),
-      ],
-    );
-  }
-}
-
-class _BirthdayMemoriesSection extends StatelessWidget {
-  final List<HeroCardRow> rows;
-  const _BirthdayMemoriesSection({required this.rows});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(
-              PhosphorIconsFill.cake,
-              color: AppColors.rafiCoral,
-              size: 16,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'BIRTHDAY MEMORIES',
-              style: AppTextStyles.caption(
-                context,
-                color: AppColors.rafiCoral,
-              ).copyWith(letterSpacing: 1.0, fontWeight: FontWeight.w800),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (rows.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.lightBackground,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              'No birthday cards yet — celebrate a birthday at Diaries Club to earn one.',
-              style: AppTextStyles.caption(
-                context,
-                color: AppColors.lightTextSecondary,
-              ),
-            ),
-          )
-        else
-          _HeroGrid(cards: rows),
       ],
     );
   }
