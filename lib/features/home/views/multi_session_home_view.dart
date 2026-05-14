@@ -16,7 +16,6 @@ import '../widgets/my_upcoming_workshops.dart';
 import '../widgets/recent_activity_list.dart';
 import '../widgets/referral_entry_card.dart';
 import '../widgets/start_session_card.dart';
-import '../widgets/wallet_card.dart';
 
 /// Home view used whenever the family has at least one open session.
 /// Renders a stack of compact session cards (one per child playing) at
@@ -46,15 +45,14 @@ class MultiSessionHomeView extends ConsumerWidget {
     // (the start screen handles guests / new-child flow).
     final showStartCta = children.isEmpty || hasIdleChildren;
 
+    // Greeting first, then the immersive ActiveSessionsCard with a ring
+    // timer per kid (character-tinted). Wallet pill lives in the top app
+    // bar so we don't render WalletCard here.
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Compact wallet pill at top — small + clean. Big top-up
-          // experience moves to the idle home view.
-          const WalletCard(compact: true),
-          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
@@ -76,23 +74,19 @@ class MultiSessionHomeView extends ConsumerWidget {
               ),
             ],
           ),
-          // Announcements right after the greeting so promos / closures
-          // surface above the playing sessions list (self-margins;
-          // collapses when there's nothing live).
-          const AnnouncementsFeed(),
-          const SizedBox(height: 12),
-          for (final s in sessions) ...[
-            ActiveSessionCard(session: s),
-            const SizedBox(height: 10),
-          ],
+          const SizedBox(height: 16),
+          ActiveSessionsCard(sessions: sessions),
           if (showStartCta) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             const StartSessionCard(),
           ],
           if (referralEligible) ...[
             const SizedBox(height: 16),
             const ReferralEntryCard(),
           ],
+          // Announcements moved BELOW the live session(s) — the primary
+          // attention moment is what's playing right now.
+          const AnnouncementsFeed(),
           const SizedBox(height: 20),
           const HomeCombosStrip(),
           const SizedBox(height: 16),

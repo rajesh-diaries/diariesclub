@@ -5,14 +5,13 @@ import '../../../core/providers/current_family_provider.dart';
 import '../../../core/providers/referral_eligibility_provider.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../widgets/announcements_feed.dart';
+import '../widgets/big_start_session_card.dart';
 import '../widgets/birthday_card.dart';
 import '../widgets/home_combos_strip.dart';
 import '../widgets/marketing_consent_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
 import '../widgets/recent_activity_list.dart';
 import '../widgets/referral_entry_card.dart';
-import '../widgets/start_session_card.dart';
-import '../widgets/wallet_card.dart';
 
 /// "No active session" state. Greeting + wallet + start CTA + birthday +
 /// soft prompts + recent activity. Most users land here on every cold open.
@@ -45,8 +44,11 @@ class IdleHomeBody extends ConsumerWidget {
         .watch(referralRedeemEligibleProvider)
         .maybeWhen(data: (v) => v, orElse: () => false);
 
-    // Sections add their OWN top gap when they render content. Empty
-    // sections (auto-hide) return SizedBox.shrink — no phantom gap.
+    // Order: greeting → big "Shall we start a session?" card (always
+    // pinned at top so the primary CTA is the first thing below the
+    // greeting) → combos → birthday → workshops → announcements →
+    // activity. Sections that have nothing to show return
+    // SizedBox.shrink so they don't leave phantom gaps.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -58,26 +60,24 @@ class IdleHomeBody extends ConsumerWidget {
         ),
         const SizedBox(height: 4),
         Text('Ready for adventure?', style: AppTextStyles.body(context)),
-        // Announcements top-of-fold so time-sensitive promos / events
-        // / closures hit the customer before anything else. Self-
-        // margined: collapses cleanly when there are no active rows.
-        const AnnouncementsFeed(),
         const SizedBox(height: 20),
-        const WalletCard(),
-        const SizedBox(height: 16),
-        const StartSessionCard(),
+        const BigStartSessionCard(),
         if (referralEligible) ...[
           const SizedBox(height: 16),
           const ReferralEntryCard(),
         ],
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         const HomeCombosStrip(),
         const SizedBox(height: 16),
         const BirthdayCardList(),
-        // Two sections that carry their own top:16 margin so they
-        // collapse cleanly when empty (no phantom gaps).
+        // MarketingConsentCard carries its own top:16 margin so it
+        // collapses cleanly when consent is already granted.
         const MarketingConsentCard(),
+        const SizedBox(height: 16),
         const MyUpcomingWorkshopsSection(),
+        // Announcements moved BELOW the start CTA so the primary
+        // action lands first. Self-margined: collapses if no rows.
+        const AnnouncementsFeed(),
         const SizedBox(height: 16),
         const RecentActivityList(),
         const SizedBox(height: 32),

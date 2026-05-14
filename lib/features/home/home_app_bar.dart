@@ -4,13 +4,17 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/providers/current_family_provider.dart';
+import '../../core/providers/current_wallet_provider.dart';
 import '../../core/providers/notifications_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/utils/currency.dart';
 import 'widgets/notification_inbox_sheet.dart';
+import 'widgets/top_up_sheet.dart';
 
-/// AppBar for the Home tab. Avatar (left → /profile) + bell (right → inbox).
-/// Bell shows a small unread badge from `unreadNotificationCountProvider`.
+/// AppBar for the Home tab.
+/// Avatar (left → /profile) · wallet pill (centre-right → top-up sheet)
+/// · bell with unread badge (right → inbox).
 class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
   const HomeAppBar({super.key});
 
@@ -26,18 +30,30 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
     );
   }
 
+  void _openTopUp(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const TopUpSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final family = ref.watch(currentFamilyProvider).valueOrNull;
     final initials = _initials(family?['name'] as String?);
     final unread = ref.watch(unreadNotificationCountProvider);
+    final balancePaise = ref.watch(walletBalancePaiseProvider);
 
     return AppBar(
       automaticallyImplyLeading: false,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       elevation: 0,
+      centerTitle: false,
       titleSpacing: 16,
       title: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           GestureDetector(
             onTap: () => context.go('/profile'),
@@ -53,10 +69,42 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
               ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 10),
+          // Wordmark: "Diaries ★ Club" — gold star between the two words.
+          // Sits next to the avatar so the brand reads at every Home open.
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: AppColors.navy,
+                letterSpacing: -0.2,
+              ),
+              children: [
+                const TextSpan(text: 'Diaries '),
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 1),
+                    child: Icon(
+                      PhosphorIconsFill.star,
+                      color: AppColors.gold,
+                      size: 14,
+                    ),
+                  ),
+                ),
+                const TextSpan(text: ' Club'),
+              ],
+            ),
+          ),
         ],
       ),
       actions: [
+        _WalletPill(
+          balancePaise: balancePaise,
+          onTap: () => _openTopUp(context),
+        ),
+        const SizedBox(width: 8),
         Padding(
           padding: const EdgeInsets.only(right: 8),
           child: IconButton(
@@ -112,5 +160,52 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
     if (parts.length == 1) return parts.first.characters.first.toUpperCase();
     return (parts.first.characters.first + parts.last.characters.first)
         .toUpperCase();
+  }
+}
+
+/// Always-visible wallet balance pill — gold-tinted, star icon + amount.
+/// Tap → opens the Top-up sheet. Renders "₹—" while the wallet provider
+/// is still loading so we never flash an incorrect zero balance.
+class _WalletPill extends StatelessWidget {
+  final int? balancePaise;
+  final VoidCallback onTap;
+  const _WalletPill({required this.balancePaise, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = balancePaise == null ? '₹—' : Money.fromPaise(balancePaise!);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.gold.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: AppColors.gold.withValues(alpha: 0.50),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                PhosphorIconsFill.star,
+                color: AppColors.gold,
+                size: 14,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: AppTextStyles.body(context, color: AppColors.navy)
+                    .copyWith(fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
