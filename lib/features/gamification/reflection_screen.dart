@@ -232,6 +232,18 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
             final childName =
                 ((recap['children'] as Map?)?['name'] as String?) ?? 'Today';
             final childId = recap['child_id'] as String;
+            final reflectionStatus =
+                (recap['reflection_status'] as String?) ?? 'pending';
+
+            // BUG-051: tapping a stale notification (or re-opening from
+            // Adventure) for a session whose reflection is already saved
+            // used to drop the user on an empty picker. Submitting then
+            // raised reflection_already_done — the user saw a tiny red
+            // line and nothing happened. Detect the terminal state up
+            // front and show an honest "already saved" surface instead.
+            if (reflectionStatus != 'pending') {
+              return _AlreadySavedView(childName: childName);
+            }
 
             return momentsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -365,6 +377,69 @@ class _Body extends StatelessWidget {
         ),
         bottomBar,
       ],
+    );
+  }
+}
+
+/// Shown when the recap's reflection is no longer in 'pending' state —
+/// usually because the parent already submitted it from another device
+/// (or this device, then the notification was tapped after the fact).
+class _AlreadySavedView extends StatelessWidget {
+  final String childName;
+  const _AlreadySavedView({required this.childName});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.20),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_rounded,
+                color: AppColors.navy,
+                size: 56,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Reflection saved',
+              style: AppTextStyles.h1(context),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "$childName's moments are already saved for this session.",
+              style: AppTextStyles.body(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: PrimaryButton(
+                label: 'Open Adventure',
+                onPressed: () => context.go('/adventure'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => context.go('/home'),
+              child: const Text('Back to home'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

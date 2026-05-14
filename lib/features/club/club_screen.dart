@@ -7,6 +7,7 @@ import 'coffee_menu_tab.dart';
 import 'combos_tab.dart';
 import 'fit_menu_tab.dart';
 import 'providers/cart_provider.dart';
+import 'providers/pending_club_tab_provider.dart';
 import 'widgets/cart_sheet.dart';
 import 'workshops_tab.dart';
 
@@ -48,6 +49,20 @@ class _ClubScreenState extends ConsumerState<ClubScreen>
   @override
   Widget build(BuildContext context) {
     final count = ref.watch(cartItemCountProvider);
+
+    // Honour one-shot tab requests (e.g. Home's "Order food" card forces
+    // Cafe). After consuming we clear the state so a later plain /club
+    // visit lands on the user's last-viewed tab.
+    ref.listen<int?>(pendingClubTabProvider, (_, next) {
+      if (next == null) return;
+      if (next >= 0 && next < _tab.length) {
+        _tab.animateTo(next);
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(pendingClubTabProvider.notifier).state = null;
+      });
+    });
 
     return Scaffold(
       appBar: AppBar(

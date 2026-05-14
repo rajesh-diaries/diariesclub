@@ -48,9 +48,9 @@ class _ActiveSessionsCardState extends ConsumerState<ActiveSessionsCard> {
   Widget build(BuildContext context) {
     final children = ref.watch(familyChildrenProvider).valueOrNull ?? const [];
 
-    final entries = widget.sessions
-        .map((s) => _Entry.from(s, children))
-        .toList();
+    final entries = _dedupeByChild(
+      widget.sessions.map((s) => _Entry.from(s, children)),
+    );
     if (entries.isEmpty) return const SizedBox.shrink();
 
     final singleKid = entries.length == 1;
@@ -117,8 +117,43 @@ class _ActiveSessionsCardState extends ConsumerState<ActiveSessionsCard> {
   }
 }
 
+/// Keep one entry per child_id. Defends against pre-trigger duplicate
+/// session rows (see migration 0142): the BEFORE-INSERT trigger now
+/// blocks new duplicates, but rows created before it landed are still
+/// in the database and stream through until they auto-expire. Of the
+/// duplicates, prefer 'active' > 'grace' > 'pending', then earliest
+/// created (i.e. the original session, not the bogus retry).
+List<_Entry> _dedupeByChild(Iterable<_Entry> raw) {
+  const statusRank = {'active': 0, 'grace': 1, 'pending': 2};
+  final byChild = <String, _Entry>{};
+  for (final e in raw) {
+    final key = e.childId ?? e.sessionId;
+    final existing = byChild[key];
+    if (existing == null) {
+      byChild[key] = e;
+      continue;
+    }
+    final newRank = statusRank[e.status] ?? 99;
+    final oldRank = statusRank[existing.status] ?? 99;
+    if (newRank < oldRank) {
+      byChild[key] = e;
+    } else if (newRank == oldRank) {
+      // Tie-break: keep the earlier-created session.
+      final newCreated = e.createdAt;
+      final oldCreated = existing.createdAt;
+      if (newCreated != null &&
+          oldCreated != null &&
+          newCreated.isBefore(oldCreated)) {
+        byChild[key] = e;
+      }
+    }
+  }
+  return byChild.values.toList();
+}
+
 class _Entry {
   final String sessionId;
+  final String? childId;
   final String childName;
   final String status; // 'pending' | 'active' | 'grace' (or active-overrun)
   final DateTime? expiresAt;
@@ -127,6 +162,7 @@ class _Entry {
 
   _Entry({
     required this.sessionId,
+    required this.childId,
     required this.childName,
     required this.status,
     required this.expiresAt,
@@ -149,6 +185,7 @@ class _Entry {
     );
     return _Entry(
       sessionId: (s['id'] as String?) ?? '',
+      childId: childId,
       childName: (child['name'] as String?) ?? 'Your kid',
       status: (s['status'] as String?) ?? 'active',
       expiresAt:

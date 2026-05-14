@@ -13,6 +13,7 @@ import '../widgets/birthday_card.dart';
 import '../widgets/home_combos_strip.dart';
 import '../widgets/marketing_consent_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
+import '../widgets/order_food_card.dart';
 import '../widgets/recent_activity_list.dart';
 import '../widgets/referral_entry_card.dart';
 import '../widgets/start_session_card.dart';
@@ -64,9 +65,11 @@ class MultiSessionHomeView extends ConsumerWidget {
                 ),
               ),
               Text(
-                sessions.length == 1
+                // Count by unique child — matches ActiveSessionsCard's
+                // dedupe so the badge can never disagree with the rings.
+                childrenInSession.length == 1
                     ? '1 playing'
-                    : '${sessions.length} playing',
+                    : '${childrenInSession.length} playing',
                 style: AppTextStyles.caption(
                   context,
                   color: AppColors.lightTextSecondary,
@@ -76,8 +79,16 @@ class MultiSessionHomeView extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           ActiveSessionsCard(sessions: sessions),
+          // Primary CTA while a session is running: order food. Cafe tab
+          // gets pre-selected on /club so the parent lands on coffee +
+          // snacks directly.
+          const SizedBox(height: 16),
+          const OrderFoodCard(),
+          // Secondary CTA: only when at least one sibling is idle. Lets
+          // the parent start a session for the other kid without leaving
+          // home.
           if (showStartCta) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             const StartSessionCard(),
           ],
           if (referralEligible) ...[

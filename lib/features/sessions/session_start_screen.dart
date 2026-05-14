@@ -244,6 +244,24 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
           return;
         }
       }
+      if (e.message.contains('child_already_in_session')) {
+        if (!mounted) return;
+        // The kid picker filters out already-playing kids, so we only
+        // get here if a sibling session was started from another device
+        // between picker render and submit. Refresh the picker so it
+        // catches up.
+        ref.invalidate(activeSessionsProvider);
+        if (createdCount[0] > 0) {
+          _handlePartialOrFullFailure(createdCount[0], children.length);
+          return;
+        }
+        setState(() {
+          _busy = false;
+          _errorText =
+              'One of those kids is already playing. Try again.';
+        });
+        return;
+      }
       if (e.message.contains('insufficient_balance')) {
         if (!mounted) return;
         // If some sessions already started before the wallet drained,
