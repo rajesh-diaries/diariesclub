@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Android 13+ (API 33) requires runtime permission to post notifications.
+         firebase_messaging 15.x calls the runtime prompt automatically via
+         FirebaseMessaging.instance.requestPermission(); declaring the
+         permission here is required for that prompt to be shown at all. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"

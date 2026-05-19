@@ -10,6 +10,13 @@
 		<!-- framework without a purpose string. End users never see it. -->
 		<key>NSCameraUsageDescription</key>
 		<string>Camera is used to scan play-session QR codes.</string>
+		<!-- Same pattern as the camera string above: image_picker is linked -->
+		<!-- via pubspec for the admin flavor's image uploads (catalog / -->
+		<!-- packages). The customer flavor never calls pickImage(), but -->
+		<!-- Apple's static analysis flags any binary with the PhotoKit -->
+		<!-- framework linked unless this string is present. -->
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Photos are used to upload images to your kid's profile or order.</string>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>

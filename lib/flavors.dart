@@ -35,7 +35,6 @@ class FlavorConfig {
   final String razorpayKeyId; // TEST keys for dev/staging; LIVE only for prod
   final RazorpayMode razorpayMode;
   final String sentryDsn;
-  final String branchKey;
   final bool sentryEnabled;
   final OtpMode otpMode;
 
@@ -46,7 +45,6 @@ class FlavorConfig {
     required this.razorpayKeyId,
     required this.razorpayMode,
     required this.sentryDsn,
-    required this.branchKey,
     required this.sentryEnabled,
     required this.otpMode,
   });

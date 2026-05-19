@@ -4,7 +4,6 @@
   "SUPABASE_ANON_KEY": "<anon-key-from-Supabase-dashboard>",
   "RAZORPAY_KEY_ID": "rzp_test_xxxxxxxxxxxxxx",
   "RAZORPAY_MODE": "test",
-  "BRANCH_KEY": "",
   "SENTRY_DSN": "<customer-app-sentry-dsn>",
   "OTP_MODE": "real",
   "ENV": "staging"

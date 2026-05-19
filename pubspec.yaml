@@ -67,8 +67,9 @@ dependencies:
   # Crash reporting — bumped from spec's 8.5 to 9.x for Kotlin 1.8+ compat
   sentry_flutter: ^9.0.0
 
-  # Deep links — IMPORTANT: NOT firebase_dynamic_links
-  flutter_branch_sdk: ^8.0.0
+  # Deep links arrive via FCM `data.deep_link` payloads — see
+  # lib/core/notifications/fcm_setup.dart. No Branch / Firebase Dynamic
+  # Links / Universal Links surface needed for the customer-app launch.
 
   # Misc
   collection: ^1.18.0

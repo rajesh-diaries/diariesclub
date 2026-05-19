@@ -38,9 +38,6 @@ void main() async {
       const String.fromEnvironment('RAZORPAY_MODE', defaultValue: 'mock'),
     ),
     sentryDsn: const String.fromEnvironment('SENTRY_DSN'),
-    // Branch isn't used by the staff app (no deferred deep links) — pass
-    // through so bootstrap() can no-op cleanly.
-    branchKey: const String.fromEnvironment('BRANCH_KEY'),
     sentryEnabled: false,
     otpMode: otpModeFrom(
       const String.fromEnvironment('OTP_MODE', defaultValue: 'mock'),

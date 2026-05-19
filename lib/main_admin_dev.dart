@@ -25,7 +25,6 @@ void main() async {
     razorpayKeyId: 'rzp_test_placeholder',
     razorpayMode: RazorpayMode.mock,
     sentryDsn: String.fromEnvironment('SENTRY_DSN'),
-    branchKey: '',
     sentryEnabled: false,
     otpMode: OtpMode.mock,
   );

@@ -3,7 +3,6 @@ import 'dart:developer' as dev;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_branch_sdk/flutter_branch_sdk.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -72,16 +71,6 @@ Future<void> _initServices() async {
     }
   }
 
-  // Branch.io — same: real key + native config arrives in Session 12.
-  try {
-    if (F.branchKey.isNotEmpty) {
-      await FlutterBranchSdk.init(enableLogging: !F.isProd);
-    } else {
-      dev.log('Branch init skipped — BRANCH_KEY empty (expected pre-Session 12).');
-    }
-  } catch (e) {
-    dev.log('Branch init failed (non-fatal): $e');
-  }
 }
 
 // ── PII scrub regex set ───────────────────────────────────────────────

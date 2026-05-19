@@ -6,7 +6,7 @@ Running log of post-merge bugs. New entries at the top.
 
 # Phase 3: Pre-launch
 
-## BUG-069: Delete-account + re-signup leaves family in broken state AND enables welcome-coupon farming (OPEN 2026-05-17)
+## BUG-069: Delete-account + re-signup leaves family in broken state AND enables welcome-coupon farming (FIXED 2026-05-17, E2E pending)
 
 - **Severity:** 🔴 BLOCKER — App Store compliance + active financial-abuse vector
 - **Symptom 1 (broken state):** Customer uses in-app "Delete account" (calls `family_anonymise(..., 'DELETE')`), then re-signs up with the same phone. Auth-otp finds the existing family row by phone and logs them back in, but the row still has `deleted_at IS NOT NULL` and `is_anonymised = true`. Result: sessions run on a logically-deleted family, push dispatcher skips with `family_inactive`, wallet credits applied to a phantom-deleted row. Surfaced 2026-05-17 when founder didn't receive a session-started push during E2E testing — `notifications.push_status='skipped', push_failure_reason='family_inactive'` confirmed root cause.
@@ -155,19 +155,21 @@ Caught during BUG-023 V3 testing — the logout dialog opened ("Sign out tablet?
 
 ---
 
-## BUG-026: Staff app RLS — direct table reads return empty for staff users (OPEN 2026-05-06)
+## BUG-026: Staff app RLS — direct table reads return empty for staff users (FIXED 2026-05-19)
 
 Discovered while investigating BUG-023. Adjacent but separate bug — significant enough to track on its own.
 
 - **Severity:** 🔴 BLOCKER (production staff app cannot read its own data)
-- **Finding:** RLS audit via `pg_policies` + simulated `SET LOCAL ROLE authenticated` query as `stafftest@gmail.com`:
-  | Table | RLS | Policies for staff/tablet user |
+- **Status:** FIXED 2026-05-19 via migration `0167_bug_026_staff_rls_gaps.sql`. Counts as staff user `74358efc-edf3-4568-bf12-6d316fbbbdce` (Play Diaries Kondapur tablet) now: sessions=68, orders=11, order_items=13, families=66, workshops_published=9, menu_items=29, tablet_devices_self=1. Approach was Hybrid (Option C): venue-scoped RLS policies keyed off the existing `_is_active_tablet_for_venue(venue_id)` SECURITY DEFINER helper for tables the staff app reads directly; `staff` table with `pin_hash` stays admin-RPC-only.
+- **Original finding (2026-05-06):** RLS audit via `pg_policies` + simulated `SET LOCAL ROLE authenticated` query as `stafftest@gmail.com`:
+  | Table | RLS | Policies for staff/tablet user (at discovery) |
   |---|---|---|
   | `tablet_devices` | ✅ enabled | **0 policies** — only service_role can read |
   | `staff` | ✅ enabled | **0 policies** |
   | `sessions` | ✅ enabled | only `sessions_family` (`family_id = auth_family_id()`) |
   | `orders` | ✅ enabled | only `orders_family` (same) |
-  Verified counts as the staff user: `tablet_devices=0, sessions=0, orders=0, staff=0`.
+  Verified counts as the staff user (at discovery): `tablet_devices=0, sessions=0, orders=0, staff=0`.
+- **What landed (migration 0167):** new SELECT/INSERT/UPDATE policies on `order_items`, `families`, `refunds`, `workshops`, `menu_items` (UPDATE), `audit_log` (INSERT). Earlier rounds (between 2026-05-06 and 2026-05-19) had already added staff policies on `sessions`, `orders`, `tablet_devices` (self), `menus`, `menu_items` (SELECT), `workshops_public_read`, `hero_card_definitions`. 0167 closes the final gap so all `.from()` reads + the `menu_availability` UPDATE/INSERT path work without Dart changes.
 - **Implication:** raw `.from(...).select()` calls in the staff app return empty for any signed-in staff/tablet user. Touch points (every staff-side direct query):
   - `lib/staff/providers/staff_auth_provider.dart` (`tablet_devices` for venue lookup)
   - `lib/staff/providers/venue_streams_provider.dart` (`sessions`, `orders` realtime streams)

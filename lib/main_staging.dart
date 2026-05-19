@@ -14,7 +14,6 @@ void main() async {
       const String.fromEnvironment('RAZORPAY_MODE', defaultValue: 'test'),
     ),
     sentryDsn: const String.fromEnvironment('SENTRY_DSN'),
-    branchKey: const String.fromEnvironment('BRANCH_KEY'),
     sentryEnabled: true,
     otpMode: otpModeFrom(
       const String.fromEnvironment('OTP_MODE', defaultValue: 'real'),
