@@ -6,13 +6,32 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// surface within seconds.
 final combosProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) async* {
-  final stream = Supabase.instance.client
-      .from('combos')
-      .stream(primaryKey: ['id'])
-      .order('sort_order', ascending: true);
+  final client = Supabase.instance.client;
 
-  await for (final rows in stream) {
-    yield rows.where((r) => r['is_active'] == true).toList();
+  // One-shot initial read so the Combos tab renders even if Realtime
+  // later errors (iOS post-login channelError 1002).
+  final initialRows = await client
+      .from('combos')
+      .select()
+      .order('sort_order', ascending: true);
+  yield (initialRows as List)
+      .where((r) => (r as Map)['is_active'] == true)
+      .map((r) => Map<String, dynamic>.from(r as Map))
+      .toList();
+
+  // Best-effort Realtime — swallow errors to keep the initial data visible.
+  try {
+    final stream = client
+        .from('combos')
+        .stream(primaryKey: ['id'])
+        .order('sort_order', ascending: true);
+
+    await for (final rows in stream) {
+      yield rows.where((r) => r['is_active'] == true).toList();
+    }
+  } catch (e) {
+    // ignore: avoid_print
+    print('[combos_provider] realtime error (non-fatal): $e');
   }
 });
 

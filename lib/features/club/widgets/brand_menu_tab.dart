@@ -140,16 +140,11 @@ class _Hero extends StatelessWidget {
             )
           else
             Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    color.withValues(alpha: 0.55),
-                    color.withValues(alpha: 0.20),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
+              // Solid brand color — the previous faded gradient (0.55→0.20
+              // alpha) produced a near-white surface that drowned the
+              // white title/tagline text. Brand colors here are intended
+              // to be high-contrast hero backgrounds.
+              decoration: BoxDecoration(color: color),
             ),
           if (hasImage)
             Container(
@@ -180,11 +175,13 @@ class _Hero extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  tagline,
-                  style: AppTextStyles.body(context, color: Colors.white70),
-                ),
+                if (tagline.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    tagline,
+                    style: AppTextStyles.body(context, color: Colors.white70),
+                  ),
+                ],
               ],
             ),
           ),

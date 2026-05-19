@@ -8,8 +8,8 @@ import '../widgets/announcements_feed.dart';
 import '../widgets/big_start_session_card.dart';
 import '../widgets/birthday_card.dart';
 import '../widgets/home_combos_strip.dart';
-import '../widgets/marketing_consent_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
+import '../widgets/pending_reflections_section.dart';
 import '../widgets/recent_activity_list.dart';
 import '../widgets/referral_entry_card.dart';
 
@@ -62,6 +62,11 @@ class IdleHomeBody extends ConsumerWidget {
         Text('Ready for adventure?', style: AppTextStyles.body(context)),
         const SizedBox(height: 20),
         const BigStartSessionCard(),
+        // Pending reflections (one card per kid whose session ended in
+        // the last 24h without reflection). Self-margined: hides cleanly
+        // when nothing's pending. Sits between the Start CTA and combos
+        // because reflecting is more time-sensitive than browsing food.
+        const PendingReflectionsSection(),
         if (referralEligible) ...[
           const SizedBox(height: 16),
           const ReferralEntryCard(),
@@ -70,9 +75,6 @@ class IdleHomeBody extends ConsumerWidget {
         const HomeCombosStrip(),
         const SizedBox(height: 16),
         const BirthdayCardList(),
-        // MarketingConsentCard carries its own top:16 margin so it
-        // collapses cleanly when consent is already granted.
-        const MarketingConsentCard(),
         const SizedBox(height: 16),
         const MyUpcomingWorkshopsSection(),
         // Announcements moved BELOW the start CTA so the primary

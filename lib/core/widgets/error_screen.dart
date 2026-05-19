@@ -61,7 +61,7 @@ class FriendlyErrorScreen extends StatelessWidget {
                 label: 'Copy code & contact support',
                 onPressed: () async {
                   await Clipboard.setData(
-                    ClipboardData(text: 'Diaries Club error: $code'),
+                    ClipboardData(text: 'Play Diaries error: $code'),
                   );
                   await launchUrl(
                     Uri.parse(

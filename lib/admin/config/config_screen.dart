@@ -1,10 +1,12 @@
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -123,6 +125,12 @@ class _ConfigFormState extends State<_ConfigForm> {
             _AppVersionSection(config: c, busy: _busy, save: _save),
             const SizedBox(height: 12),
             _ContactSection(config: c, busy: _busy, save: _save),
+            const SizedBox(height: 12),
+            _ClubTaglinesSection(config: c, busy: _busy, save: _save),
+            const SizedBox(height: 12),
+            _WorkshopsSection(config: c, busy: _busy, save: _save),
+            const SizedBox(height: 12),
+            _BirthdaysTabSection(config: c, busy: _busy, save: _save),
             const SizedBox(height: 12),
             _FeatureFlagsSection(config: c, busy: _busy, save: _save),
 
@@ -1136,6 +1144,408 @@ class _ContactSectionState extends State<_ContactSection> {
         ],
       ),
     );
+  }
+}
+
+// =====================================================================
+// Section: Club taglines (Coffee Diaries / FIT Diaries / Workshops).
+// Customer-visible subtitle copy on each Club tab. Empty strings hide
+// the row in the app.
+// =====================================================================
+class _ClubTaglinesSection extends StatefulWidget {
+  final Map<String, dynamic> config;
+  final bool busy;
+  final Future<void> Function(Map<String, dynamic>) save;
+  const _ClubTaglinesSection(
+      {required this.config, required this.busy, required this.save});
+  @override
+  State<_ClubTaglinesSection> createState() => _ClubTaglinesSectionState();
+}
+
+class _ClubTaglinesSectionState extends State<_ClubTaglinesSection> {
+  static const _keys = <String, String>{
+    'coffee_diaries_tagline': 'Coffee Diaries tagline',
+    'fit_diaries_tagline':    'FIT Diaries tagline',
+    'workshops_tagline':      'Workshops tagline',
+  };
+
+  late final Map<String, TextEditingController> _ctrls = {
+    for (final k in _keys.keys)
+      k: TextEditingController(
+          text: (widget.config[k] as String?) ?? ''),
+  };
+
+  @override
+  void dispose() {
+    for (final c in _ctrls.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _Section(
+      title: 'Club taglines',
+      icon: PhosphorIconsRegular.textT,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final e in _keys.entries)
+            _TextField(label: e.value, controller: _ctrls[e.key]!),
+          _SaveBar(
+            busy: widget.busy,
+            onSave: () => widget.save({
+              for (final k in _keys.keys) k: _ctrls[k]!.text.trim(),
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// Section: Workshops lifecycle knobs.
+//   - workshop_reminder_minutes_before: how far ahead of scheduled_at the
+//     'Starting soon' push fires. Default 30. workshop-lifecycle-cron
+//     reads this every minute; change applies on the next tick.
+// =====================================================================
+class _WorkshopsSection extends StatefulWidget {
+  final Map<String, dynamic> config;
+  final bool busy;
+  final Future<void> Function(Map<String, dynamic>) save;
+  const _WorkshopsSection(
+      {required this.config, required this.busy, required this.save});
+  @override
+  State<_WorkshopsSection> createState() => _WorkshopsSectionState();
+}
+
+class _WorkshopsSectionState extends State<_WorkshopsSection> {
+  late final TextEditingController _reminderLead = TextEditingController(
+    text: ((widget.config['workshop_reminder_minutes_before'] as int?) ?? 30)
+        .toString(),
+  );
+
+  @override
+  void dispose() {
+    _reminderLead.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _Section(
+      title: 'Workshops',
+      icon: PhosphorIconsRegular.palette,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _NumField(
+            label: 'Reminder lead time (mins before start)',
+            controller: _reminderLead,
+          ),
+          _SaveBar(
+            busy: widget.busy,
+            onSave: () => widget.save({
+              'workshop_reminder_minutes_before':
+                  int.tryParse(_reminderLead.text) ?? 30,
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// Section: Birthdays tab (Club > Birthdays).
+//   - celebrations + happy_kids: integer counters surfaced as social proof
+//   - testimonials: ordered list of {quote, author} cards. Founder pastes
+//     real Google-review quotes; the customer tab renders whatever exists.
+// =====================================================================
+class _BirthdaysTabSection extends StatefulWidget {
+  final Map<String, dynamic> config;
+  final bool busy;
+  final Future<void> Function(Map<String, dynamic>) save;
+  const _BirthdaysTabSection(
+      {required this.config, required this.busy, required this.save});
+  @override
+  State<_BirthdaysTabSection> createState() => _BirthdaysTabSectionState();
+}
+
+class _BirthdaysTabSectionState extends State<_BirthdaysTabSection> {
+  late final TextEditingController _celebrations = TextEditingController(
+      text: ((widget.config['birthday_celebrations_count'] as int?) ?? 0)
+          .toString());
+  late final TextEditingController _kids = TextEditingController(
+      text: ((widget.config['birthday_happy_kids_count'] as int?) ?? 0)
+          .toString());
+  // Brochure PDF: storage URL of the single shared birthday brochure.
+  // Uploaded via the button below — admin doesn't see the URL string.
+  late String _brochureUrl =
+      (widget.config['birthday_brochure_url'] as String?) ?? '';
+  bool _uploadingBrochure = false;
+  late final List<_TestimonialDraft> _testimonials = _seedTestimonials();
+
+  List<_TestimonialDraft> _seedTestimonials() {
+    final raw = widget.config['birthday_testimonials'];
+    if (raw is! List) return [];
+    return raw
+        .whereType<Map<String, dynamic>>()
+        .map((m) => _TestimonialDraft(
+              quote: (m['quote'] as String?) ?? '',
+              author: (m['author'] as String?) ?? '',
+            ))
+        .toList();
+  }
+
+  @override
+  void dispose() {
+    _celebrations.dispose();
+    _kids.dispose();
+    for (final t in _testimonials) {
+      t.dispose();
+    }
+    super.dispose();
+  }
+
+  /// Pick a PDF from the admin's machine, upload to Supabase Storage
+  /// (`package-pdfs` bucket — reused from the now-removed per-package PDF
+  /// flow), then auto-save the resulting public URL into
+  /// venue_config.birthday_brochure_url. No URL paste step.
+  Future<void> _uploadBrochure() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't read that file.")),
+      );
+      return;
+    }
+
+    setState(() => _uploadingBrochure = true);
+    try {
+      final path =
+          'birthday-brochure/${DateTime.now().millisecondsSinceEpoch}.pdf';
+      await Supabase.instance.client.storage.from('package-pdfs').uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(contentType: 'application/pdf'),
+          );
+      final publicUrl = Supabase.instance.client.storage
+          .from('package-pdfs')
+          .getPublicUrl(path);
+
+      // Save just this key so we don't fight with un-saved edits in
+      // celebrations/kids/testimonials.
+      await widget.save({'birthday_brochure_url': publicUrl});
+
+      if (!mounted) return;
+      setState(() {
+        _brochureUrl = publicUrl;
+        _uploadingBrochure = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Brochure uploaded.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _uploadingBrochure = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't upload: $e")),
+      );
+    }
+  }
+
+  void _addTestimonial() {
+    setState(() => _testimonials.add(_TestimonialDraft.empty()));
+  }
+
+  void _removeTestimonial(int i) {
+    setState(() {
+      _testimonials[i].dispose();
+      _testimonials.removeAt(i);
+    });
+  }
+
+  Map<String, dynamic> _buildPatch() {
+    final list = _testimonials
+        .where((t) => t.quoteCtrl.text.trim().isNotEmpty)
+        .map((t) => {
+              'quote': t.quoteCtrl.text.trim(),
+              'author': t.authorCtrl.text.trim(),
+            })
+        .toList();
+    return {
+      'birthday_celebrations_count':
+          int.tryParse(_celebrations.text.trim()) ?? 0,
+      'birthday_happy_kids_count':
+          int.tryParse(_kids.text.trim()) ?? 0,
+      // birthday_brochure_url is saved by _uploadBrochure() the moment a
+      // PDF is picked, so it's intentionally not in this patch.
+      'birthday_testimonials': list,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _Section(
+      title: 'Birthdays tab (Club > Birthdays)',
+      icon: PhosphorIconsRegular.cake,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _TextField(label: 'Celebrations count', controller: _celebrations),
+          _TextField(label: 'Happy kids count', controller: _kids),
+          const SizedBox(height: 12),
+          // Brochure PDF row — upload only, no URL pasting. Shows current
+          // state + Open link if a PDF is on file.
+          Row(
+            children: [
+              Icon(
+                _brochureUrl.isEmpty
+                    ? PhosphorIconsRegular.warningCircle
+                    : PhosphorIconsFill.filePdf,
+                color: _brochureUrl.isEmpty
+                    ? AppColors.lightTextSecondary
+                    : AppColors.activeGreen,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _brochureUrl.isEmpty
+                      ? 'Shared birthday brochure — no PDF yet'
+                      : 'Brochure uploaded',
+                  style: AppTextStyles.body(context).copyWith(
+                    color: _brochureUrl.isEmpty
+                        ? AppColors.lightTextSecondary
+                        : AppColors.lightTextPrimary,
+                  ),
+                ),
+              ),
+              if (_brochureUrl.isNotEmpty)
+                TextButton.icon(
+                  icon: const Icon(PhosphorIconsRegular.arrowSquareOut,
+                      size: 14),
+                  label: const Text('Open'),
+                  onPressed: () => launchUrl(Uri.parse(_brochureUrl)),
+                ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                icon: Icon(
+                  _brochureUrl.isEmpty
+                      ? PhosphorIconsRegular.upload
+                      : PhosphorIconsRegular.arrowsClockwise,
+                  size: 14,
+                ),
+                label: Text(_brochureUrl.isEmpty ? 'Upload PDF' : 'Replace'),
+                onPressed: _uploadingBrochure ? null : _uploadBrochure,
+              ),
+            ],
+          ),
+          if (_uploadingBrochure) ...[
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text('Testimonials',
+                    style: AppTextStyles.bodyLarge(context)),
+              ),
+              TextButton.icon(
+                onPressed: widget.busy ? null : _addTestimonial,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add'),
+              ),
+            ],
+          ),
+          if (_testimonials.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No testimonials yet. Paste a quote from Google reviews and a parent name.',
+                style: AppTextStyles.caption(
+                  context,
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
+            ),
+          for (var i = 0; i < _testimonials.length; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 6, 4, 8),
+                decoration: BoxDecoration(
+                  color: AppColors.lightSurface,
+                  border: Border.all(color: AppColors.lightBorder),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('#${i + 1}',
+                              style: AppTextStyles.caption(
+                                context,
+                                color: AppColors.lightTextSecondary,
+                              )),
+                        ),
+                        IconButton(
+                          tooltip: 'Remove',
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: widget.busy
+                              ? null
+                              : () => _removeTestimonial(i),
+                        ),
+                      ],
+                    ),
+                    _TextField(
+                      label: 'Quote',
+                      controller: _testimonials[i].quoteCtrl,
+                    ),
+                    _TextField(
+                      label: 'Author / parent name',
+                      controller: _testimonials[i].authorCtrl,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          _SaveBar(
+            busy: widget.busy,
+            onSave: () => widget.save(_buildPatch()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TestimonialDraft {
+  final TextEditingController quoteCtrl;
+  final TextEditingController authorCtrl;
+  _TestimonialDraft({required String quote, required String author})
+      : quoteCtrl = TextEditingController(text: quote),
+        authorCtrl = TextEditingController(text: author);
+  _TestimonialDraft.empty()
+      : quoteCtrl = TextEditingController(),
+        authorCtrl = TextEditingController();
+  void dispose() {
+    quoteCtrl.dispose();
+    authorCtrl.dispose();
   }
 }
 

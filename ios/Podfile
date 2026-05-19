@@ -38,5 +38,14 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    # Xcode 26 rejects pods with IPHONEOS_DEPLOYMENT_TARGET < 12.0 (legacy
+    # default 9.0 still ships in PromisesObjC, DKPhotoGallery,
+    # DKImagePickerController, etc.). Bump every pod to match the
+    # Runner target's iOS 14 floor so the build stops failing on those
+    # warnings under Xcode 26+.
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+    end
   end
 end

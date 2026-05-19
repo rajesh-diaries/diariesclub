@@ -50,7 +50,6 @@ class ChildSelectCard extends StatelessWidget {
               child: ChildAvatar(
                 name: name,
                 size: 80,
-                photoPath: child['photo_url'] as String?,
               ),
             ),
             const SizedBox(height: 12),

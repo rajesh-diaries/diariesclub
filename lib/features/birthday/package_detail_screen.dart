@@ -729,8 +729,7 @@ class _HowItWorks extends StatelessWidget {
   Widget build(BuildContext context) {
     const steps = [
       ('1', 'Tell us roughly when, and how many guests.'),
-      ('2', "We'll WhatsApp you within 24 hours to lock the date."),
-      ('3',
+      ('2',
           'On confirmation, we collect a deposit offline (cash/UPI to our team).'),
     ];
     return Padding(
@@ -880,7 +879,7 @@ class _PreferencesForm extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'This package fits $minGuests–$maxGuests guests',
+            'Up to $maxGuests guests. Need more? Ask about a bigger hall.',
             style: AppTextStyles.caption(
               context,
               color: AppColors.lightTextSecondary,
@@ -909,7 +908,7 @@ class _PreferencesForm extends StatelessWidget {
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               hintText:
-                  'e.g. Jain food for 10 guests, magician add-on, custom backdrop',
+                  'e.g. custom menu, tattoo artist, photographer, return gifts',
             ),
           ),
           const SizedBox(height: 12),
@@ -921,8 +920,8 @@ class _PreferencesForm extends StatelessWidget {
               border: Border.all(color: AppColors.lightBorder),
             ),
             child: Text(
-              'These packages are starting points. For better customization, '
-              'our team will reach out within 24 hours to plan the details.',
+              'These packages are starting points — our team will tailor '
+              'the details with you.',
               style: AppTextStyles.caption(
                 context,
                 color: AppColors.lightTextSecondary,
@@ -1011,7 +1010,7 @@ class _StickyCta extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            "No payment in app — we'll reach out within 24 hours.",
+            'Our team will reach out.',
             style: AppTextStyles.caption(
               context,
               color: AppColors.lightTextSecondary,

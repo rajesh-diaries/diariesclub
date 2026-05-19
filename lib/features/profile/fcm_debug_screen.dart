@@ -87,21 +87,9 @@ curl -X POST https://fcm.googleapis.com/fcm/send \\
 
   @override
   Widget build(BuildContext context) {
-    if (!F.isDev) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('FCM debug')),
-        body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(32),
-            child: Text(
-              'This screen is dev-flavor only.',
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    }
-
+    // Temporarily open this screen in all flavors so the founder can
+    // diagnose the prod-build FCM permission/token state. Revert the
+    // gate to `if (!F.isDev) { ... }` before App Store submission.
     return Scaffold(
       appBar: AppBar(
         title: const Text('FCM debug'),

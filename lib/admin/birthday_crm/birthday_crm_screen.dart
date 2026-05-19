@@ -1,7 +1,5 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -594,10 +592,9 @@ class _DetailDrawerState extends ConsumerState<_DetailDrawer> {
           label: 'Mark party completed',
           onPressed: _markCompleted,
         ),
-      'completed' => _KeepsakeUploader(
-          reservationId: widget.reservation['id'] as String,
-          albumReadyAt: widget.reservation['album_ready_at'] as String?,
-          onChanged: widget.onAction,
+      'completed' => Text(
+          'Party completed.',
+          style: AppTextStyles.body(context),
         ),
       'cancelled' => Text(
           'Cancelled.${(widget.reservation['cancelled_reason'] as String?) != null ? ' Reason: ${widget.reservation['cancelled_reason']}' : ''}',
@@ -1481,7 +1478,7 @@ class _ContextHeader extends ConsumerWidget {
                   ),
                   _statRow(
                     context,
-                    'Diaries Coins',
+                    'Coins',
                     '${(wallet['coins_balance'] as num?)?.toInt() ?? 0}'
                     ' · lifetime '
                     '${(wallet['coins_lifetime'] as num?)?.toInt() ?? 0}',
@@ -1544,255 +1541,6 @@ class _ContextHeader extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Uploader for the "little memory" keepsake photo on a completed
-/// reservation. Pick image → upload to storage → call the RPC →
-/// photo + Remove button render. The customer side auto-updates
-/// because album_ready_at flips and the existing notification + album
-/// link flow takes over.
-class _KeepsakeUploader extends ConsumerStatefulWidget {
-  final String reservationId;
-  final String? albumReadyAt;
-  final VoidCallback onChanged;
-  const _KeepsakeUploader({
-    required this.reservationId,
-    required this.albumReadyAt,
-    required this.onChanged,
-  });
-
-  @override
-  ConsumerState<_KeepsakeUploader> createState() =>
-      _KeepsakeUploaderState();
-}
-
-class _KeepsakeUploaderState extends ConsumerState<_KeepsakeUploader> {
-  static const _bucket = 'birthday-photos';
-  bool _busy = false;
-  String? _photoPath;
-  String? _signedUrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadExisting();
-  }
-
-  Future<void> _loadExisting() async {
-    try {
-      final rows = await Supabase.instance.client
-          .from('birthday_party_photos')
-          .select('photo_url')
-          .eq('reservation_id', widget.reservationId)
-          .limit(1);
-      if ((rows as List).isEmpty) {
-        if (mounted) {
-          setState(() {
-            _photoPath = null;
-            _signedUrl = null;
-          });
-        }
-        return;
-      }
-      final path = (rows.first as Map)['photo_url'] as String?;
-      if (path == null || path.isEmpty) return;
-      final signed = await Supabase.instance.client.storage
-          .from(_bucket)
-          .createSignedUrl(path, 60 * 60);
-      if (!mounted) return;
-      setState(() {
-        _photoPath = path;
-        _signedUrl = signed;
-      });
-    } catch (_) {/* fall through to upload state */}
-  }
-
-  Future<void> _pickAndUpload() async {
-    final picker = ImagePicker();
-    final file = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 88,
-      maxWidth: 2400,
-    );
-    if (file == null) return;
-    if (!mounted) return;
-    setState(() => _busy = true);
-    try {
-      final bytes = await file.readAsBytes();
-      final ext = file.name.contains('.') ? file.name.split('.').last : 'jpg';
-      final path =
-          '${widget.reservationId}/keepsake-${DateTime.now().millisecondsSinceEpoch}.$ext';
-
-      await Supabase.instance.client.storage.from(_bucket).uploadBinary(
-            path,
-            bytes,
-            fileOptions: FileOptions(contentType: 'image/$ext'),
-          );
-
-      await Supabase.instance.client
-          .rpc<dynamic>('admin_birthday_keepsake_upload', params: {
-        'p_reservation_id': widget.reservationId,
-        'p_storage_path': path,
-        'p_caption': null,
-      });
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Keepsake shared with the family.')),
-      );
-      widget.onChanged();
-      await _loadExisting();
-    } on PostgrestException catch (e) {
-      _showError(e.message);
-    } catch (e) {
-      _showError('$e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _remove() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Remove this keepsake?'),
-        content: const Text(
-          'The family will lose access to this photo. You can upload a new one after.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('Keep it'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.adminRed,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(c, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    setState(() => _busy = true);
-    try {
-      if (_photoPath != null) {
-        try {
-          await Supabase.instance.client.storage
-              .from(_bucket)
-              .remove([_photoPath!]);
-        } catch (_) {/* best-effort */}
-      }
-      await Supabase.instance.client
-          .rpc<dynamic>('admin_birthday_keepsake_delete', params: {
-        'p_reservation_id': widget.reservationId,
-      });
-      if (!mounted) return;
-      setState(() {
-        _photoPath = null;
-        _signedUrl = null;
-      });
-      widget.onChanged();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Keepsake removed.')),
-      );
-    } catch (e) {
-      _showError('$e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  void _showError(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Couldn't share keepsake: $msg")),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_busy) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-    final hasPhoto = _signedUrl != null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'A LITTLE MEMORY',
-          style: AppTextStyles.caption(
-            context,
-            color: AppColors.lightTextSecondary,
-          ).copyWith(letterSpacing: 0.8, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 8),
-        if (hasPhoto) ...[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: AspectRatio(
-              aspectRatio: 4 / 3,
-              child: CachedNetworkImage(
-                imageUrl: _signedUrl!,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) =>
-                    Container(color: AppColors.lightBorder),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            widget.albumReadyAt != null
-                ? 'Shared with the family.'
-                : 'Uploaded — not yet shared.',
-            style: AppTextStyles.caption(
-              context,
-              color: AppColors.lightTextSecondary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          AdminSecondaryButton(
-            label: 'Replace photo',
-            onPressed: _pickAndUpload,
-          ),
-          const SizedBox(height: 8),
-          AdminSecondaryButton(
-            label: 'Remove',
-            ghost: true,
-            onPressed: _remove,
-          ),
-        ] else ...[
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.gold.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-              border:
-                  Border.all(color: AppColors.gold.withValues(alpha: 0.30)),
-            ),
-            child: Text(
-              'Share one keepsake photo with the family. They\'ll get a '
-              'notification and can open it from their app.',
-              style: AppTextStyles.body(
-                context,
-                color: AppColors.lightTextSecondary,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          AdminPrimaryButton(
-            label: 'Upload little memory',
-            onPressed: _pickAndUpload,
-          ),
-        ],
-      ],
     );
   }
 }

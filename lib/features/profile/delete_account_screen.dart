@@ -46,9 +46,55 @@ class _DeleteAccountScreenState
   bool get _canDelete =>
       _confirmController.text == 'DELETE' && !_busy;
 
+  /// Final native-style confirmation before the nuke fires. Apple's
+  /// guideline for destructive actions: the primary button must be
+  /// destructive-red and the dialog must surface the most expensive
+  /// thing the user is about to lose (wallet balance), not just "are
+  /// you sure". One typo away from forfeiting real money — we owe the
+  /// parent one last unmissable check.
+  Future<bool> _confirmDestructive() async {
+    final balancePaise = ref.read(walletBalancePaiseProvider) ?? 0;
+    final balanceLine = balancePaise > 0
+        ? 'Your wallet balance of ${Money.fromPaise(balancePaise)} '
+            'will be forfeited and cannot be refunded.\n\n'
+        : '';
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete everything?'),
+            content: Text(
+              '${balanceLine}Every kid, every session, every order, every '
+              'card — gone. This cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.adminRed,
+                ),
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Delete everything'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
   Future<void> _delete() async {
     final familyId = ref.read(currentFamilyIdProvider);
     if (familyId == null) return;
+
+    // Final destructive-action confirm. Parent must explicitly tap
+    // "Delete everything" after typing DELETE — guards against a
+    // muscle-memory finger slip on the red CTA.
+    final ok = await _confirmDestructive();
+    if (!ok || !mounted) return;
+
     setState(() {
       _busy = true;
       _errorText = null;
@@ -135,25 +181,22 @@ class _DeleteAccountScreenState
               Text('What will happen', style: AppTextStyles.h3(context)),
               const SizedBox(height: 8),
               const _Bullet(
-                text: 'Your name, phone, and email will be removed.',
+                text: 'Your name, phone, and profile will be removed.',
               ),
               const _Bullet(
-                text: "Your children's names and photos will be deleted.",
+                text: "Every child's name, photo and progress will be deleted.",
               ),
               const _Bullet(
-                text: 'Your wallet balance will be lost.',
+                text: 'Your wallet balance will be forfeited.',
+              ),
+              const _Bullet(
+                text: 'All session history, orders and coupons will be erased.',
               ),
               const _Bullet(
                 text: 'Character cards and adventure progress will be removed.',
               ),
-              const SizedBox(height: 12),
-              Text(
-                "We'll keep:",
-                style: AppTextStyles.bodyLarge(context),
-              ),
               const _Bullet(
-                text: 'Transaction history (required for tax records).',
-                muted: true,
+                text: 'Push notifications to all your devices will stop.',
               ),
               const SizedBox(height: 16),
               Text(

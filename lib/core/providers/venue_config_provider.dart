@@ -14,9 +14,12 @@ final venueConfigProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   // Single-venue v1; centralised in core/utils/venues.dart so the
   // multi-venue swap is one find-and-replace.
   const venueId = Venues.kondapurId;
+  // 10s timeout: venue_config is read at splash and on most home views.
+  // If it hangs the whole UI hangs. AsyncError surfaces to the caller's
+  // .when(error: ...) so user gets a retry-able state, not infinite spin.
   final raw = await Supabase.instance.client.rpc<Map<String, dynamic>>(
     'get_venue_config',
     params: {'p_venue_id': venueId},
-  );
+  ).timeout(const Duration(seconds: 10));
   return Map<String, dynamic>.from(raw);
 });

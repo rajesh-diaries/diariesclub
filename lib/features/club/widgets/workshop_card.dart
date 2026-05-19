@@ -227,15 +227,9 @@ class _SpotsLabel extends StatelessWidget {
         ],
       );
     }
-    final color = isLow ? AppColors.warningYellow : AppColors.lightTextSecondary;
-    return Row(
-      children: [
-        icon(PhosphorIconsRegular.users, color),
-        Text(
-          '$spots of $capacity spots left',
-          style: AppTextStyles.caption(context, color: color),
-        ),
-      ],
-    );
+    // "X of Y spots left" hidden per founder request — looked empty on
+    // workshops that hadn't filled. Workshop-full state stays so customers
+    // don't waste a tap on a sold-out slot.
+    return const SizedBox.shrink();
   }
 }

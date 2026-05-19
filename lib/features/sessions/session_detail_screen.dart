@@ -83,6 +83,15 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
         params: {'p_session_id': sessionId},
       );
       if (!mounted) return;
+      // Force-invalidate the active-sessions stream so the home view
+      // rebuilds without this kid's "Wrapping up" card immediately.
+      // Supabase realtime emission for the status='completed' update
+      // can lag a few seconds, and during that window the parent sees
+      // the toast confirming wrap-up while the stale card still ticks
+      // on home (the bug screenshot). Manual invalidation refetches
+      // directly so the UI matches the success message. Mirrors the
+      // single-session wrap-up handler in session_home_view.dart.
+      ref.invalidate(activeSessionsProvider);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Session complete! Thanks for visiting.'),

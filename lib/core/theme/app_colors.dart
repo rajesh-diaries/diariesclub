@@ -35,6 +35,7 @@ class AppColors {
 
   // Sub-brands
   static const coffeeBrown = Color(0xFFD4A473);
+  static const coffeeBrownDeep = Color(0xFF4E2E1F); // banner/hero use — high contrast on white text
   static const fitGreen = Color(0xFF0D4A2E);
 
   // Session card states

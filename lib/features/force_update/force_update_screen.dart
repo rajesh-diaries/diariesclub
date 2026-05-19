@@ -48,7 +48,7 @@ class ForceUpdateScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Please update Diaries Club to continue.',
+                'Please update Play Diaries to continue.',
                 style: AppTextStyles.body(context),
                 textAlign: TextAlign.center,
               ),

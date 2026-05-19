@@ -289,7 +289,7 @@ class _BalanceBanner extends StatelessWidget {
           if (coinsLifetime > 0) ...[
             const SizedBox(height: 8),
             Text(
-              '+$coinsLifetime Diaries Coins earned (lifetime)',
+              '+$coinsLifetime Coins earned (lifetime)',
               style: AppTextStyles.caption(context, color: AppColors.gold),
             ),
           ],

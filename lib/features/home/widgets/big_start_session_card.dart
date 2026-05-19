@@ -7,9 +7,12 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// Premium "Start playing" banner pinned at the top of idle home.
-/// Single row: gold "READY WHEN YOU ARE" eyebrow on the left, gold Start
-/// button on the right. Background is a navy gradient that slowly rotates
-/// (12s cycle) so the surface feels alive without being noisy.
+/// Stacked layout: gold "READY WHEN YOU ARE" eyebrow on top, full-width
+/// gold "Start playing" pill below. The full width gives the eyebrow
+/// room to render without ellipsizing on narrow phones, and makes the
+/// CTA — the most important tap target in the app — visually dominant.
+/// Background is a navy gradient that slowly rotates (12s cycle) so the
+/// surface feels alive without being noisy.
 class BigStartSessionCard extends StatefulWidget {
   const BigStartSessionCard({super.key});
 
@@ -43,7 +46,7 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
       builder: (context, _) {
         final angle = _gradientController.value * 2 * math.pi;
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             gradient: LinearGradient(
@@ -70,9 +73,11 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
               ),
             ],
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(child: _Eyebrow()),
+              const _Eyebrow(),
+              const SizedBox(height: 14),
               _StartButton(onTap: () => context.push('/session/start')),
             ],
           ),
@@ -83,6 +88,8 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
 }
 
 class _Eyebrow extends StatelessWidget {
+  const _Eyebrow();
+
   @override
   Widget build(BuildContext context) {
     return const Row(
@@ -90,16 +97,13 @@ class _Eyebrow extends StatelessWidget {
       children: [
         Icon(PhosphorIconsFill.sparkle, color: AppColors.gold, size: 18),
         SizedBox(width: 10),
-        Flexible(
-          child: Text(
-            'READY WHEN YOU ARE',
-            style: TextStyle(
-              color: AppColors.gold,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.6,
-            ),
-            overflow: TextOverflow.ellipsis,
+        Text(
+          'READY WHEN YOU ARE',
+          style: TextStyle(
+            color: AppColors.gold,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.6,
           ),
         ),
       ],
@@ -119,7 +123,7 @@ class _StartButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 11, 14, 11),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           decoration: BoxDecoration(
             color: AppColors.gold,
             borderRadius: BorderRadius.circular(999),
@@ -132,22 +136,22 @@ class _StartButton extends StatelessWidget {
             ],
           ),
           child: const Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
                 'Start playing',
                 style: TextStyle(
                   color: AppColors.navy,
-                  fontSize: 15,
+                  fontSize: 17,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.2,
                 ),
               ),
-              SizedBox(width: 8),
+              SizedBox(width: 10),
               Icon(
                 PhosphorIconsFill.playCircle,
                 color: AppColors.navy,
-                size: 20,
+                size: 22,
               ),
             ],
           ),

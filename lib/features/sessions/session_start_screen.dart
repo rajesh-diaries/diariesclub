@@ -4,7 +4,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -440,7 +439,6 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                     _selectedChildIds.contains(id);
                                 return _ChildAvatar(
                                   name: c['name'] as String? ?? '—',
-                                  photoUrl: c['photo_url'] as String?,
                                   selected: selected,
                                   onTap: () => setState(() {
                                     if (selected) {
@@ -460,8 +458,6 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                             children: [
                               _ChildAvatar(
                                 name: children.first['name'] as String? ?? '—',
-                                photoUrl:
-                                    children.first['photo_url'] as String?,
                                 selected: true,
                                 onTap: () {},
                               ),
@@ -552,7 +548,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                           value: 'wallet',
                           groupValue: _paymentMethod,
                           title: Text(
-                              'Diaries Wallet (${Money.fromPaise(balance)})'),
+                              'Wallet (${Money.fromPaise(balance)})'),
                           subtitle: !walletEnough &&
                                   _selectedDurationMinutes != null
                               ? const Text(
@@ -610,18 +606,18 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
 
 class _ChildAvatar extends StatelessWidget {
   final String name;
-  final String? photoUrl;
   final bool selected;
   final VoidCallback onTap;
   const _ChildAvatar({
     required this.name,
-    required this.photoUrl,
     required this.selected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final initial =
+        name.trim().isEmpty ? '?' : name.trim().characters.first.toUpperCase();
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -630,27 +626,23 @@ class _ChildAvatar extends StatelessWidget {
           Container(
             width: 72,
             height: 72,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
                 color: selected ? AppColors.gold : AppColors.lightBorder,
                 width: selected ? 3 : 1,
               ),
-              image: photoUrl != null && photoUrl!.isNotEmpty
-                  ? DecorationImage(
-                      image: NetworkImage(photoUrl!),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
               color: AppColors.gold.withValues(alpha: 0.18),
             ),
-            child: photoUrl == null || photoUrl!.isEmpty
-                ? const Icon(
-                    PhosphorIconsFill.smiley,
-                    color: AppColors.navy,
-                    size: 30,
-                  )
-                : null,
+            child: Text(
+              initial,
+              style: const TextStyle(
+                color: AppColors.navy,
+                fontWeight: FontWeight.w800,
+                fontSize: 28,
+              ),
+            ),
           ),
           const SizedBox(height: 6),
           SizedBox(
@@ -902,10 +894,13 @@ class _CouponSection extends StatelessWidget {
       );
     }
 
-    // Vertical stack — no Row/Expanded shenanigans. The TextField gets
-    // full width from the parent stretch, the Apply button right-aligns
-    // with intrinsic width. Bulletproof against Flutter web's flex
-    // layout pitfalls.
+    // Apply lives INSIDE the TextField as a suffix button so it stays
+    // glued to the input. A separate Apply button below the field gets
+    // hidden by the on-screen keyboard, and parents — seeing only the
+    // sticky "Pay" CTA — were tapping Pay before realising they hadn't
+    // applied their coupon. With the suffix pattern, "APPLY" is always
+    // next to where they're typing, and pressing Return on the keyboard
+    // also applies (onSubmitted handler).
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -915,34 +910,41 @@ class _CouponSection extends StatelessWidget {
           controller: controller,
           enabled: enabled && !validating,
           textCapitalization: TextCapitalization.characters,
+          textInputAction: TextInputAction.done,
           decoration: InputDecoration(
             hintText: enabled ? 'e.g. WELCOME50' : 'Pick a duration first',
             border: const OutlineInputBorder(),
             isDense: true,
             errorText: error,
-          ),
-          onSubmitted: (_) => enabled ? onApply() : null,
-        ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton(
-            onPressed: enabled && !validating ? onApply : null,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.navy,
-              foregroundColor: Colors.white,
-            ),
-            child: validating
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Colors.white),
+            suffixIcon: validating
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(AppColors.navy),
+                      ),
                     ),
                   )
-                : const Text('Apply coupon'),
+                : TextButton(
+                    onPressed: enabled ? onApply : null,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.navy,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      minimumSize: const Size(60, 36),
+                    ),
+                    child: const Text(
+                      'APPLY',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
           ),
+          onSubmitted: (_) => enabled ? onApply() : null,
         ),
       ],
     );

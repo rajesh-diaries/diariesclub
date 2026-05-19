@@ -91,7 +91,7 @@ class _CardUnboxingScreenState extends ConsumerState<CardUnboxingScreen>
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => context.go('/home'),
+          onPressed: () => context.go('/adventure'),
         ),
       ),
       body: SafeArea(
@@ -289,7 +289,7 @@ class _Body extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => context.go('/home'),
+                    onPressed: () => context.go('/adventure'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: const BorderSide(color: Colors.white60),

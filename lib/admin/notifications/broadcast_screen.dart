@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -150,9 +151,26 @@ class _BroadcastNotificationScreenState
                       size: 22,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      'Broadcast to all families',
-                      style: AppTextStyles.h2(context, color: AppColors.navy),
+                    Expanded(
+                      child: Text(
+                        'Broadcast to all families',
+                        style: AppTextStyles.h2(context, color: AppColors.navy),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () =>
+                          context.go('/admin/notifications/activity'),
+                      icon: const Icon(PhosphorIconsRegular.chartLine,
+                          size: 18),
+                      label: const Text('Activity log'),
+                    ),
+                    const SizedBox(width: 4),
+                    TextButton.icon(
+                      onPressed: () =>
+                          context.go('/admin/notifications/templates'),
+                      icon: const Icon(PhosphorIconsRegular.slidersHorizontal,
+                          size: 18),
+                      label: const Text('Edit templates'),
                     ),
                   ],
                 ),

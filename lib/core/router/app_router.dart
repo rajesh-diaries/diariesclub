@@ -7,14 +7,13 @@ import '../../features/adventure/per_trait_detail_screen.dart';
 import '../../features/auth/otp_verify_screen.dart';
 import '../../features/auth/phone_entry_screen.dart';
 import '../../features/auth/splash_screen.dart';
-import '../../features/birthday/birthday_album_screen.dart';
-import '../../features/birthday/birthday_discovery_screen.dart';
 import '../../features/birthday/birthday_packages_screen.dart';
 import '../../features/birthday/package_detail_screen.dart';
 import '../../features/birthday/reservation_status_screen.dart';
 import '../../features/club/club_screen.dart';
 import '../../features/club/fit_builder_screen.dart';
 import '../../features/club/order_tracking_screen.dart';
+import '../../features/club/providers/pending_club_tab_provider.dart';
 import '../../features/club/workshop_detail_screen.dart';
 import '../../features/force_update/force_update_screen.dart';
 import '../../features/home/home_screen.dart';
@@ -45,6 +44,8 @@ import '../../features/reactivation/reactivation_screen.dart';
 import '../../features/sessions/session_detail_screen.dart';
 import '../../features/sessions/session_qr_screen.dart';
 import '../../features/sessions/session_start_screen.dart';
+import '../notifications/fcm_lifecycle_provider.dart';
+import '../notifications/fcm_setup.dart';
 import '../providers/app_version_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/error_screen.dart';
@@ -81,7 +82,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     debugLogDiagnostics: true,
-    refreshListenable: _AuthListenable(ref),
+    // Listen to BOTH auth state changes AND pending FCM deep links so
+    // a notification tap re-runs `redirect` and consumes the link from
+    // anywhere in the app (not just home_screen). See _onMessageOpenedApp.
+    refreshListenable: Listenable.merge(
+      [_AuthListenable(ref), pendingFcmDeepLinkNotifier],
+    ),
     errorBuilder: (context, state) => FriendlyErrorScreen(
       code: 'E-ROUTE',
       userMessage: 'Page not found',
@@ -105,6 +111,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (familyId == null && !_isPublic(loc)) {
         debugPrint('[ROUTER] → redirecting to /auth/phone');
         return '/auth/phone';
+      }
+
+      // 3) Pending FCM deep link. A notification tap stashes the target
+      // path on pendingFcmDeepLinkNotifier (see _onMessageOpenedApp).
+      // Consume it here so the user lands on the right screen regardless
+      // of which tab they were on when they tapped.
+      final pendingLink = pendingFcmDeepLink;
+      if (familyId != null &&
+          pendingLink != null &&
+          pendingLink.isNotEmpty &&
+          loc != pendingLink) {
+        consumePendingFcmDeepLink(); // null out so we don't re-fire
+        debugPrint('[ROUTER] consuming FCM deep link → $pendingLink');
+        return pendingLink;
       }
 
       return null;
@@ -217,12 +237,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/wallet',
         redirect: (_, __) => '/profile/wallet-history',
       ),
-      // Workshop-published notifications embed '/club/workshops' —
-      // there's no dedicated workshops route, the workshops list lives
-      // inside the Club tab. Redirect there so the tap doesn't 404.
+      // Workshop-published notifications + workshop announcement cards
+      // embed '/club/workshops'. There's no dedicated workshops route
+      // (the workshops list lives inside the Club tab as tab index 4 —
+      // bumped from 3 when the Birthdays tab landed between Combos and
+      // Workshops), so we set pendingClubTabProvider before redirecting
+      // to /club — ClubScreen listens for that and animates to the
+      // Workshops tab.
       GoRoute(
         path: '/club/workshops',
-        redirect: (_, __) => '/club',
+        redirect: (context, _) {
+          ProviderScope.containerOf(context)
+              .read(pendingClubTabProvider.notifier)
+              .state = 4;
+          return '/club';
+        },
       ),
       GoRoute(
         path: '/profile/sessions',
@@ -296,15 +325,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ── Birthday funnel ───────────────────────────────────────────────
+      // /birthday is now the packages screen directly — the old discovery
+      // hop (interest radio + "see packages" CTA) was a redundant screen
+      // between the home card and the actual content.
       GoRoute(
         path: '/birthday',
-        name: 'birthday_discovery',
-        builder: (context, state) => const BirthdayDiscoveryScreen(),
+        name: 'birthday_packages',
+        builder: (context, state) => const BirthdayPackagesScreen(),
       ),
       GoRoute(
         path: '/birthday/packages',
-        name: 'birthday_packages',
-        builder: (context, state) => const BirthdayPackagesScreen(),
+        redirect: (_, __) => '/birthday',
       ),
       GoRoute(
         path: '/birthday/reserve/:packageId',
@@ -321,14 +352,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           reservationId: state.pathParameters['reservationId']!,
         ),
       ),
-      GoRoute(
-        path: '/birthday/album/:reservationId',
-        name: 'birthday_album',
-        builder: (context, state) => BirthdayAlbumScreen(
-          reservationId: state.pathParameters['reservationId']!,
-        ),
-      ),
-
       // ── Session lifecycle (Session 5) ─────────────────────────────────
       GoRoute(
         path: '/session/start',
@@ -403,9 +426,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/club/fit/builder/:templateId',
         name: 'club_fit_builder',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => FitBuilderScreen(
-          templateId: state.pathParameters['templateId']!,
-        ),
+        builder: (context, state) {
+          // When opened from a combo with a linked FIT template (Option B),
+          // the caller passes a FitBuilderComboContext via state.extra so
+          // the builder knows to render combo-mode UI and pop with the
+          // selections instead of writing the cart directly.
+          final extra = state.extra;
+          return FitBuilderScreen(
+            templateId: state.pathParameters['templateId']!,
+            comboContext:
+                extra is FitBuilderComboContext ? extra : null,
+          );
+        },
       ),
 
       // ── Bottom-nav shell with 4 main tabs ─────────────────────────────

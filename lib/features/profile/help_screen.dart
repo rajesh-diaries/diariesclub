@@ -42,7 +42,7 @@ class _HelpScreenState extends ConsumerState<HelpScreen> {
     final cfg = ref.read(venueConfigProvider).valueOrNull ?? const {};
     final phone = (cfg['whatsapp_support_phone'] as String?) ?? '';
     final num = phone.replaceAll(RegExp(r'[^\d]'), '');
-    final body = prefilled ?? 'Hi, I need help with Diaries Club.';
+    final body = prefilled ?? 'Hi, I need help with Play Diaries.';
     final uri = Uri.parse('https://wa.me/$num?text=${Uri.encodeComponent(body)}');
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
@@ -99,9 +99,70 @@ class _HelpScreenState extends ConsumerState<HelpScreen> {
               onWhatsApp: () => _openWhatsApp(),
               onCall: _call,
             ),
+            const SizedBox(height: 16),
+            const _PolicyFooter(),
             const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Privacy / Terms / Refund policy links — hosted externally (see
+/// venue_config.*_url). Lives at the bottom of every Help screen so the
+/// App Store reviewer and any parent can reach them in one tap from the
+/// app's main support surface.
+class _PolicyFooter extends ConsumerWidget {
+  const _PolicyFooter();
+
+  Future<void> _open(String? url) async {
+    if (url == null || url.isEmpty) return;
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cfg = ref.watch(venueConfigProvider).valueOrNull ?? const {};
+    final privacy = cfg['privacy_policy_url'] as String?;
+    final terms = cfg['terms_of_service_url'] as String?;
+    final refund = cfg['refund_policy_url'] as String?;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (privacy != null && privacy.isNotEmpty)
+            TextButton.icon(
+              onPressed: () => _open(privacy),
+              icon: const Icon(PhosphorIconsRegular.shieldCheck, size: 18),
+              label: const Text('Privacy Policy'),
+              style: TextButton.styleFrom(
+                alignment: Alignment.centerLeft,
+                foregroundColor: AppColors.lightTextSecondary,
+              ),
+            ),
+          if (terms != null && terms.isNotEmpty)
+            TextButton.icon(
+              onPressed: () => _open(terms),
+              icon: const Icon(PhosphorIconsRegular.fileText, size: 18),
+              label: const Text('Terms of Service'),
+              style: TextButton.styleFrom(
+                alignment: Alignment.centerLeft,
+                foregroundColor: AppColors.lightTextSecondary,
+              ),
+            ),
+          if (refund != null && refund.isNotEmpty)
+            TextButton.icon(
+              onPressed: () => _open(refund),
+              icon: const Icon(PhosphorIconsRegular.receipt, size: 18),
+              label: const Text('Refund Policy'),
+              style: TextButton.styleFrom(
+                alignment: Alignment.centerLeft,
+                foregroundColor: AppColors.lightTextSecondary,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -177,18 +238,18 @@ class _FaqAccordion extends StatelessWidget {
   const _FaqAccordion();
 
   static const _sections = <_FaqSection>[
-    _FaqSection('About Diaries Club', [
+    _FaqSection('About Play Diaries', [
       _FaqItem(
-        'What is Diaries Club?',
+        'What is Play Diaries?',
         "A premium kids' play space + café where character grows through play.",
       ),
       _FaqItem(
-        'What are Diaries Coins?',
-        'Bonus rupees earned from sessions, top-ups, and milestones. Spend them like cash on play, café, or workshops.',
+        'What are Coins?',
+        'Cashback you earn on Coffee Diaries and FIT Diaries purchases. They sit in their own balance — redeem to your wallet from Profile when you want, then spend the wallet on anything at Play Diaries. (XP is different — kids earn that through play sessions and workshops.)',
       ),
       _FaqItem(
         'Why have a wallet?',
-        'It lets you skip card entry every time and unlocks better top-up bonuses.',
+        'One balance across Play Diaries — pay for sessions, FIT meals, café orders. Top it up via recharge, referral bonuses, or redeemed Coins.',
       ),
     ]),
     _FaqSection('Sessions', [
@@ -236,15 +297,19 @@ class _FaqAccordion extends StatelessWidget {
     _FaqSection('Birthdays', [
       _FaqItem(
         'How do I book a birthday?',
-        'Open the Birthday card on Home or visit the Birthday tab. Pick a package and we hold a date with a deposit.',
+        "It's a quick enquiry first — open the Birthday card on Home, browse the packages and tap Inquire on the one you like. Our team WhatsApps you within 24 hours to lock the date and customise.",
       ),
       _FaqItem(
-        'Can I cancel?',
-        'Yes, free cancellation until 7 days before. Within 7 days, the deposit is non-refundable.',
+        'Can I cancel or reschedule?',
+        'Cancel up to 1 month before the event. Reschedule up to 10 days before. Inside the 10-day window we’ve already committed to preparations, so neither is possible.',
       ),
       _FaqItem(
-        'What is included?',
-        'Decor, hosting, character card for the birthday kid, and venue access. Food add-ons live in the package detail.',
+        "What's included in every package?",
+        'A dedicated host, full play-area access for your guests, your own private hall, and unlimited food per the package menu.',
+      ),
+      _FaqItem(
+        'Are add-ons available?',
+        'Yes — activities (entertainer, themed games), themed decor, photography (event coverage + edited album), and a wallet/bar service. Our team walks you through the options.',
       ),
     ]),
     _FaqSection('Account', [
@@ -258,7 +323,7 @@ class _FaqAccordion extends StatelessWidget {
       ),
       _FaqItem(
         'Privacy and data',
-        'See the Privacy Policy in the Account section.',
+        'Our Privacy Policy, Terms of Service, and Refund Policy are linked at the bottom of this screen.',
       ),
     ]),
   ];

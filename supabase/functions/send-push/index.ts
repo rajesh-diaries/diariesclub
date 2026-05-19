@@ -258,18 +258,40 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Per-type TTL — drives FCM's android.ttl + apns-expiration so a
+    // session_started undelivered for 30 min is dropped rather than
+    // popping up much later. NULL → carrier default (~4 weeks).
+    const { data: tmpl } = await admin
+      .from("notification_templates")
+      .select("ttl_seconds")
+      .eq("type", payload.type)
+      .maybeSingle();
+    const ttlSeconds = (tmpl as { ttl_seconds?: number | null } | null)
+      ?.ttl_seconds ?? null;
+
     const accessToken = await getAccessToken();
     const sa = loadServiceAccount();
 
     // The customer app's foreground handler reads suppress_foreground from
     // data; we set it for in-context types so the app doesn't show a
     // banner when the user is already on the relevant screen.
+    // session_started is intentionally NOT suppressed — parents often hand
+    // the kid to staff and walk away during scan, so the banner serves as
+    // a receipt confirming the session is officially running.
     const suppressForeground =
-      payload.type === "session_started" ||
       payload.type === "grace_started" ||
       payload.type === "session_closed" ||
       payload.type === "extend_nudge" ||
       payload.type === "hydration_nudge";
+
+    // Note: the previous version slept 3.5s for session_started to dodge
+    // the QR→home transition swallowing the banner on iOS. That delay
+    // turned out to be the only thing different about session_started
+    // (which kept landing as 'dispatched' but never showed on device)
+    // while other types worked. We rely on the foreground-message
+    // handler in fcm_setup.dart (`_onForegroundMessage`) +
+    // `setForegroundNotificationPresentationOptions` to render the
+    // banner regardless of UI state — no server-side delay needed.
 
     const fcmBody = {
       message: {
@@ -287,14 +309,55 @@ Deno.serve(async (req) => {
         },
         android: {
           priority: "HIGH",
+          // android.ttl format: "<seconds>s" string. Omitted → ~4 weeks.
+          ...(ttlSeconds != null ? { ttl: `${ttlSeconds}s` } : {}),
           notification: {
             channel_id: channelForType(payload.type),
             sound: "default",
           },
         },
         apns: {
+          // Explicit headers so APNs (a) treats this as an alert push,
+          // not background/silent, and (b) delivers immediately at the
+          // highest priority. apns-expiration is the absolute Unix
+          // timestamp after which APNs stops trying — 0 means "no store".
+          headers: {
+            "apns-priority": "10",
+            "apns-push-type": "alert",
+            ...(ttlSeconds != null
+              ? { "apns-expiration":
+                    Math.floor(Date.now() / 1000 + ttlSeconds).toString() }
+              : {}),
+          },
           payload: {
-            aps: { sound: "default", badge: 1 },
+            aps: {
+              // Explicit alert block so iOS 26 treats willPresent with
+              // a populated UNNotificationContent.title/body even when
+              // app is foregrounded. v12 omitted this and relied on FCM
+              // to merge `notification` → `aps.alert`; on iOS 26 that
+              // merge was inconsistent and the banner failed to show
+              // in foreground.
+              alert: { title: payload.title, body: payload.body },
+              sound: "default",
+              badge: 1,
+              // Time-sensitive bypasses Focus/Do-Not-Disturb on iOS 15+
+              // for the events parents really care about (kid checked
+              // in / out, healthy bite ready, grace, hydration). Other
+              // types stay at the default level so they don't override
+              // user-chosen Focus.
+              "interruption-level": [
+                "session_started",
+                "session_closed",
+                "grace_started",
+                "extend_nudge",
+                "healthy_bite_earned",
+                "hydration_nudge",
+                "workshop_starting_soon",
+                "workshop_attended",
+              ].includes(payload.type)
+                ? "time-sensitive"
+                : "active",
+            },
           },
         },
       },

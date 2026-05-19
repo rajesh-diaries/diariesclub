@@ -10,12 +10,16 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import 'widgets/empty_state.dart';
 
-/// Workshops the family has registered for. Two sections: Upcoming
-/// (scheduled in the future, not cancelled) + Past (already happened OR
-/// cancelled). Each section uses card rows with cover image + title +
-/// date + status pill so the screen reads as workshops, not a SQL dump.
+/// All venue workshops with this family's registration state baked in.
+/// Two sections:
+///   * Upcoming — every published workshop with scheduled_at >= now
+///   * Past — the 10 most recent past venue workshops
+/// Joined ones (registration not cancelled) are highlighted with a
+/// "Registered" or "Attended" pill so the family can scan their history
+/// at a glance, plus see what they've missed.
 ///
-/// (Was a flat ListTile list — too text-heavy per founder feedback.)
+/// Founder ask 2026-05-18: was registered-only, now shows the full venue
+/// catalogue with joined workshops standing out.
 class PastWorkshopsScreen extends ConsumerWidget {
   const PastWorkshopsScreen({super.key});
 
@@ -43,12 +47,16 @@ class PastWorkshopsScreen extends ConsumerWidget {
             if (rows.isEmpty) {
               return const ProfileEmptyState(
                 icon: PhosphorIconsRegular.paintBrush,
-                message: "No workshops yet. Discover what's coming up →",
-                ctaLabel: 'See workshops',
+                message: 'No workshops scheduled yet. Check back soon!',
+                ctaLabel: 'See Club',
                 ctaRoute: '/club',
               );
             }
 
+            // Provider returns upcoming first, then past (each already
+            // ordered). Split by scheduled_at vs now so the section
+            // headers + the "Missed" pill logic are consistent even if
+            // the provider's ordering ever drifts.
             final now = DateTime.now();
             final upcoming = <Map<String, dynamic>>[];
             final past = <Map<String, dynamic>>[];
@@ -56,8 +64,7 @@ class PastWorkshopsScreen extends ConsumerWidget {
               final ws = (r['workshops'] as Map?) ?? const {};
               final dt = DateTime.tryParse(
                   (ws['scheduled_at'] as String?) ?? '');
-              final cancelled = r['cancelled_at'] != null;
-              if (!cancelled && dt != null && dt.isAfter(now)) {
+              if (dt != null && dt.isAfter(now)) {
                 upcoming.add(r);
               } else {
                 past.add(r);
@@ -148,8 +155,11 @@ class _WorkshopRegistrationCard extends StatelessWidget {
     final cover = ws['cover_image_url'] as String?;
     final scheduled =
         DateTime.tryParse((ws['scheduled_at'] as String?) ?? '');
-    final attended = reg['attended'] == true;
-    final cancelled = reg['cancelled_at'] != null;
+    final registration = reg['registration'] as Map?;
+    final isRegistered = registration != null &&
+        (registration['cancelled_at'] == null);
+    final attended = registration?['attended'] == true;
+    final cancelled = registration?['cancelled_at'] != null;
     final workshopId = ws['id'] as String?;
 
     final dateStr = scheduled == null
@@ -159,19 +169,38 @@ class _WorkshopRegistrationCard extends StatelessWidget {
         ? null
         : DateFormat('h:mm a').format(scheduled.toLocal());
 
-    final (statusLabel, statusColor) = cancelled
+    // Pill logic — depends on isPast and whether family was registered.
+    //  * Cancelled registration → red "Cancelled"
+    //  * Attended past          → green "Attended"   (highlight)
+    //  * Registered past, no-show → grey "Missed"
+    //  * Registered upcoming    → gold "Registered"  (highlight)
+    //  * Not registered past    → no pill            (browse-only)
+    //  * Not registered upcoming→ no pill            (tap to register)
+    final (String? statusLabel, Color statusColor) = cancelled
         ? ('Cancelled', AppColors.adminRed)
         : attended
             ? ('Attended', AppColors.activeGreen)
-            : isPast
+            : isPast && isRegistered
                 ? ('Missed', AppColors.lightTextSecondary)
-                : ("You're registered", AppColors.activeGreen);
+                : !isPast && isRegistered
+                    ? ('Registered', AppColors.gold)
+                    : (null, AppColors.lightTextSecondary);
+
+    // Highlight cards the family actually joined (registered/attended)
+    // with a thicker gold border. Browse-only cards keep the neutral
+    // border so they recede visually.
+    final highlighted = isRegistered;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: AppColors.lightSurface,
-        border: Border.all(color: AppColors.lightBorder),
+        border: Border.all(
+          color: highlighted
+              ? AppColors.gold.withValues(alpha: 0.55)
+              : AppColors.lightBorder,
+          width: highlighted ? 1.5 : 1,
+        ),
         borderRadius: BorderRadius.circular(14),
       ),
       clipBehavior: Clip.antiAlias,
@@ -202,7 +231,10 @@ class _WorkshopRegistrationCard extends StatelessWidget {
                             ),
                           )
                         : ColorFiltered(
-                            colorFilter: isPast
+                            // Desaturate past-and-not-joined cards only.
+                            // Past+joined stays full colour so it pops as
+                            // a real memory; upcoming always full colour.
+                            colorFilter: (isPast && !attended)
                                 ? const ColorFilter.matrix(<double>[
                                     0.33, 0.33, 0.33, 0, 0,
                                     0.33, 0.33, 0.33, 0, 0,
@@ -247,24 +279,26 @@ class _WorkshopRegistrationCard extends StatelessWidget {
                           color: AppColors.lightTextSecondary,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
+                      if (statusLabel != null) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: AppTextStyles.caption(
+                              context,
+                              color: statusColor,
+                            ).copyWith(fontWeight: FontWeight.w700),
+                          ),
                         ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Text(
-                          statusLabel,
-                          style: AppTextStyles.caption(
-                            context,
-                            color: statusColor,
-                          ).copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                 ),

@@ -89,8 +89,8 @@ class _NotificationsSettingsScreenState
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 child: Text(
-                  "Pick which notifications you'd like to receive. We "
-                  'default everything on, except marketing.',
+                  "Pick what you'd like to hear from us. You can change "
+                  'these anytime.',
                   style: AppTextStyles.body(
                     context,
                     color: AppColors.lightTextSecondary,
@@ -100,7 +100,7 @@ class _NotificationsSettingsScreenState
               _Toggle(
                 title: 'Session reminders',
                 subtitle:
-                    'Time-running-out, grace nudges, session-complete pings.',
+                    "A heads-up before time's up, and a wrap-up note when your session ends.",
                 value: prefs.sessionReminders,
                 onChanged: _busy
                     ? null
@@ -114,7 +114,7 @@ class _NotificationsSettingsScreenState
               _Toggle(
                 title: 'Adventure progress',
                 subtitle:
-                    'Stage transitions, character card unlocks, level-ups.',
+                    'When your kids unlock a new card, move up a stage, or level up.',
                 value: prefs.heroProgression,
                 onChanged: _busy
                     ? null
@@ -127,7 +127,7 @@ class _NotificationsSettingsScreenState
               ),
               _Toggle(
                 title: 'Birthday reminders',
-                subtitle: 'Countdown nudges as the big day approaches.',
+                subtitle: 'A gentle nudge as the big day gets close.',
                 value: prefs.birthdayReminders,
                 onChanged: _busy
                     ? null
@@ -141,7 +141,7 @@ class _NotificationsSettingsScreenState
               _Toggle(
                 title: 'Birthday wishes for my children',
                 subtitle:
-                    'A short note from us on your kids\' birthdays — even if you celebrate elsewhere.',
+                    "A short note from us on your kids' birthdays.",
                 value: prefs.birthdayWishEnabled,
                 onChanged: _busy
                     ? null
@@ -154,7 +154,7 @@ class _NotificationsSettingsScreenState
               ),
               _Toggle(
                 title: 'Order status',
-                subtitle: 'Confirmations and ready-to-pickup pings.',
+                subtitle: "When your order's being prepared and when it's ready.",
                 value: prefs.orderStatus,
                 onChanged: _busy
                     ? null
@@ -167,7 +167,8 @@ class _NotificationsSettingsScreenState
               ),
               _Toggle(
                 title: 'Wallet alerts',
-                subtitle: 'Low balance, top-up confirmations.',
+                subtitle:
+                    "Top-up confirmations, and a heads-up if your balance is running low.",
                 value: prefs.walletAlerts,
                 onChanged: _busy
                     ? null
@@ -180,7 +181,8 @@ class _NotificationsSettingsScreenState
               ),
               _Toggle(
                 title: 'Marketing & offers',
-                subtitle: 'Tips, party ideas, special offers.',
+                subtitle:
+                    "The occasional note about offers, party ideas and what's new.",
                 value: prefs.marketing,
                 onChanged: _busy
                     ? null
@@ -193,7 +195,8 @@ class _NotificationsSettingsScreenState
               ),
               _Toggle(
                 title: 'Streaks & milestones',
-                subtitle: 'Visit milestones, weekly streak rewards.',
+                subtitle:
+                    'Visit milestones and weekly streak rewards for your kids.',
                 value: prefs.streaksMilestones,
                 onChanged: _busy
                     ? null
@@ -206,7 +209,7 @@ class _NotificationsSettingsScreenState
               ),
               _Toggle(
                 title: 'Workshop reminders',
-                subtitle: 'Upcoming workshops your kids might enjoy.',
+                subtitle: "Upcoming workshops we think your kids would enjoy.",
                 value: prefs.workshopReminders,
                 onChanged: _busy
                     ? null

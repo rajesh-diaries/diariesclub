@@ -9,6 +9,9 @@ import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
+import '../../club/fit_builder_screen.dart'
+    show FitBuilderComboContext, FitBuilderResult;
+import '../../club/providers/cart_provider.dart';
 import '../../club/providers/combos_provider.dart';
 import 'combo_purchase_sheet.dart';
 
@@ -76,6 +79,17 @@ class _ComboMiniCardState extends ConsumerState<_ComboMiniCard> {
   }
 
   void _openSheet(BuildContext context) {
+    // FIT combos (with a linked fit_template_id) require the customer to
+    // customize the meal before purchase — the bottom sheet doesn't know
+    // about FIT selections and order_place rejects with
+    // combo_fit_selections_required if we skip that step. Route those to
+    // the same FIT builder path that the Combos tab uses (combo_card.dart
+    // ._addComboWithFitBuilder), so home + Combos tab behave consistently.
+    final fitTemplateId = widget.combo['fit_template_id'] as String?;
+    if (fitTemplateId != null && fitTemplateId.isNotEmpty) {
+      _openFitBuilder(context, fitTemplateId);
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -83,6 +97,59 @@ class _ComboMiniCardState extends ConsumerState<_ComboMiniCard> {
       useRootNavigator: true,
       builder: (_) => ComboPurchaseSheet(combo: widget.combo),
     );
+  }
+
+  Future<void> _openFitBuilder(
+      BuildContext context, String fitTemplateId) async {
+    final combo = widget.combo;
+    final inclusions =
+        (combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
+    final sessionMinutes = inclusions['session_minutes'] as int?;
+    final result = await context.push<FitBuilderResult>(
+      '/club/fit/builder/$fitTemplateId',
+      extra: FitBuilderComboContext(
+        comboId: combo['id'] as String,
+        comboName: (combo['name'] as String?) ?? 'Combo',
+        comboPricePaise: (combo['price_paise'] as int?) ?? 0,
+        sessionMinutes: sessionMinutes,
+      ),
+    );
+    // Session-combo path: FIT builder places order itself and navigates
+    // away — nothing for us to do here.
+    if (sessionMinutes != null) return;
+    if (result == null || !context.mounted) return;
+
+    final comboPrice = (combo['price_paise'] as int?) ?? 0;
+    ref.read(cartProvider.notifier).addCombo(
+          ComboLine.create(
+            comboId: combo['id'] as String,
+            name: (combo['name'] as String?) ?? 'Combo',
+            unitPricePaise: comboPrice + result.upchargePaise,
+            quantity: 1,
+            imageUrl: combo['cover_image_url'] as String?,
+            includedItemNames: const [],
+            linkedFitTemplateId: result.templateId,
+            linkedFitTemplateName: result.templateName,
+            linkedFitUpchargePaise: result.upchargePaise,
+            linkedFitSelections: result.selections,
+            linkedFitSelectionsSummary: result.selectionsSummary,
+          ),
+        );
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: AppColors.activeGreen,
+        content: Text(
+          result.upchargePaise > 0
+              ? 'Added · ${Money.fromPaise(comboPrice + result.upchargePaise)} '
+                  '(combo + extras)'
+              : 'Added · ${Money.fromPaise(comboPrice)}',
+        ),
+      ),
+    );
+    context.go('/club');
   }
 
   Future<void> _computeSavings() async {

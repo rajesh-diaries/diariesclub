@@ -1,10 +1,8 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -14,7 +12,10 @@ import '../widgets/admin_list_scaffold.dart';
 
 /// Birthday packages CRUD list (Module 2.7). Card grid because there
 /// are typically only 3–4 tiers and the visual emphasis is on cover
-/// photo + tier name + price.
+/// photo + tier name + price. The single venue-level brochure PDF is
+/// managed in admin Config → Birthdays tab (venue_config.birthday_brochure_url),
+/// not per package — customers see one shared brochure above the package
+/// grid.
 class PackagesListScreen extends ConsumerWidget {
   const PackagesListScreen({super.key});
 
@@ -24,7 +25,7 @@ class PackagesListScreen extends ConsumerWidget {
     return AdminListScaffold(
       title: 'Birthday packages',
       subtitle:
-          'Tier, photo, price, capacity, status. Each package has menu options + non-food offerings + PDF download.',
+          'Tier, photo, price, capacity, status. Upload the shared brochure PDF in Config → Birthdays.',
       actions: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -69,7 +70,6 @@ class _PackageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cover = row['cover_image_url'] as String?;
     final isActive = (row['is_active'] as bool?) ?? true;
-    final pdfUrl = row['pdf_url'] as String?;
 
     return SizedBox(
       width: 320,
@@ -138,149 +138,22 @@ class _PackageCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      _Chip(
-                        icon: pdfUrl != null
-                            ? PhosphorIconsFill.filePdf
-                            : PhosphorIconsRegular.warningCircle,
-                        label: pdfUrl != null ? 'PDF uploaded' : 'No PDF',
-                        color: pdfUrl != null
-                            ? AppColors.activeGreen
-                            : AppColors.lightTextSecondary,
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(PhosphorIconsRegular.pencilSimple,
-                              size: 14),
-                          label: const Text('Edit'),
-                          onPressed: () =>
-                              context.go('/admin/packages/${row['id']}/edit'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: Icon(
-                            pdfUrl == null
-                                ? PhosphorIconsRegular.upload
-                                : PhosphorIconsRegular.arrowsClockwise,
-                            size: 14,
-                          ),
-                          label: Text(pdfUrl == null ? 'Upload PDF' : 'Replace PDF'),
-                          onPressed: () =>
-                              _pickAndUploadPdf(context, row['id'] as String),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (pdfUrl != null) ...[
-                    const SizedBox(height: 6),
-                    TextButton.icon(
-                      icon: const Icon(PhosphorIconsRegular.arrowSquareOut,
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(PhosphorIconsRegular.pencilSimple,
                           size: 14),
-                      label: const Text('Open current PDF'),
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                      ),
-                      onPressed: () => launchUrl(Uri.parse(pdfUrl)),
+                      label: const Text('Edit'),
+                      onPressed: () =>
+                          context.go('/admin/packages/${row['id']}/edit'),
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  static const _bucket = 'package-pdfs';
-
-  Future<void> _pickAndUploadPdf(
-      BuildContext context, String packageId) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf'],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Couldn't read that file.")),
-      );
-      return;
-    }
-
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Uploading PDF…')),
-    );
-
-    try {
-      final path =
-          '$packageId/menu-${DateTime.now().millisecondsSinceEpoch}.pdf';
-      await Supabase.instance.client.storage.from(_bucket).uploadBinary(
-            path,
-            bytes,
-            fileOptions: const FileOptions(contentType: 'application/pdf'),
-          );
-      final publicUrl =
-          Supabase.instance.client.storage.from(_bucket).getPublicUrl(path);
-
-      await Supabase.instance.client.rpc<dynamic>(
-        'admin_package_set_pdf_url',
-        params: {'p_package_id': packageId, 'p_pdf_url': publicUrl},
-      );
-
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PDF uploaded — customers can download now.')),
-      );
-      ref.invalidate(packagesAdminListProvider);
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Couldn't upload PDF: $e")),
-      );
-    }
-  }
-}
-
-class _Chip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  const _Chip({required this.icon, required this.label, required this.color});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: AppTextStyles.caption(context, color: color)
-                .copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
       ),
     );
   }

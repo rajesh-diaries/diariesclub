@@ -265,7 +265,7 @@ class _Headline extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Diaries Club is where we help them grow.',
+          'Play Diaries is where we help them grow.',
           style: AppTextStyles.body(context).copyWith(
             fontWeight: FontWeight.w700,
             color: AppColors.navy,

@@ -13,11 +13,15 @@ final currentFamilyProvider = FutureProvider<Map<String, dynamic>?>((ref) async 
   final familyId = ref.watch(currentFamilyIdProvider);
   if (familyId == null) return null;
 
+  // 8s timeout — this is read at splash to decide onboarding vs home
+  // routing. Hanging here = blank screen forever. Surface as null so the
+  // splash error path activates and the user gets a retry option.
   final row = await Supabase.instance.client
       .from('families')
       .select()
       .eq('id', familyId)
-      .maybeSingle();
+      .maybeSingle()
+      .timeout(const Duration(seconds: 8));
 
   return row;
 });

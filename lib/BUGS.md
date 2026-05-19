@@ -6,6 +6,65 @@ Running log of post-merge bugs. New entries at the top.
 
 # Phase 3: Pre-launch
 
+## BUG-069: Delete-account + re-signup leaves family in broken state AND enables welcome-coupon farming (OPEN 2026-05-17)
+
+- **Severity:** 🔴 BLOCKER — App Store compliance + active financial-abuse vector
+- **Symptom 1 (broken state):** Customer uses in-app "Delete account" (calls `family_anonymise(..., 'DELETE')`), then re-signs up with the same phone. Auth-otp finds the existing family row by phone and logs them back in, but the row still has `deleted_at IS NOT NULL` and `is_anonymised = true`. Result: sessions run on a logically-deleted family, push dispatcher skips with `family_inactive`, wallet credits applied to a phantom-deleted row. Surfaced 2026-05-17 when founder didn't receive a session-started push during E2E testing — `notifications.push_status='skipped', push_failure_reason='family_inactive'` confirmed root cause.
+- **Symptom 2 (financial abuse):** Once Symptom 1 is fixed (re-signup = fresh family_id), `coupon_validate` first-time check is keyed on `family_id` only — a deleted-and-re-signed-up user has 0 redemptions on the new row and can claim WELCOME100 (₹100 flat-off, min ₹500 order) again. Loop cost: ~₹0.20 SMS, profit ~₹100/cycle. Same exploit applies to any coupon configured with `max_per_family=1`.
+- **Why bundled:** Fixing Symptom 1 alone (re-signup creates fresh family) opens Symptom 2. Fixing Symptom 2 alone leaves the deletion flow broken. Both must ship together or neither.
+- **Root cause (Symptom 1):** `family_anonymise` sets `deleted_at`/`is_anonymised` but does not scrub `phone`, so the unique constraint stays held and auth-otp matches the dead row. There's no `deleted_at IS NULL` filter on the auth-otp family lookup. There's no partial unique index on phone to allow tombstone + live coexistence.
+- **Root cause (Symptom 2):** `coupon_validate` joins `coupon_redemptions` on `family_id`, so identity is per-row not per-human. No phone-fingerprint mechanism exists.
+
+### Fix (one migration, bundled)
+
+1. **Schema**
+   - `families`: add `phone_hash TEXT` (nullable; sha256 hex of phone)
+   - `families`: drop existing `UNIQUE (phone)` constraint; add `CREATE UNIQUE INDEX families_phone_live_uniq ON families(phone) WHERE deleted_at IS NULL`
+   - `coupons`: add `first_time_only BOOLEAN NOT NULL DEFAULT false` (replaces overloaded `max_per_family=1` convention)
+   - Backfill: `UPDATE families SET phone_hash = encode(digest(phone, 'sha256'), 'hex') WHERE phone IS NOT NULL AND phone_hash IS NULL`
+2. **`family_anonymise` RPC** — before nulling/scrubbing PII: `UPDATE families SET phone_hash = encode(digest(phone,'sha256'),'hex'), phone = NULL, fcm_token = NULL, ...`. Phone_hash survives the scrub.
+3. **`auth-otp` Edge Function** — family lookup becomes `WHERE phone=$1 AND deleted_at IS NULL`. On new family creation always set `phone_hash = sha256(phone)`. Deleted rows become invisible to signup matching.
+4. **`coupon_validate` RPC** — replace the family-uses count with a phone-hash-scoped count:
+   ```sql
+   SELECT COUNT(*) FROM coupon_redemptions cr
+     JOIN families f ON f.id = cr.family_id
+    WHERE cr.coupon_id = v_coupon.id
+      AND f.phone_hash = (SELECT phone_hash FROM families WHERE id = v_caller_id);
+   ```
+   Same dedup spans all family rows (alive + tombstoned) that ever held this phone.
+5. **`session_create` / `qr_scan_validate` (defense in depth)** — guard on `deleted_at IS NULL` before allowing session creation. Today they don't, which is how this whole bug got triggered (session ran on a deleted family).
+6. **`referral_attach` / `referral_convert` (Symptom 3, same phone-hash gate)** — referral payout is the third financial-abuse lane. Same loop as the coupon vector: signup → enter friend's code → first session → ₹100 referee credit + ₹100 referrer credit → delete → re-signup → repeat. `referral_attach` must reject a code attach if any tombstoned family with the same `phone_hash` has already converted; `referral_convert` must skip credit if the phone_hash has paid out before. Without this, fixing BUG-069 Symptom 1 alone opens both WELCOME100 farming AND referral farming. Bundle all three function patches in the same migration.
+
+### Verification path
+- delete account → re-signup with same phone → **new family_id**, zero XP/cards/wallet, no welcome coupon eligibility
+- delete account → re-signup → try WELCOME100 → rejected with "already used"
+- delete account → never re-signup → DB row stays with `phone=NULL, phone_hash=<hash>, deleted_at=<ts>` (legal tombstone)
+- existing live customers backfilled: `families.phone_hash` populated, no behavior change
+
+### App Store relevance
+Apple App Review explicitly requires "Delete account" to permanently destroy PII and not auto-restore it. The current behavior (delete leaves PII intact, re-signup resurrects silently) is a documented rejection reason. This BUG closing is a submission prerequisite for iOS.
+
+### Status
+**FIXED 2026-05-17.** Implementation differed from the design notes above in one key way: since `families.id = auth.users.id` and `find_auth_user_for_otp` reuses the same UUID across re-signups, we did NOT need a `phone_hash` column or a partial unique index. Just stopping `family_anonymise` from deleting `coupon_redemptions` + `referral_conversions` is enough — the existing `family_id`-keyed dedup checks in `coupon_validate` / `coupon_redeem` / `session_create` / `referral_attach` continue to work transparently because the same `family_id` is reused on revival.
+
+What shipped:
+1. **Migration `0151_bug_069_delete_re_signup_dedup.sql`** — three `CREATE OR REPLACE FUNCTION` patches:
+   - `family_anonymise`: removed `DELETE FROM coupon_redemptions` and `DELETE FROM referral_conversions`. PII scrubbing of children/wallet/sessions/etc. unchanged.
+   - `session_create`: added `IF families.deleted_at IS NOT NULL THEN RAISE 'family_deleted'` guard immediately after `assert_caller_authority`.
+   - `qr_scan_validate`: same `deleted_at` guard after session resolution.
+2. **`auth-otp` Edge Function v22** — when an OTP-verified phone resolves to a tombstoned `families` row, the function revives it server-side: clears `deleted_at` + `is_anonymised`, restores the real phone, nulls `name` + `has_children` so onboarding picks up cleanly. Coupon and referral history is intact under the revived `family_id`, so welcome-coupon / referral farming is blocked by the existing per-family checks.
+
+Verification (E2E pending on founder's test phone):
+- delete account on customer app → families row tombstoned, but `coupon_redemptions` and `referral_conversions` for the family remain
+- sign back in with same phone → auth-otp v22 revives the row, returns `family: null` → client routes through onboarding
+- new family_id is identical to the old one (same auth user)
+- attempt to redeem WELCOME100 → `coupon_validate` sees the historical redemption under same `family_id` → "You've already used this coupon"
+- attempt to redeem the same referrer's code → `referral_attach` sees `already_converted` against the preserved `referral_conversions` row → rejected
+
+App Store compliance: PII (name, phone, children with PII, wallet history, fcm token, etc.) is still scrubbed by `family_anonymise`. Only audit-grade metadata rows are preserved, which contain no PII and are needed for fraud prevention.
+
+---
+
 ## BUG-042: Existing customer phone numbers cannot re-login (v14 deployed; verifying 2026-05-06)
 
 - **Severity:** 🔴 BLOCKER (every existing customer can't sign in; new accounts work)

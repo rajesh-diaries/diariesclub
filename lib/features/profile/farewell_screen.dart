@@ -36,7 +36,7 @@ class FarewellScreen extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 'Your account has been deleted. '
-                'Thanks for being part of Diaries Club.',
+                'Thanks for being part of Play Diaries.',
                 style: AppTextStyles.body(
                   context,
                   color: AppColors.lightTextSecondary,

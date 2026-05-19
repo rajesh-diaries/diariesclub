@@ -34,7 +34,7 @@ class ReferralCard extends ConsumerWidget {
     int gifterPaise,
     int newFamilyPaise,
   ) async {
-    final text = 'Hey! I love Diaries Club for the kids. '
+    final text = 'Hey! I love Play Diaries for the kids. '
         'Use my code $code when you sign up — both of us get a wallet credit '
         '(${Money.fromPaise(newFamilyPaise)} for you, '
         '${Money.fromPaise(gifterPaise)} for me) once you play your first session.';

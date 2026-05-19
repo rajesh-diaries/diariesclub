@@ -1,17 +1,11 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/providers/auth_provider.dart';
 import '../../core/providers/family_children_provider.dart';
-import '../../core/services/child_photo_service.dart';
-import '../../core/services/photo_compress_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/child_avatar.dart';
@@ -34,8 +28,6 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
   final _addressController = TextEditingController();
   DateTime? _dob;
   String _hero = 'ellie';
-  String? _existingPhotoPath;
-  Uint8List? _newPhotoBytes;
   bool _busy = false;
   bool _hydrated = false;
   String? _errorText;
@@ -53,7 +45,6 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
     _nameController.text = (child['name'] as String?) ?? '';
     _addressController.text = (child['delivery_address'] as String?) ?? '';
     _hero = (child['favourite_hero'] as String?) ?? 'ellie';
-    _existingPhotoPath = child['photo_url'] as String?;
     final dob = child['date_of_birth'] as String?;
     if (dob != null) _dob = DateTime.tryParse(dob);
   }
@@ -69,28 +60,7 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
     if (picked != null) setState(() => _dob = picked);
   }
 
-  Future<void> _pickPhoto() async {
-    try {
-      final picked = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1080,
-        maxHeight: 1080,
-      );
-      if (picked == null) return;
-      final raw = await picked.readAsBytes();
-      final compressed = await PhotoCompressService.compress(raw);
-      if (!mounted) return;
-      setState(() => _newPhotoBytes = compressed);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() =>
-          _errorText = "Couldn't load that photo. Try a different one.");
-    }
-  }
-
   Future<void> _save() async {
-    final familyId = ref.read(currentFamilyIdProvider);
-    if (familyId == null) return;
     if (_nameController.text.trim().isEmpty || _dob == null) {
       setState(() => _errorText = 'Name and date of birth are required.');
       return;
@@ -101,33 +71,17 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
       _errorText = null;
     });
 
-    String? newPath;
     try {
-      if (_newPhotoBytes != null) {
-        newPath = await ChildPhotoService.uploadCompressed(
-          familyId: familyId,
-          childId: widget.childId,
-          rawBytes: _newPhotoBytes!,
-        );
-      }
-
       await Supabase.instance.client
           .rpc<Map<String, dynamic>>('child_update', params: {
         'p_child_id': widget.childId,
         'p_name': _nameController.text.trim(),
         'p_dob': DateFormat('yyyy-MM-dd').format(_dob!),
-        if (newPath != null) 'p_photo_url': newPath,
         'p_favourite_hero': _hero,
         'p_delivery_address': _addressController.text.trim().isEmpty
             ? null
             : _addressController.text.trim(),
       });
-
-      // Best-effort cleanup of the orphan photo (the path uploaded on a
-      // *previous* edit, not the just-created one).
-      if (newPath != null && _existingPhotoPath != null) {
-        await ChildPhotoService.deleteIfExists(_existingPhotoPath);
-      }
 
       ref.invalidate(familyChildrenProvider);
       if (!mounted) return;
@@ -233,38 +187,7 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
-                child: GestureDetector(
-                  onTap: _busy ? null : _pickPhoto,
-                  child: _newPhotoBytes != null
-                      ? Container(
-                          width: 96,
-                          height: 96,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            image: DecorationImage(
-                              image: MemoryImage(_newPhotoBytes!),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        )
-                      : ChildAvatar(
-                          name: name,
-                          size: 96,
-                          photoPath: _existingPhotoPath,
-                        ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: Text(
-                  _newPhotoBytes != null || _existingPhotoPath != null
-                      ? 'Tap to change'
-                      : 'Add photo (optional)',
-                  style: AppTextStyles.caption(
-                    context,
-                    color: AppColors.lightTextSecondary,
-                  ),
-                ),
+                child: ChildAvatar(name: name, size: 96),
               ),
               const SizedBox(height: 24),
               TextField(

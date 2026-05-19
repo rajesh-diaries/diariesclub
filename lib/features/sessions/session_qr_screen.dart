@@ -172,6 +172,10 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
     }
   }
 
+  /// Set once we kick off the auto-cancel on countdown zero, so the 1Hz
+  /// tick doesn't keep firing the RPC every second after the deadline.
+  bool _autoCancelFired = false;
+
   void _tickCountdown() {
     if (_deadline == null) return;
     final remaining = _deadline!.difference(DateTime.now().toUtc());
@@ -179,6 +183,32 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
     setState(() {
       _remaining = remaining.isNegative ? Duration.zero : remaining;
     });
+    // When the timer reaches zero we used to just sit on "Auto-cancels
+    // in 00:00" until the server-side cron tick (up to ~1 min later)
+    // flipped status. During that gap home stayed on "Awaiting check-in"
+    // and tapping Cancel sometimes raced with the cron. Fire the cancel
+    // RPC client-side immediately so the server flips status now and
+    // home + this screen converge within ~500ms. Cron remains the safety
+    // net if the client crashes or loses connection.
+    if (remaining.isNegative &&
+        !_autoCancelFired &&
+        (_session?['status'] as String?) == 'pending') {
+      _autoCancelFired = true;
+      _autoCancelOnTimeout();
+    }
+  }
+
+  Future<void> _autoCancelOnTimeout() async {
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'session_cancel_pending',
+        params: {'p_session_id': widget.sessionId},
+      );
+    } catch (_) {
+      // Best-effort — the server-side cron is the safety net. Let the
+      // realtime listener flip the screen state when it does eventually
+      // catch up.
+    }
   }
 
   // _pollStatus removed — replaced by realtime stream in _startTickers.
@@ -248,11 +278,20 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
         const SnackBar(content: Text('Session cancelled, hold released.')),
       );
       context.go('/home');
-    } catch (_) {
+    } on PostgrestException catch (e) {
+      // If the auto-cancel cron (or the on-timeout client cancel) beat us
+      // to it, the RPC returns success — we won't land here. This catch
+      // is for unexpected server errors only.
       if (!mounted) return;
       setState(() => _cancelling = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Couldn't cancel. Please try again.")),
+        SnackBar(content: Text("Couldn't cancel: ${e.message}")),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _cancelling = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't cancel: $e")),
       );
     }
   }

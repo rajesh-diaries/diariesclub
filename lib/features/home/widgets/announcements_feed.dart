@@ -62,9 +62,13 @@ class _AnnouncementCard extends StatelessWidget {
 
     return InkWell(
       borderRadius: BorderRadius.circular(14),
+      // context.go (not push): some cta_routes target shell-tab paths
+      // like /club/workshops whose redirect lands on the /club shell
+      // branch. push() on a shell branch path silently keeps you on the
+      // current branch (Home); go() correctly switches branches.
       onTap: ctaRoute == null || ctaRoute.isEmpty
           ? null
-          : () => context.push(ctaRoute),
+          : () => context.go(ctaRoute),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.lightSurface,

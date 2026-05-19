@@ -27,39 +27,38 @@ final reservationByIdProvider =
   );
 });
 
-/// Realtime stream of all reservations for the current family. Used by
-/// the Home BirthdayCard state machine to find each child's most recent
-/// active reservation. Sorted newest first; capped at 20 to keep
-/// payloads tight.
+/// REST list of all reservations for the current family. Used by the
+/// Home BirthdayCard state machine to find each child's most recent
+/// active reservation. Sorted newest first; capped at 20.
+///
+/// Was a StreamProvider with .stream() realtime, but the subscription
+/// was hitting RealtimeSubscribeStatus.channelError on iOS 26 (E-BSTAT
+/// on the status screen 2026-05-18). Reservation status transitions
+/// happen within hours, not seconds, so polling/refresh-on-demand is
+/// the right model. Customers pull-to-refresh; the Home BirthdayCard
+/// invalidates this provider when relevant actions complete.
 final familyReservationsProvider =
-    StreamProvider<List<Map<String, dynamic>>>((ref) async* {
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final familyId = ref.watch(currentFamilyIdProvider);
-  if (familyId == null) {
-    yield const [];
-    return;
-  }
-  final stream = Supabase.instance.client
+  if (familyId == null) return const [];
+  final rows = await Supabase.instance.client
       .from('birthday_reservations')
-      .stream(primaryKey: ['id'])
+      .select()
       .eq('family_id', familyId)
       .order('created_at', ascending: false)
       .limit(20);
-  await for (final rows in stream) {
-    yield rows;
-  }
+  return List<Map<String, dynamic>>.from(rows);
 });
 
-/// Realtime stream of birthday photos for one reservation. The bucket is
-/// private + family-scoped via RLS. The widgets resolve each path into a
-/// signed URL via `signedBirthdayPhotoUrlProvider`.
-final birthdayPhotosProvider = StreamProvider.family<
-    List<Map<String, dynamic>>, String>((ref, reservationId) async* {
-  final stream = Supabase.instance.client
+/// REST list of birthday photos for one reservation. Same realtime →
+/// REST migration as familyReservationsProvider — photos are uploaded
+/// in batches by admin, customer doesn't need second-by-second updates.
+final birthdayPhotosProvider = FutureProvider.family<
+    List<Map<String, dynamic>>, String>((ref, reservationId) async {
+  final rows = await Supabase.instance.client
       .from('birthday_party_photos')
-      .stream(primaryKey: ['id'])
+      .select()
       .eq('reservation_id', reservationId)
       .order('created_at', ascending: true);
-  await for (final rows in stream) {
-    yield rows;
-  }
+  return List<Map<String, dynamic>>.from(rows);
 });

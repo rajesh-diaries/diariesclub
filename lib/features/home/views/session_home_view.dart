@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/providers/active_sessions_provider.dart';
 import '../../../core/providers/server_clock_provider.dart';
 import '../../../core/providers/urgent_home_prompts_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -284,7 +285,7 @@ class _GraceCtaPair extends ConsumerWidget {
   final String sessionId;
   const _GraceCtaPair({required this.onExtend, required this.sessionId});
 
-  Future<void> _wrapUp(BuildContext context) async {
+  Future<void> _wrapUp(BuildContext context, WidgetRef ref) async {
     debugPrint('[BUG-038] _wrapUp invoked, sessionId=$sessionId');
     // BUG-038 root cause: previous version called `Navigator.pop(context, …)`
     // inside the dialog actions, where `context` was the captured OUTER
@@ -328,6 +329,14 @@ class _GraceCtaPair extends ConsumerWidget {
         debugPrint('[BUG-038] context unmounted after RPC, skipping nav');
         return;
       }
+      // Force-invalidate the active-sessions stream so the home view
+      // rebuilds into IdleHomeView immediately. Supabase realtime
+      // emission for the status='completed' update can lag 1-5s on
+      // slow connections, and during that window the user sees a stale
+      // "wrapping up" card next to the "Session complete" snackbar —
+      // exactly the symptom reported. Manual invalidation refetches
+      // directly so the UI matches the success message.
+      ref.invalidate(activeSessionsProvider);
       debugPrint('[BUG-038] scheduling post-frame snackbar');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         debugPrint('[BUG-038] post-frame fired, showing snackbar');
@@ -386,7 +395,7 @@ class _GraceCtaPair extends ConsumerWidget {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
-            onPressed: () => _wrapUp(context),
+            onPressed: () => _wrapUp(context, ref),
             child: const Text("I'm wrapping up"),
           ),
         ),

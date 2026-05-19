@@ -10,8 +10,9 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/phone.dart';
 import '../../../core/widgets/primary_button.dart';
 
-/// Edit family name + email. Phone is shown read-only with a "contact
-/// support" link (opens WhatsApp via venue_config.whatsapp_support_phone).
+/// Edit family name. Phone is shown read-only with a "contact support"
+/// link (opens WhatsApp via venue_config.whatsapp_support_phone). Email
+/// is intentionally not collected — see docs/POLICY_INVENTORY.md §2.1.
 class EditProfileSheet extends ConsumerStatefulWidget {
   final Map<String, dynamic> family;
   const EditProfileSheet({super.key, required this.family});
@@ -22,7 +23,6 @@ class EditProfileSheet extends ConsumerStatefulWidget {
 
 class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
   late final TextEditingController _nameController;
-  late final TextEditingController _emailController;
   bool _busy = false;
   String? _errorText;
 
@@ -32,21 +32,16 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
     _nameController = TextEditingController(
       text: (widget.family['name'] as String?) ?? '',
     );
-    _emailController = TextEditingController(
-      text: (widget.family['email'] as String?) ?? '',
-    );
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final name = _nameController.text.trim();
-    final email = _emailController.text.trim();
 
     if (name.isEmpty) {
       setState(() => _errorText = 'Family name is required.');
@@ -54,10 +49,6 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
     }
     if (name.length > 80) {
       setState(() => _errorText = 'Family name is too long.');
-      return;
-    }
-    if (email.isNotEmpty && !_emailLooksValid(email)) {
-      setState(() => _errorText = "That email doesn't look right.");
       return;
     }
 
@@ -70,7 +61,6 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
       await Supabase.instance.client
           .rpc<Map<String, dynamic>>('family_update', params: {
         'p_name': name,
-        'p_email': email.isEmpty ? null : email,
       });
       ref.invalidate(currentFamilyProvider);
       if (!mounted) return;
@@ -91,12 +81,8 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
     }
   }
 
-  bool _emailLooksValid(String email) =>
-      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
-
   String _mapError(String msg) {
     if (msg.contains('invalid_name')) return 'Family name is required.';
-    if (msg.contains('invalid_email')) return "That email doesn't look right.";
     return "Couldn't save. Please try again.";
   }
 
@@ -106,7 +92,7 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
     if (supportPhone == null || supportPhone.isEmpty) return;
     final num = supportPhone.replaceAll(RegExp(r'[^\d]'), '');
     final text = Uri.encodeComponent(
-      "Hi, I'd like to change the phone number on my Diaries Club account.",
+      "Hi, I'd like to change the phone number on my Play Diaries account.",
     );
     await launchUrl(
       Uri.parse('https://wa.me/$num?text=$text'),
@@ -160,19 +146,6 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
             textCapitalization: TextCapitalization.words,
             decoration: InputDecoration(
               labelText: 'Family name',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            style: AppTextStyles.body(context),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              labelText: 'Email (optional)',
-              helperText: 'For GST invoices and order receipts',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

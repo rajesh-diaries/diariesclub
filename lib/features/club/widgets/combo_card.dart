@@ -2,12 +2,15 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
 import '../../home/widgets/combo_purchase_sheet.dart';
+import '../fit_builder_screen.dart'
+    show FitBuilderComboContext, FitBuilderResult;
 import '../providers/cart_provider.dart';
 import '../providers/combos_provider.dart';
 
@@ -34,6 +37,11 @@ class ComboCard extends ConsumerWidget {
         .cast<String>();
     final sessionMinutes = inclusions['session_minutes'] as int?;
     final marketing = inclusions['description'] as String?;
+    // Option B: when the combo is linked to a FIT meal template, the
+    // "Add" CTA opens the FIT builder in combo mode instead of writing
+    // the cart directly. The base price is covered by the combo;
+    // selection upcharges are bundled onto the same ComboLine.
+    final fitTemplateId = combo['fit_template_id'] as String?;
 
     final menuItemsAsync = ref.watch(comboMenuItemsProvider(menuItemIds));
 
@@ -167,6 +175,22 @@ class ComboCard extends ConsumerWidget {
                     icon: const Icon(Icons.remove_circle_outline),
                     label: const Text('Remove from bag'),
                   )
+                else if (fitTemplateId != null)
+                  // Option B path: open the FIT builder, await selections,
+                  // then add a ComboLine with the linked FIT meal payload.
+                  FilledButton.icon(
+                    onPressed: () => _addComboWithFitBuilder(
+                      context,
+                      ref,
+                      fitTemplateId: fitTemplateId,
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.navy,
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: const Icon(PhosphorIconsRegular.bowlFood),
+                    label: const Text('Customise your meal · Add'),
+                  )
                 else
                   FilledButton.icon(
                     onPressed: () => _addCombo(
@@ -196,6 +220,68 @@ class ComboCard extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       useRootNavigator: true,
       builder: (_) => ComboPurchaseSheet(combo: combo),
+    );
+  }
+
+  /// Option B add path: combo opens the FIT builder for its linked
+  /// template, awaits the parent's selections, then bundles the result
+  /// onto a single [ComboLine]. The base FIT price stays "covered" by
+  /// the combo's own price_paise; selection upcharges raise the line
+  /// total. If the parent backs out of the builder, nothing is added.
+  Future<void> _addComboWithFitBuilder(
+    BuildContext context,
+    WidgetRef ref, {
+    required String fitTemplateId,
+  }) async {
+    HapticFeedback.mediumImpact();
+    final inclusions =
+        (combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
+    final sessionMinutes = inclusions['session_minutes'] as int?;
+    final result = await context.push<FitBuilderResult>(
+      '/club/fit/builder/$fitTemplateId',
+      extra: FitBuilderComboContext(
+        comboId: combo['id'] as String,
+        comboName: (combo['name'] as String?) ?? 'Combo',
+        comboPricePaise: (combo['price_paise'] as int?) ?? 0,
+        sessionMinutes: sessionMinutes,
+      ),
+    );
+    // Session-combo path: builder placed the order itself and navigated
+    // away — no cart write needed here.
+    if (sessionMinutes != null) return;
+    if (result == null) return; // parent backed out
+    if (!context.mounted) return;
+
+    final comboPrice = (combo['price_paise'] as int?) ?? 0;
+    ref.read(cartProvider.notifier).addCombo(
+          ComboLine.create(
+            comboId: combo['id'] as String,
+            name: (combo['name'] as String?) ?? 'Combo',
+            // Combo covers the FIT base; upcharges from selections raise
+            // the line total. The server re-validates on order_place.
+            unitPricePaise: comboPrice + result.upchargePaise,
+            quantity: 1,
+            imageUrl: combo['cover_image_url'] as String?,
+            includedItemNames: const [],
+            linkedFitTemplateId: result.templateId,
+            linkedFitTemplateName: result.templateName,
+            linkedFitUpchargePaise: result.upchargePaise,
+            linkedFitSelections: result.selections,
+            linkedFitSelectionsSummary: result.selectionsSummary,
+          ),
+        );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: AppColors.activeGreen,
+        content: Text(
+          result.upchargePaise > 0
+              ? 'Added · ${Money.fromPaise(comboPrice + result.upchargePaise)} '
+                  '(combo + extras)'
+              : 'Added · ${Money.fromPaise(comboPrice)}',
+        ),
+      ),
     );
   }
 

@@ -13,6 +13,7 @@ import '../../core/utils/currency.dart';
 import '../widgets/admin_app_bar.dart';
 import '../widgets/admin_buttons.dart';
 import 'combos_list_screen.dart' show combosAdminListProvider;
+import 'fit_list_screen.dart' show fitTemplatesAdminListProvider;
 
 const _kondapurVenueId = '00000000-0000-0000-0000-000000000001';
 
@@ -39,6 +40,12 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
 
   // selectedItems[menu_item_id] = quantity
   final Map<String, int> _selectedItems = {};
+
+  // When set, this combo opens the FIT builder (pre-targeted to this
+  // template) instead of using the fixed-items flow. The combo's price
+  // covers the template's base_price_paise; selection upcharges are
+  // billed on top at checkout. NULL = legacy fixed-items combo.
+  String? _fitTemplateId;
 
   bool _busy = false;
   bool _loading = true;
@@ -88,6 +95,7 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
         _sortCtrl.text = (row['sort_order'] as int?)?.toString() ?? '0';
         _isActive = (row['is_active'] as bool?) ?? true;
         _existingPhotoUrl = row['cover_image_url'] as String?;
+        _fitTemplateId = row['fit_template_id'] as String?;
 
         // Read items from inclusions JSONB. Accept both new shape
         // (menu_items: [{id, quantity}]) and legacy (menu_item_ids: [...]).
@@ -190,6 +198,7 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
         'p_photo_url': photoUrl,
         'p_inclusions': inclusions,
         'p_sort_order': int.tryParse(_sortCtrl.text.trim()) ?? 0,
+        'p_fit_template_id': _fitTemplateId,
       };
       if (_isEditing) {
         await Supabase.instance.client.rpc<dynamic>(
@@ -306,6 +315,26 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
                             : (v) => setState(() => _isActive = v),
                       ),
                     ],
+                    const SizedBox(height: 24),
+                    Text('Link to a FIT meal builder (optional)',
+                        style: AppTextStyles.h3(context)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Set this to turn the combo into a Play + FIT bundle. '
+                      'The customer opens the FIT builder for the chosen '
+                      'template, the combo price covers its base, and any '
+                      'selection upcharges are added at checkout. Leave as '
+                      '"None" for plain fixed-item combos.',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _FitTemplatePicker(
+                      value: _fitTemplateId,
+                      onChanged: (v) => setState(() => _fitTemplateId = v),
+                    ),
                     const SizedBox(height: 24),
                     Text('Items in this combo',
                         style: AppTextStyles.h3(context)),
@@ -660,3 +689,53 @@ final _allMenuItemsProvider =
   }
   return out;
 });
+
+/// Dropdown of FIT meal templates with a "None" sentinel for legacy
+/// fixed-item combos. Used in the combo editor to opt this combo into
+/// the FIT builder flow.
+class _FitTemplatePicker extends ConsumerWidget {
+  final String? value;
+  final ValueChanged<String?> onChanged;
+  const _FitTemplatePicker({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(fitTemplatesAdminListProvider);
+    return async.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: LinearProgressIndicator(),
+      ),
+      error: (e, _) => Text(
+        "Couldn't load FIT templates: $e",
+        style: AppTextStyles.caption(context, color: AppColors.adminRed),
+      ),
+      data: (templates) {
+        final items = <DropdownMenuItem<String?>>[
+          const DropdownMenuItem<String?>(
+            value: null,
+            child: Text('None — plain fixed-item combo'),
+          ),
+          for (final t in templates)
+            DropdownMenuItem<String?>(
+              value: t['id'] as String?,
+              child: Text(
+                '${t['name']}  ·  base ${Money.fromPaise((t['base_price_paise'] as int?) ?? 0)}',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ];
+        return DropdownButtonFormField<String?>(
+          initialValue: value,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Linked FIT template',
+            border: OutlineInputBorder(),
+          ),
+          items: items,
+          onChanged: onChanged,
+        );
+      },
+    );
+  }
+}

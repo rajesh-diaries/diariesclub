@@ -33,9 +33,12 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
   static const int _resendCooldownSeconds = 30;
   static const int _maxResends = 5;
 
-  final _controllers =
-      List.generate(_otpLength, (_) => TextEditingController());
-  final _focusNodes = List.generate(_otpLength, (_) => FocusNode());
+  // Single source of truth for the OTP. The visual boxes are a pure
+  // decoration of `_controller.text` — one TextField means one keyboard,
+  // no flicker as digits move from box to box, and iOS Messages
+  // autofill targets a single field.
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode();
 
   String? _phone;
   int _resendSeconds = _resendCooldownSeconds;
@@ -55,12 +58,8 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
-    }
+    _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -87,20 +86,16 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
   }
 
   void _clearBoxes() {
-    for (final c in _controllers) {
-      c.clear();
-    }
-    _focusNodes[0].requestFocus();
+    _controller.clear();
+    _focusNode.requestFocus();
   }
 
   Future<void> _verify() async {
     // BUG-007 guard: paste handler + per-box completion can both call us in
-    // the same frame. Without this gate, two HTTP submits race; the second
-    // gets aborted and the browser logs "Form submission canceled because
-    // form is not connected".
+    // the same frame. Without this gate, two HTTP submits race.
     if (_isVerifying) return;
 
-    final code = _controllers.map((c) => c.text).join();
+    final code = _controller.text;
     if (code.length != _otpLength || _phone == null) return;
 
     setState(() {
@@ -113,10 +108,13 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
       //    plus (BUG-043 fix) the families row. Routing off the response
       //    avoids the post-verifyOTP auth-state-propagation race that
       //    previously sent existing users to onboarding on web.
+      //    15s timeout: better to surface "couldn't reach server" with a
+      //    retry than spin forever if the Edge Function is cold-starting
+      //    or the Supabase gateway is having a moment.
       final res = await Supabase.instance.client.functions.invoke(
         'auth-otp',
         body: {'action': 'verify', 'phone': _phone, 'code': code},
-      );
+      ).timeout(const Duration(seconds: 15));
       final data = (res.data as Map?)?.cast<String, dynamic>() ?? {};
       if (data['ok'] != true) {
         setState(() {
@@ -248,7 +246,7 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
       await Supabase.instance.client.functions.invoke(
         'auth-otp',
         body: {'action': 'send', 'phone': _phone},
-      );
+      ).timeout(const Duration(seconds: 10));
       _startResendTimer();
       _clearBoxes();
     } catch (_) {
@@ -304,8 +302,8 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
               const SizedBox(height: 16),
 
               _OtpBoxes(
-                controllers: _controllers,
-                focusNodes: _focusNodes,
+                controller: _controller,
+                focusNode: _focusNode,
                 onCompleted: _verify,
                 isVerifying: _isVerifying,
               ),
@@ -366,86 +364,186 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
   }
 }
 
-class _OtpBoxes extends StatelessWidget {
-  final List<TextEditingController> controllers;
-  final List<FocusNode> focusNodes;
+/// Single TextField rendered invisibly behind six visible boxes.
+///
+/// All keyboard input — typing, deleting, iOS Messages autofill, paste —
+/// lands on the one TextField. The boxes are pure decoration that
+/// display the controller's characters with a "next box" indicator.
+/// Single focus means iOS doesn't dismiss/re-present the keyboard
+/// between digits → no flicker.
+class _OtpBoxes extends StatefulWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
   final VoidCallback onCompleted;
   final bool isVerifying;
 
   const _OtpBoxes({
-    required this.controllers,
-    required this.focusNodes,
+    required this.controller,
+    required this.focusNode,
     required this.onCompleted,
     required this.isVerifying,
   });
 
-  void _onChanged(int index, String value) {
-    // Paste handling: a six-char paste lands in box 0; spread it.
-    if (index == 0 && value.length == 6) {
-      for (var i = 0; i < 6; i++) {
-        controllers[i].text = value[i];
-      }
-      focusNodes[5].unfocus();
-      onCompleted();
-      return;
-    }
-    if (value.length == 1 && index < 5) {
-      focusNodes[index + 1].requestFocus();
-    }
-    if (controllers.every((c) => c.text.length == 1)) {
-      onCompleted();
+  @override
+  State<_OtpBoxes> createState() => _OtpBoxesState();
+}
+
+class _OtpBoxesState extends State<_OtpBoxes> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onTextChanged);
+    widget.focusNode.addListener(_onFocusChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onTextChanged);
+    widget.focusNode.removeListener(_onFocusChanged);
+    super.dispose();
+  }
+
+  void _onTextChanged() {
+    setState(() {});
+    if (widget.controller.text.length == 6 && !widget.isVerifying) {
+      widget.focusNode.unfocus();
+      widget.onCompleted();
     }
   }
 
-  KeyEventResult _onKey(int index, FocusNode node, KeyEvent event) {
-    if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.backspace &&
-        controllers[index].text.isEmpty &&
-        index > 0) {
-      controllers[index - 1].clear();
-      focusNodes[index - 1].requestFocus();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
+  void _onFocusChanged() => setState(() {});
+
+  void _requestFocus() {
+    if (widget.isVerifying) return;
+    widget.focusNode.requestFocus();
   }
 
   @override
   Widget build(BuildContext context) {
+    final text = widget.controller.text;
+    final hasFocus = widget.focusNode.hasFocus;
+
     return AutofillGroup(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(6, (i) {
-          return SizedBox(
-            width: 48,
-            height: 56,
-            child: Focus(
-              onKeyEvent: (node, event) => _onKey(i, node, event),
-              child: TextField(
-                controller: controllers[i],
-                focusNode: focusNodes[i],
-                enabled: !isVerifying,
-                autofocus: i == 0,
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                maxLength: i == 0 ? 6 : 1,
-                autofillHints: const [AutofillHints.oneTimeCode],
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
+      child: GestureDetector(
+        onTap: _requestFocus,
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          children: [
+            // Invisible-but-functional TextField. SizedBox.shrink keeps it
+            // out of the layout flow but still lets the framework attach
+            // the platform keyboard.
+            SizedBox(
+              height: 56,
+              child: Opacity(
+                opacity: 0,
+                child: TextField(
+                  controller: widget.controller,
+                  focusNode: widget.focusNode,
+                  enabled: !widget.isVerifying,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  maxLength: 6,
+                  autofillHints: const [AutofillHints.oneTimeCode],
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                  decoration: const InputDecoration(counterText: ''),
                 ),
-                decoration: InputDecoration(
-                  counterText: '',
-                  contentPadding: EdgeInsets.zero,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onChanged: (v) => _onChanged(i, v),
               ),
             ),
-          );
-        }),
+            // Visible cells — pure presentation.
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(6, (i) {
+                final hasChar = i < text.length;
+                final isNext = i == text.length && hasFocus;
+                return _OtpCell(
+                  character: hasChar ? text[i] : null,
+                  active: isNext,
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OtpCell extends StatelessWidget {
+  final String? character;
+  final bool active;
+  const _OtpCell({required this.character, required this.active});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 48,
+      height: 56,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.lightSurface,
+        border: Border.all(
+          color: active ? AppColors.navy : AppColors.lightBorder,
+          width: active ? 2 : 1,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: character != null
+          ? Text(
+              character!,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          : active
+              ? const _BlinkingCursor()
+              : null,
+    );
+  }
+}
+
+/// Lightweight blinking caret for the "next box". A 600ms toggle keeps it
+/// feeling alive without burning frames.
+class _BlinkingCursor extends StatefulWidget {
+  const _BlinkingCursor();
+
+  @override
+  State<_BlinkingCursor> createState() => _BlinkingCursorState();
+}
+
+class _BlinkingCursorState extends State<_BlinkingCursor> {
+  Timer? _timer;
+  bool _on = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 600), (_) {
+      if (mounted) setState(() => _on = !_on);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: _on ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 150),
+      child: Container(
+        width: 2,
+        height: 28,
+        color: AppColors.navy,
       ),
     );
   }

@@ -1,15 +1,10 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers/onboarding_state_provider.dart';
-import '../../core/services/photo_compress_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/primary_button.dart';
@@ -21,10 +16,6 @@ import '../../core/widgets/progress_dots.dart';
 /// default) and let the next screen update it. Inserting on this screen
 /// rather than buffering means the child row exists for resume purposes
 /// (kill-and-reopen at hero-pick still works).
-///
-/// Photo upload to Storage is deferred — we wire it once a public bucket
-/// + policies land. For now the picker shows but `photo_url` is sent as
-/// null. A user can re-select the photo from Profile later.
 class ChildDetailsScreen extends ConsumerStatefulWidget {
   const ChildDetailsScreen({super.key});
 
@@ -37,9 +28,39 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
   DateTime? _dob;
-  Uint8List? _photoBytes;
   bool _isLoading = false;
   String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    // If the user previously submitted on this screen and then navigated
+    // back, currentOnboardingChildIdProvider still has the child UUID.
+    // Refetch the row and prefill so back-nav doesn't lose state — and
+    // _submit can route to child_update instead of creating a duplicate.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _prefillFromDraft());
+  }
+
+  Future<void> _prefillFromDraft() async {
+    final childId = await ref.read(currentOnboardingChildIdProvider.future);
+    if (childId == null || !mounted) return;
+    try {
+      final row = await Supabase.instance.client
+          .from('children')
+          .select('name, dob, delivery_address')
+          .eq('id', childId)
+          .maybeSingle();
+      if (row == null || !mounted) return;
+      setState(() {
+        _nameController.text = (row['name'] as String?) ?? '';
+        _addressController.text = (row['delivery_address'] as String?) ?? '';
+        final dobStr = row['dob'] as String?;
+        if (dobStr != null) _dob = DateTime.tryParse(dobStr);
+      });
+    } catch (_) {
+      // Non-fatal — user will just see blank fields, same as today.
+    }
+  }
 
   @override
   void dispose() {
@@ -66,26 +87,6 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
     }
   }
 
-  Future<void> _pickPhoto() async {
-    try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1080,
-        maxHeight: 1080,
-      );
-      if (picked == null) return;
-      final raw = await picked.readAsBytes();
-      final compressed = await PhotoCompressService.compress(raw);
-      if (!mounted) return;
-      setState(() => _photoBytes = compressed);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() =>
-          _errorText = "Couldn't load that photo. Please try a different one.");
-    }
-  }
-
   Future<void> _submit() async {
     if (!_canSubmit) return;
     setState(() {
@@ -94,24 +95,46 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
     });
 
     try {
-      final result = await Supabase.instance.client.rpc<Map<String, dynamic>>(
-        'child_create',
-        params: {
-          'p_name': _nameController.text.trim(),
-          'p_dob': DateFormat('yyyy-MM-dd').format(_dob!),
-          // p_photo_url left null for now — Storage wiring is a later session.
-          'p_photo_url': null,
-          'p_favourite_hero': 'ellie',
-          'p_delivery_address':
-              _addressController.text.trim().isEmpty
-                  ? null
-                  : _addressController.text.trim(),
-        },
-      );
+      final existingId =
+          await ref.read(currentOnboardingChildIdProvider.future);
+      final client = Supabase.instance.client;
+      final name = _nameController.text.trim();
+      final dobStr = DateFormat('yyyy-MM-dd').format(_dob!);
+      final address = _addressController.text.trim().isEmpty
+          ? null
+          : _addressController.text.trim();
 
-      final childId = result['child_id'] as String?;
-      if (childId == null) {
-        throw StateError('child_create did not return child_id');
+      final String childId;
+      if (existingId != null) {
+        // Returning user after back-nav — update the same row instead of
+        // creating a duplicate. Preserves whatever favourite_hero they
+        // already picked on the hero-pick screen if they got that far.
+        await client.rpc<Map<String, dynamic>>(
+          'child_update',
+          params: {
+            'p_child_id': existingId,
+            'p_name': name,
+            'p_dob': dobStr,
+            'p_favourite_hero': null,
+            'p_delivery_address': address,
+          },
+        );
+        childId = existingId;
+      } else {
+        final result = await client.rpc<Map<String, dynamic>>(
+          'child_create',
+          params: {
+            'p_name': name,
+            'p_dob': dobStr,
+            'p_favourite_hero': 'ellie',
+            'p_delivery_address': address,
+          },
+        );
+        final newId = result['child_id'] as String?;
+        if (newId == null) {
+          throw StateError('child_create did not return child_id');
+        }
+        childId = newId;
       }
 
       await ref.read(currentOnboardingChildIdProvider.notifier).set(childId);
@@ -160,46 +183,6 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
               const SizedBox(height: 16),
               Text('About your kid', style: AppTextStyles.h1(context)),
               const SizedBox(height: 24),
-
-              // Photo picker
-              Center(
-                child: GestureDetector(
-                  onTap: _isLoading ? null : _pickPhoto,
-                  child: Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.gold.withValues(alpha: 0.18),
-                      image: _photoBytes != null
-                          ? DecorationImage(
-                              image: MemoryImage(_photoBytes!),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
-                    ),
-                    child: _photoBytes == null
-                        ? const Icon(
-                            PhosphorIconsFill.camera,
-                            color: AppColors.navy,
-                            size: 32,
-                          )
-                        : null,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: Text(
-                  _photoBytes == null ? 'Add photo (optional)' : 'Tap to change',
-                  style: AppTextStyles.caption(context,
-                      color: AppColors.lightTextSecondary),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Name
               TextField(
                 controller: _nameController,
                 textCapitalization: TextCapitalization.words,
@@ -212,10 +195,7 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
                 ),
                 style: AppTextStyles.body(context),
               ),
-
               const SizedBox(height: 16),
-
-              // DOB
               InkWell(
                 onTap: _pickDob,
                 borderRadius: BorderRadius.circular(12),
@@ -230,10 +210,7 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
                   child: Text(dobText, style: AppTextStyles.body(context)),
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // Address (optional)
               TextField(
                 controller: _addressController,
                 maxLines: 3,
@@ -246,7 +223,6 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
                 ),
                 style: AppTextStyles.body(context),
               ),
-
               if (_errorText != null) ...[
                 const SizedBox(height: 12),
                 Semantics(
@@ -258,9 +234,7 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
                   ),
                 ),
               ],
-
               const SizedBox(height: 32),
-
               SizedBox(
                 width: double.infinity,
                 child: PrimaryButton(

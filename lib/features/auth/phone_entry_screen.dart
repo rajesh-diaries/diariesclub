@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -51,10 +50,12 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
     });
 
     try {
+      // 10s timeout — better to surface "couldn't reach server" than spin
+      // forever if MSG91 or the auth-otp Edge Function is slow.
       final res = await Supabase.instance.client.functions.invoke(
         'auth-otp',
         body: {'action': 'send', 'phone': phone},
-      );
+      ).timeout(const Duration(seconds: 10));
 
       final data = (res.data as Map?)?.cast<String, dynamic>() ?? {};
       if (data['ok'] != true) {
@@ -133,23 +134,31 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
             children: [
               const SizedBox(height: 40),
 
-              // Hero placeholder until art lands. Same row of icons that
-              // will become the four-hero illustration.
+              // Four heroes — same circular layout as before, now with
+              // the actual character art. Tinted halo behind each PNG
+              // ties the row to the trait colour even with non-transparent
+              // backgrounds on the source images.
               const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _HeroPlaceholder(icon: PhosphorIconsFill.shieldStar, color: AppColors.rafiCoral),
+                  _HeroAvatar(asset: 'assets/hero/rafi.png', tint: AppColors.rafiCoral),
                   SizedBox(width: 12),
-                  _HeroPlaceholder(icon: PhosphorIconsFill.heart, color: AppColors.ellieBlue),
+                  _HeroAvatar(asset: 'assets/hero/ellie.png', tint: AppColors.ellieBlue),
                   SizedBox(width: 12),
-                  _HeroPlaceholder(icon: PhosphorIconsFill.magnifyingGlass, color: AppColors.gerryAmber),
+                  _HeroAvatar(asset: 'assets/hero/gerry.png', tint: AppColors.gerryAmber),
                   SizedBox(width: 12),
-                  _HeroPlaceholder(icon: PhosphorIconsFill.palette, color: AppColors.zenaGreen),
+                  _HeroAvatar(asset: 'assets/hero/zena.png', tint: AppColors.zenaGreen),
                 ],
               ),
 
               const SizedBox(height: 32),
-              Text('Welcome to Diaries Club', style: AppTextStyles.h1(context)),
+              // Two-line layout so "Play Diaries" stays together as a
+               // brand unit instead of orphaning "Diaries" on its own line
+               // at H1 font size on phone widths.
+               Text(
+                 'Welcome to\nPlay Diaries',
+                 style: AppTextStyles.h1(context),
+               ),
               const SizedBox(height: 8),
               Text(
                 'Enter your phone number to get started.',
@@ -224,10 +233,10 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
   }
 }
 
-class _HeroPlaceholder extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  const _HeroPlaceholder({required this.icon, required this.color});
+class _HeroAvatar extends StatelessWidget {
+  final String asset;
+  final Color tint;
+  const _HeroAvatar({required this.asset, required this.tint});
 
   @override
   Widget build(BuildContext context) {
@@ -235,10 +244,17 @@ class _HeroPlaceholder extends StatelessWidget {
       width: 56,
       height: 56,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: tint.withValues(alpha: 0.15),
         shape: BoxShape.circle,
       ),
-      child: Icon(icon, color: color, size: 28),
+      child: ClipOval(
+        child: Image.asset(
+          asset,
+          width: 56,
+          height: 56,
+          fit: BoxFit.cover,
+        ),
+      ),
     );
   }
 }
@@ -274,7 +290,17 @@ class _PhoneField extends StatelessWidget {
                 FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(10),
               ],
-              onChanged: (_) => onChanged(),
+              onChanged: (value) {
+                onChanged();
+                // 10-digit input is the most this field will ever accept,
+                // so dismiss the keypad the moment that's reached — the
+                // "Send code" button drops back into view without the
+                // parent having to scroll or tap-to-dismiss. Tap the
+                // field again to edit and the keypad comes back.
+                if (value.length == 10) {
+                  FocusScope.of(context).unfocus();
+                }
+              },
               decoration: InputDecoration(
                 hintText: '98765 43210',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -322,7 +348,11 @@ class _ConsentCheckbox extends StatelessWidget {
         Expanded(
           child: GestureDetector(
             onTap: () => onChanged(!checked),
-            behavior: HitTestBehavior.opaque,
+            // deferToChild — so the inline TapGestureRecognizers on the
+            // "Privacy Policy" and "Terms" TextSpans get first crack at
+            // tap events. With opaque, this outer detector swallowed
+            // them and the links were unclickable.
+            behavior: HitTestBehavior.deferToChild,
             child: Padding(
               padding: const EdgeInsets.only(top: 12),
               child: RichText(

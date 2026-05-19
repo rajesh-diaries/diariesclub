@@ -56,7 +56,7 @@ class ReferralEntryCard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Get $creditLabel in your wallet after your first session.',
+                    '$creditLabel wallet credit on your first visit.',
                     style: AppTextStyles.body(
                       context,
                       color: Colors.white70,
@@ -125,7 +125,7 @@ class _ReferralEntryDialogState extends ConsumerState<_ReferralEntryDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Code applied. Both wallets get credited after your first session.',
+            'Code applied. Both wallets get ₹100 after your first visit.',
           ),
         ),
       );
@@ -141,7 +141,7 @@ class _ReferralEntryDialogState extends ConsumerState<_ReferralEntryDialog> {
 
   String _friendly(String raw) {
     if (raw.contains('invalid_code')) {
-      return 'That code doesn\'t match a Diaries family.';
+      return 'That code doesn\'t match a Play Diaries family.';
     }
     if (raw.contains('self_referral')) {
       return 'You can\'t use your own referral code.';

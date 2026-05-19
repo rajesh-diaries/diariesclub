@@ -50,10 +50,15 @@ final appVersionStatusProvider = FutureProvider<AppVersionResult>((ref) async {
   final platform = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
 
   try {
+    // 8s timeout — if Supabase is unreachable at splash, fall through to
+    // the optimistic "upToDate" assumption below rather than hanging the
+    // launch screen forever. A real force-update check can wait until
+    // the next session.
     final config = await Supabase.instance.client
         .from('venue_config')
         .select('${platform}_min_supported_version, ${platform}_latest_version')
-        .single();
+        .single()
+        .timeout(const Duration(seconds: 8));
 
     final minStr = (config['${platform}_min_supported_version'] as String?) ?? '0.0.0';
     final latestStr = (config['${platform}_latest_version'] as String?) ?? '0.0.0';

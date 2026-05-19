@@ -61,7 +61,15 @@ Future<void> _initServices() async {
   // need right now. Initialise after Firebase so the messaging plugin
   // doesn't trip over a missing default app.
   if (!F.isStaff && !F.isAdmin) {
-    await FcmSetup.initialize();
+    // FCM is best-effort. On iOS, the native plugin can hang on APNs
+    // registration when entitlements are incomplete (no Runner.entitlements
+    // shipped yet — Session 12 task). A hang here would block runApp and
+    // keep the iOS launch screen visible forever. Cap at 4s.
+    try {
+      await FcmSetup.initialize().timeout(const Duration(seconds: 4));
+    } catch (e) {
+      dev.log('FCM init timed out or failed (non-fatal): $e');
+    }
   }
 
   // Branch.io — same: real key + native config arrives in Session 12.
@@ -78,14 +86,10 @@ Future<void> _initServices() async {
 
 // ── PII scrub regex set ───────────────────────────────────────────────
 // Order matters: emails first (they contain @ which the phone regex
-// would not catch), then phones, then catch-all 10+ digit blocks.
-//
-// Child names live in family rows we control — we never log them
-// directly. Defense-in-depth: if a stack trace ever interpolates a
-// child.name (e.g., "Aarav's reflection failed"), we'd want to scrub
-// that too. We can't enumerate child names at scrub time, but we *can*
-// flag any string ending in 's reflection / 's session / 's birthday
-// pattern as PII-suspect and replace the leading word with [child].
+// would not catch), then phones, then catch-all 10+ digit blocks, then
+// any child names the current family has registered with us at runtime
+// (see [registerChildNamesForScrub] below), then the possessive-pattern
+// fallback for any child name we didn't get to register in time.
 final RegExp _emailRe =
     RegExp(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}');
 final RegExp _phoneRe = RegExp(r'\+?91[\s\-]?[6-9]\d{4}[\s\-]?\d{5}');
@@ -93,16 +97,57 @@ final RegExp _bareIndianMobileRe = RegExp(r'(?<!\d)[6-9]\d{9}(?!\d)');
 final RegExp _possessiveChildRe =
     RegExp(r"\b[A-Z][a-zA-Z]{1,30}'s\s+(reflection|session|birthday|hero|recap)");
 
+/// Runtime set of the current family's child first names. Populated by
+/// the children provider once auth + first read complete; cleared on
+/// sign-out. Read inside [_scrubText] to replace any bare occurrence of
+/// a child name with the literal `[child]` before the event leaves the
+/// device.
+///
+/// This is best-effort: if a crash happens before the children stream
+/// has yielded its first row, the bare-name strip won't catch anything
+/// — the possessive-pattern fallback still applies. Anything matching
+/// `<Name>'s reflection|session|birthday|hero|recap` is scrubbed even
+/// without registration.
+final Set<String> _runtimeChildNames = <String>{};
+
+/// Register the current family's child first names so the Sentry PII
+/// scrubber can strip them out of any event / breadcrumb that would
+/// otherwise leave the device. Call this whenever the children list
+/// changes (e.g. inside `familyChildrenProvider`'s yield path). Pass an
+/// empty list on sign-out to clear.
+void registerChildNamesForScrub(Iterable<String> names) {
+  _runtimeChildNames
+    ..clear()
+    ..addAll(names
+        .map((n) => n.trim())
+        .where((n) => n.length >= 2 && n.length <= 40));
+}
+
 String _scrubText(String input) {
   if (input.isEmpty) return input;
-  return input
+  var out = input
       .replaceAll(_emailRe, '[email]')
       .replaceAll(_phoneRe, '[phone]')
-      .replaceAll(_bareIndianMobileRe, '[phone]')
-      .replaceAllMapped(_possessiveChildRe, (m) {
+      .replaceAll(_bareIndianMobileRe, '[phone]');
+
+  // Strip every registered child name (case-insensitive, word-bounded).
+  // Iterating a small set (typically 1-3 names) is cheap.
+  for (final n in _runtimeChildNames) {
+    final escaped = RegExp.escape(n);
+    out = out.replaceAll(
+      RegExp(r'\b' + escaped + r'\b', caseSensitive: false),
+      '[child]',
+    );
+  }
+
+  // Possessive-pattern fallback for any child name we didn't register
+  // (e.g. crash fired before the children stream yielded).
+  out = out.replaceAllMapped(_possessiveChildRe, (m) {
     final tail = m.group(1) ?? '';
     return "[child]'s $tail";
   });
+
+  return out;
 }
 
 dynamic _scrubAny(dynamic value) {

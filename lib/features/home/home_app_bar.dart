@@ -81,7 +81,7 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
                 letterSpacing: -0.2,
               ),
               children: [
-                const TextSpan(text: 'Diaries '),
+                const TextSpan(text: 'Play '),
                 WidgetSpan(
                   alignment: PlaceholderAlignment.middle,
                   child: Padding(
@@ -93,7 +93,7 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
                     ),
                   ),
                 ),
-                const TextSpan(text: ' Club'),
+                const TextSpan(text: ' Diaries'),
               ],
             ),
           ),

@@ -89,7 +89,6 @@ class BirthdayCardList extends ConsumerWidget {
 
         final variant = _resolveActiveVariant(
           status: activeReservation['status'] as String? ?? '',
-          albumReady: activeReservation['album_ready_at'] != null,
           daysUntil: daysUntil,
           daysSincePartySlot: daysSincePartySlot,
         );
@@ -147,14 +146,11 @@ class BirthdayCardList extends ConsumerWidget {
     );
   }
 
-  /// Hide post-party cards (Thank you / A little memory) on Home once
-  /// the party is 7+ days in the past. Keepsake stays accessible via
-  /// Profile → Past birthdays — Home should reflect what's *current*.
+  /// Hide the post-party "thank you" card once 7+ days have passed.
   static const _postPartyHomeDays = 7;
 
   static _Variant _resolveActiveVariant({
     required String status,
-    required bool albumReady,
     required int daysUntil,
     required int daysSincePartySlot,
   }) {
@@ -167,8 +163,7 @@ class BirthdayCardList extends ConsumerWidget {
       'admin_contacted' => _Variant.adminContacted,
       'confirmed' =>
         daysUntil <= 1 ? _Variant.tomorrow : _Variant.confirmed,
-      'completed' =>
-        albumReady ? _Variant.albumReady : _Variant.albumPending,
+      'completed' => _Variant.thanksForCelebrating,
       _ => _Variant.hidden,
     };
   }
@@ -180,8 +175,7 @@ enum _Variant {
   adminContacted,
   confirmed,
   tomorrow,
-  albumPending,
-  albumReady,
+  thanksForCelebrating,
 }
 
 class _CardEntry {
@@ -213,9 +207,7 @@ class _BirthdayCardTile extends StatelessWidget {
     final r = entry.reservation;
     final spec = _styleFor(name: name, daysUntil: entry.daysUntil, r: r);
 
-    final destination = entry.variant == _Variant.albumReady
-        ? '/birthday/album/${r['id']}'
-        : '/birthday/status/${r['id']}';
+    final destination = '/birthday/status/${r['id']}';
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -318,24 +310,16 @@ class _BirthdayCardTile extends StatelessWidget {
           subtitle: 'See you soon!',
           cta: 'View details →',
         );
-      case _Variant.albumPending:
+      case _Variant.thanksForCelebrating:
         return _CardSpec(
           gradient: [
             AppColors.lightTextSecondary.withValues(alpha: 0.40),
             AppColors.navy.withValues(alpha: 0.60),
           ],
-          icon: PhosphorIconsFill.images,
-          title: 'Thank you for celebrating',
-          subtitle: 'Photos coming in 3-5 days.',
-          cta: 'View status →',
-        );
-      case _Variant.albumReady:
-        return _CardSpec(
-          gradient: const [AppColors.gold, AppColors.activeGreen],
-          icon: PhosphorIconsFill.gift,
-          title: 'A little memory for $name',
-          subtitle: 'Tap to open your keepsake.',
-          cta: 'Open keepsake →',
+          icon: PhosphorIconsFill.cake,
+          title: 'Thank you for celebrating with us',
+          subtitle: 'We hope $name had a wonderful day!',
+          cta: 'View details →',
         );
       case _Variant.hidden:
         return const _CardSpec(

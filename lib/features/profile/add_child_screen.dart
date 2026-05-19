@@ -1,19 +1,11 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/providers/auth_provider.dart';
 import '../../core/providers/current_family_provider.dart';
 import '../../core/providers/family_children_provider.dart';
-import '../../core/services/child_photo_service.dart';
-import '../../core/services/photo_compress_service.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/primary_button.dart';
 import 'widgets/hero_picker.dart';
@@ -32,7 +24,6 @@ class _AddChildScreenState extends ConsumerState<AddChildScreen> {
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
   DateTime? _dob;
-  Uint8List? _photoBytes;
   String _hero = 'ellie';
   bool _busy = false;
   String? _errorText;
@@ -59,25 +50,6 @@ class _AddChildScreenState extends ConsumerState<AddChildScreen> {
     if (picked != null) setState(() => _dob = picked);
   }
 
-  Future<void> _pickPhoto() async {
-    try {
-      final picked = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1080,
-        maxHeight: 1080,
-      );
-      if (picked == null) return;
-      final raw = await picked.readAsBytes();
-      final compressed = await PhotoCompressService.compress(raw);
-      if (!mounted) return;
-      setState(() => _photoBytes = compressed);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() =>
-          _errorText = "Couldn't load that photo. Please try a different one.");
-    }
-  }
-
   Future<void> _submit() async {
     if (!_canSubmit) return;
     setState(() {
@@ -85,43 +57,16 @@ class _AddChildScreenState extends ConsumerState<AddChildScreen> {
       _errorText = null;
     });
 
-    final familyId = ref.read(currentFamilyIdProvider);
-    if (familyId == null) {
-      setState(() => _busy = false);
-      return;
-    }
-
     try {
-      // 1) Create the child row with photo_url=null (we don't have a child_id
-      // until insert, and the storage path includes the child_id).
-      final created = await Supabase.instance.client
+      await Supabase.instance.client
           .rpc<Map<String, dynamic>>('child_create', params: {
         'p_name': _nameController.text.trim(),
         'p_dob': DateFormat('yyyy-MM-dd').format(_dob!),
-        'p_photo_url': null,
         'p_favourite_hero': _hero,
         'p_delivery_address': _addressController.text.trim().isEmpty
             ? null
             : _addressController.text.trim(),
       });
-      final childId = created['child_id'] as String?;
-      if (childId == null) {
-        throw StateError('child_create did not return child_id');
-      }
-
-      // 2) If a photo was picked, upload then patch the row with the path.
-      if (_photoBytes != null) {
-        final path = await ChildPhotoService.uploadCompressed(
-          familyId: familyId,
-          childId: childId,
-          rawBytes: _photoBytes!,
-        );
-        await Supabase.instance.client
-            .rpc<Map<String, dynamic>>('child_update', params: {
-          'p_child_id': childId,
-          'p_photo_url': path,
-        });
-      }
 
       ref.invalidate(familyChildrenProvider);
       ref.invalidate(currentFamilyProvider);
@@ -162,43 +107,6 @@ class _AddChildScreenState extends ConsumerState<AddChildScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 8),
-              Center(
-                child: GestureDetector(
-                  onTap: _busy ? null : _pickPhoto,
-                  child: Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.gold.withValues(alpha: 0.18),
-                      image: _photoBytes != null
-                          ? DecorationImage(
-                              image: MemoryImage(_photoBytes!),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
-                    ),
-                    child: _photoBytes == null
-                        ? const Icon(
-                            PhosphorIconsFill.camera,
-                            color: AppColors.navy,
-                            size: 32,
-                          )
-                        : null,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: Text(
-                  _photoBytes == null ? 'Add photo (optional)' : 'Tap to change',
-                  style: AppTextStyles.caption(
-                    context,
-                    color: AppColors.lightTextSecondary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
               TextField(
                 controller: _nameController,
                 textCapitalization: TextCapitalization.words,
@@ -253,7 +161,7 @@ class _AddChildScreenState extends ConsumerState<AddChildScreen> {
                   _errorText!,
                   style: AppTextStyles.caption(
                     context,
-                    color: AppColors.adminRed,
+                    color: Theme.of(context).colorScheme.error,
                   ),
                 ),
               ],

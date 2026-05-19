@@ -1,11 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/notifications/notification_channels.dart';
 import '../../../core/providers/family_children_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -32,7 +29,6 @@ class HealthyBiteReminderBanner extends ConsumerStatefulWidget {
 class _HealthyBiteReminderBannerState
     extends ConsumerState<HealthyBiteReminderBanner> {
   bool _dismissed = false;
-  bool _notified = false;
 
   @override
   void initState() {
@@ -46,7 +42,6 @@ class _HealthyBiteReminderBannerState
     if (!mounted) return;
     setState(() {
       _dismissed = prefs.getBool('hb_dismissed_$sessionId') ?? false;
-      _notified = prefs.getBool('hb_notified_$sessionId') ?? false;
     });
   }
 
@@ -55,39 +50,6 @@ class _HealthyBiteReminderBannerState
     final sessionId = widget.session['id'] as String;
     await prefs.setBool('hb_dismissed_$sessionId', true);
     if (mounted) setState(() => _dismissed = true);
-  }
-
-  /// Fire a local notification once, the moment we first detect the
-  /// eligibility window. Mobile only — `flutter_local_notifications` has
-  /// no reliable web implementation and `kIsWeb` short-circuits cleanly.
-  /// Server-side FCM cron for backgrounded clients is a v1.1 follow-up.
-  Future<void> _maybeNotify(String childName) async {
-    if (_notified || kIsWeb) return;
-    _notified = true; // set immediately to prevent re-fire on next tick
-    final prefs = await SharedPreferences.getInstance();
-    final sessionId = widget.session['id'] as String;
-    await prefs.setBool('hb_notified_$sessionId', true);
-    try {
-      final plugin = FlutterLocalNotificationsPlugin();
-      await plugin.show(
-        sessionId.hashCode & 0x7fffffff, // stable per-session notif id
-        'A treat for $childName!',
-        'Pop by the counter for a complimentary Healthy Bite.',
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            NotificationChannels.sessionChannelId,
-            'Sessions',
-            channelDescription:
-                'Active session events: grace, hydration, healthy bite.',
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          iOS: DarwinNotificationDetails(),
-        ),
-      );
-    } catch (_) {
-      // Notification is a nice-to-have; banner is the primary surface.
-    }
   }
 
   @override
@@ -117,14 +79,11 @@ class _HealthyBiteReminderBannerState
       orElse: () => const <String, dynamic>{},
     )['name'] as String? ?? 'Your kid';
 
-    // Side effect: fire local notification once when first eligible.
-    // Banner is rebuilt on the parent's 1Hz tick, so this fires on the
-    // first eligible build and short-circuits thereafter via _notified.
-    if (!_notified) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _maybeNotify(childName);
-      });
-    }
+    // Note: the "A treat for X!" push is fired server-side by the
+    // _healthy_bite_eligibility_sweep cron (mig 0159) which inserts a
+    // notifications row and the trigger dispatches via send-push. This
+    // banner is the in-app surface — no client-side notification fires
+    // here anymore to avoid double-banners.
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),

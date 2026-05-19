@@ -29,6 +29,8 @@ import 'customers/customers_screen.dart';
 import 'live_ops/live_ops_screen.dart';
 import 'login_screen.dart';
 import 'notifications/broadcast_screen.dart';
+import 'notifications/notification_activity_screen.dart';
+import 'notifications/notification_templates_screen.dart';
 import 'packages/package_edit_screen.dart';
 import 'packages/packages_list_screen.dart';
 import 'providers/admin_auth_provider.dart';
@@ -204,6 +206,14 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/notifications',
             builder: (_, __) => const BroadcastNotificationScreen(),
+          ),
+          GoRoute(
+            path: '/admin/notifications/templates',
+            builder: (_, __) => const NotificationTemplatesScreen(),
+          ),
+          GoRoute(
+            path: '/admin/notifications/activity',
+            builder: (_, __) => const NotificationActivityScreen(),
           ),
           GoRoute(
             path: '/admin/coupons',

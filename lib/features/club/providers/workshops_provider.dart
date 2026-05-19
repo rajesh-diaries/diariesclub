@@ -24,13 +24,33 @@ final workshopFilterProvider =
 final workshopsProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) async* {
   final filter = ref.watch(workshopFilterProvider);
-  final stream = Supabase.instance.client
-      .from('workshops')
-      .stream(primaryKey: ['id'])
-      .order('scheduled_at', ascending: true);
+  final client = Supabase.instance.client;
 
-  await for (final rows in stream) {
-    yield _applyFilter(rows, filter);
+  // One-shot initial read so the Workshops tab renders even if Realtime
+  // later errors (iOS channelError 1002).
+  final initialRows = await client
+      .from('workshops')
+      .select()
+      .order('scheduled_at', ascending: true);
+  yield _applyFilter(
+    (initialRows as List)
+        .map((r) => Map<String, dynamic>.from(r as Map))
+        .toList(),
+    filter,
+  );
+
+  try {
+    final stream = client
+        .from('workshops')
+        .stream(primaryKey: ['id'])
+        .order('scheduled_at', ascending: true);
+
+    await for (final rows in stream) {
+      yield _applyFilter(rows, filter);
+    }
+  } catch (e) {
+    // ignore: avoid_print
+    print('[workshops_provider] realtime error (non-fatal): $e');
   }
 });
 
@@ -90,11 +110,27 @@ final myWorkshopRegistrationsProvider =
     yield const [];
     return;
   }
-  final stream = Supabase.instance.client
+  final client = Supabase.instance.client;
+
+  final initialRows = await client
       .from('workshop_registrations')
-      .stream(primaryKey: ['id'])
+      .select()
       .eq('family_id', familyId);
-  await for (final rows in stream) {
-    yield rows.where((r) => r['cancelled_at'] == null).toList();
+  yield (initialRows as List)
+      .where((r) => (r as Map)['cancelled_at'] == null)
+      .map((r) => Map<String, dynamic>.from(r as Map))
+      .toList();
+
+  try {
+    final stream = client
+        .from('workshop_registrations')
+        .stream(primaryKey: ['id'])
+        .eq('family_id', familyId);
+    await for (final rows in stream) {
+      yield rows.where((r) => r['cancelled_at'] == null).toList();
+    }
+  } catch (e) {
+    // ignore: avoid_print
+    print('[my_workshop_registrations_provider] realtime error (non-fatal): $e');
   }
 });

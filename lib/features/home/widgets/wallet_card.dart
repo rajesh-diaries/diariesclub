@@ -80,7 +80,7 @@ class _Card extends StatelessWidget {
           Row(
             children: [
               Text(
-                'Diaries Wallet',
+                'Wallet',
                 style: AppTextStyles.caption(context, color: Colors.white70),
               ),
               const Spacer(),
@@ -130,7 +130,7 @@ class _Card extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '$coinsBalance Diaries Coins '
+                  '$coinsBalance Coins '
                   '(${coinsBalance >= 100 ? "redeem in Profile" : "${100 - coinsBalance} more to redeem"})',
                   style: AppTextStyles.caption(context, color: AppColors.gold),
                 ),

@@ -73,8 +73,21 @@ class MenuItemLine extends CartLine {
       );
 }
 
-/// Pre-bundled combo (Coffee + FIT items at admin-set price). Combo line's
-/// price is the combo.price_paise — server re-validates on order_place.
+/// Pre-bundled combo (Coffee + FIT items at admin-set price). Combo
+/// line's price is the combo.price_paise — server re-validates on
+/// order_place.
+///
+/// Option B (Play + FIT builder): when the combo points at a
+/// fit_meal_templates row, the customer goes through the FIT builder
+/// before this line is created. The base price is covered by the
+/// combo; selection upcharges live in [linkedFitUpchargePaise] and the
+/// raw [linkedFitSelections] are forwarded to the server as
+/// order_items.selections_jsonb on this line.
+///
+/// unitPricePaise for a combo with a linked FIT meal = combo.price +
+/// linkedFitUpchargePaise. The server is responsible for validating
+/// (a) that the selections belong to the linked template, and (b) that
+/// the upcharge matches what fit_meal_compute_price would return.
 class ComboLine extends CartLine {
   @override
   final String id;
@@ -87,6 +100,13 @@ class ComboLine extends CartLine {
   final String? imageUrl;
   final List<String> includedItemNames; // for display
 
+  /// Set when the combo opens a FIT builder (admin-linked template).
+  final String? linkedFitTemplateId;
+  final String? linkedFitTemplateName;
+  final int linkedFitUpchargePaise;
+  final Map<String, dynamic>? linkedFitSelections;
+  final List<String> linkedFitSelectionsSummary;
+
   ComboLine({
     required this.id,
     required this.comboId,
@@ -95,6 +115,11 @@ class ComboLine extends CartLine {
     required this.quantity,
     this.imageUrl,
     this.includedItemNames = const [],
+    this.linkedFitTemplateId,
+    this.linkedFitTemplateName,
+    this.linkedFitUpchargePaise = 0,
+    this.linkedFitSelections,
+    this.linkedFitSelectionsSummary = const [],
   });
 
   factory ComboLine.create({
@@ -104,6 +129,11 @@ class ComboLine extends CartLine {
     required int quantity,
     String? imageUrl,
     List<String> includedItemNames = const [],
+    String? linkedFitTemplateId,
+    String? linkedFitTemplateName,
+    int linkedFitUpchargePaise = 0,
+    Map<String, dynamic>? linkedFitSelections,
+    List<String> linkedFitSelectionsSummary = const [],
   }) =>
       ComboLine(
         id: 'combo:$comboId',
@@ -113,7 +143,14 @@ class ComboLine extends CartLine {
         quantity: quantity,
         imageUrl: imageUrl,
         includedItemNames: includedItemNames,
+        linkedFitTemplateId: linkedFitTemplateId,
+        linkedFitTemplateName: linkedFitTemplateName,
+        linkedFitUpchargePaise: linkedFitUpchargePaise,
+        linkedFitSelections: linkedFitSelections,
+        linkedFitSelectionsSummary: linkedFitSelectionsSummary,
       );
+
+  bool get hasLinkedFitMeal => linkedFitTemplateId != null;
 
   @override
   String get displayName => name;
@@ -127,6 +164,11 @@ class ComboLine extends CartLine {
         quantity: q,
         imageUrl: imageUrl,
         includedItemNames: includedItemNames,
+        linkedFitTemplateId: linkedFitTemplateId,
+        linkedFitTemplateName: linkedFitTemplateName,
+        linkedFitUpchargePaise: linkedFitUpchargePaise,
+        linkedFitSelections: linkedFitSelections,
+        linkedFitSelectionsSummary: linkedFitSelectionsSummary,
       );
 }
 

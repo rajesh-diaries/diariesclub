@@ -60,6 +60,12 @@ class FcmSetup {
   /// double-init when the auth state stream re-fires.
   static bool _initialised = false;
 
+  /// Whether the onTokenRefresh listener has been wired this run.
+  /// Critical for iOS: the listener must be attached BEFORE the first
+  /// getToken() call so a token that arrives after APNs registers (which
+  /// can take several seconds) still gets persisted.
+  static bool _tokenListenerWired = false;
+
   /// One-shot init called from bootstrap when:
   ///   1) the flavor is the customer app (caller checks; this class is
   ///      not invoked from staff/admin flavors)
@@ -83,17 +89,37 @@ class FcmSetup {
       // Background handler must be registered before any other FCM call.
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-      // Local notifications plugin (used to render foreground banners on
-      // Android — iOS shows them itself if the user grants permission).
+      // iOS: explicitly OPT OUT of FCM's auto-present in foreground.
+      // We render every foreground push via _onForegroundMessage →
+      // flutter_local_notifications instead. The previous setup (alert:
+      // true) double-rendered some pushes and silently dropped others
+      // on iOS 26 — letting iOS try to merge FCM's `notification` block
+      // into `aps.alert` was the inconsistent bit. Now there's exactly
+      // one banner path: data arrives, we explicitly call
+      // _localNotifications.show(). suppress_foreground from the server
+      // is still honoured for the few in-context types.
+      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+        alert: false,
+        badge: false,
+        sound: false,
+      );
+
+      // Local notifications plugin — used to render banners in the
+      // foreground for both Android and iOS. The plugin has its own
+      // iOS permission state (FCM's permission grant doesn't carry over)
+      // so we must request alert/badge/sound here too; iOS dedupes the
+      // prompt against the FCM grant, so the user doesn't see a second
+      // dialog. Without this, _localNotifications.show() was silently
+      // failing for session_started in foreground (iOS doesn't present
+      // the FCM 'notification' block while the app is active, and our
+      // fallback was no-op'd by the missing permission).
       await _localNotifications.initialize(
         const InitializationSettings(
           android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-          // TODO(ios): swap for DarwinInitializationSettings with
-          // requestAlertPermission etc. once iOS push lands.
           iOS: DarwinInitializationSettings(
-            requestAlertPermission: false,
-            requestBadgePermission: false,
-            requestSoundPermission: false,
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
           ),
         ),
         onDidReceiveNotificationResponse: _onLocalTap,
@@ -128,7 +154,23 @@ class FcmSetup {
   /// permission, fetches the token, persists it on families.fcm_token.
   /// Idempotent — safe to call on every auth state change.
   static Future<void> onSignIn(String familyId) async {
-    if (!_initialised) return;
+    // Defensive: if initialize() timed out at boot (iOS APNs first-launch
+    // delay can exceed the 4s cap in bootstrap.dart), _initialised stays
+    // false and we'd otherwise never prompt the user. Best-effort attempt
+    // a late init so the permission prompt + token fetch still happen.
+    if (!_initialised) {
+      try {
+        if (Firebase.apps.isEmpty) {
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          );
+        }
+        _initialised = true;
+      } catch (e) {
+        dev.log('FCM late-init failed; aborting onSignIn: $e', name: 'fcm');
+        return;
+      }
+    }
 
     try {
       final settings = await FirebaseMessaging.instance.requestPermission(
@@ -142,18 +184,53 @@ class FcmSetup {
         return;
       }
 
+      // Wire the refresh listener FIRST — before any getToken call.
+      // On iOS, getToken() often returns null on the first attempt while
+      // APNs registration is still in flight; the token then arrives a
+      // few seconds later via this listener. If we registered the
+      // listener AFTER getToken (the previous bug), an iPhone whose
+      // initial getToken returned null would silently never register
+      // its token at all.
+      if (!_tokenListenerWired) {
+        _tokenListenerWired = true;
+        FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+          currentFcmToken = newToken;
+          await _persistToken(familyId, newToken);
+        });
+      }
+
+      // iOS: poll for the APNs token up to ~10s before asking Firebase
+      // for the FCM token. Without an APNs token, FCM's getToken either
+      // returns null or throws — neither of which the previous code
+      // handled.
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        String? apnsToken;
+        for (var i = 0; i < 20; i++) {
+          apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+          if (apnsToken != null) break;
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+        }
+        if (apnsToken == null) {
+          dev.log(
+            'FCM iOS: APNs token never arrived in 10s; onTokenRefresh '
+            'listener will pick it up if it lands later',
+            name: 'fcm',
+          );
+          return;
+        }
+      }
+
       final token = await FirebaseMessaging.instance.getToken();
-      if (token == null) return;
+      if (token == null) {
+        dev.log(
+          'FCM getToken() returned null; relying on onTokenRefresh listener',
+          name: 'fcm',
+        );
+        return;
+      }
 
       currentFcmToken = token;
       await _persistToken(familyId, token);
-
-      // Refresh listener — fires when the token rotates (rare but happens
-      // after reinstall, app-data clear, or backend rotation).
-      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-        currentFcmToken = newToken;
-        await _persistToken(familyId, newToken);
-      });
     } catch (e, st) {
       dev.log('FCM onSignIn failed: $e', name: 'fcm', error: e, stackTrace: st);
     }
@@ -191,10 +268,18 @@ class FcmSetup {
   // ── handlers ─────────────────────────────────────────────────────────
 
   static Future<void> _onForegroundMessage(RemoteMessage message) async {
-    // The Edge Function sets `data.suppress_foreground=true` for events
-    // the user is already looking at (session screens, etc.). Skip the
-    // banner in that case — the in-app stream already updates the UI.
+    // iOS foreground rendering is now done natively in
+    // AppDelegate.userNotificationCenter(_:willPresent:) — that path
+    // forces a banner unless `suppress_foreground=true`. Android still
+    // needs a local notification because its FCM SDK doesn't auto-
+    // present in foreground.
     if (message.data['suppress_foreground'] == 'true') return;
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      // No-op on iOS — AppDelegate handles the banner. Skipping the
+      // local notification avoids double-rendering.
+      return;
+    }
 
     final notification = message.notification;
     final type = message.data['type'] as String? ?? '';
@@ -204,7 +289,6 @@ class FcmSetup {
     final body = notification?.body ?? message.data['body'] as String?;
     if (title == null && body == null) return;
 
-    // ID is a small hash so re-deliveries dedupe; not strictly required.
     final id = message.messageId?.hashCode.abs() ?? DateTime.now().millisecondsSinceEpoch.remainder(0x7fffffff);
 
     await _localNotifications.show(
@@ -215,11 +299,9 @@ class FcmSetup {
         android: AndroidNotificationDetails(
           channelId,
           _channelDisplayName(channelId),
-          importance: Importance.defaultImportance,
-          priority: Priority.defaultPriority,
+          importance: Importance.high,
+          priority: Priority.high,
         ),
-        // TODO(ios): mirror channel concept via notification categories.
-        iOS: const DarwinNotificationDetails(),
       ),
       payload: jsonEncode(message.data),
     );

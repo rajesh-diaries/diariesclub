@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app_admin.dart';
 import 'app_staff.dart';
 import 'core/notifications/fcm_lifecycle_provider.dart';
-import 'core/providers/app_theme_mode_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'flavors.dart';
@@ -21,7 +20,6 @@ class DiariesClubApp extends ConsumerWidget {
     if (F.isAdmin) return const AdminApp();
     if (F.isStaff) return const StaffApp();
 
-    final themeMode = ref.watch(appThemeModeProvider);
     final router = ref.watch(appRouterProvider);
     // Watch the FCM lifecycle so its auth listener stays alive for the
     // life of the customer app. The provider returns void; the side
@@ -29,11 +27,16 @@ class DiariesClubApp extends ConsumerWidget {
     ref.watch(fcmLifecycleProvider);
 
     return MaterialApp.router(
-      title: 'Diaries Club',
+      title: 'Play Diaries',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: themeMode,
+      // Customer-app dark theme is shipped LOCKED OFF for v1. The card
+      // surfaces, borders, and a few text styles are still hard-coded
+      // to light values across dozens of widgets — switching the app to
+      // dark mode produced white cards with white text (unreadable).
+      // Proper dark theme audit is tracked as a separate task.
+      darkTheme: AppTheme.light,
+      themeMode: ThemeMode.light,
       routerConfig: router,
       // Indian locale baseline.
       locale: const Locale('en', 'IN'),

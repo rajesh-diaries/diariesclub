@@ -107,7 +107,7 @@ class HeroWithinCelebrationCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'The rarest unlock in the Diaries Club — only the kids '
+                  'The rarest unlock in the Play Diaries — only the kids '
                   'who grow across every trait reach it.',
                   style: AppTextStyles.body(context).copyWith(
                     color: Colors.white.withValues(alpha: 0.92),

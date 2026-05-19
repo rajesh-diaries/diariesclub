@@ -39,17 +39,17 @@ android {
             dimension = "default"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            resValue("string", "app_name", "Diaries Club Dev")
+            resValue("string", "app_name", "Play Diaries Dev")
         }
         create("staging") {
             dimension = "default"
             applicationIdSuffix = ".staging"
             versionNameSuffix = "-staging"
-            resValue("string", "app_name", "Diaries Club Staging")
+            resValue("string", "app_name", "Play Diaries Staging")
         }
         create("prod") {
             dimension = "default"
-            resValue("string", "app_name", "Diaries Club")
+            resValue("string", "app_name", "Play Diaries")
         }
         // Staff flavors (Session 10, phone-only per DECISION-001).
         // Different applicationId from the customer app so both can

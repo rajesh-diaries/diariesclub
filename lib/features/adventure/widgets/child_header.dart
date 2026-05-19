@@ -41,7 +41,6 @@ class ChildHeader extends ConsumerWidget {
             child: ChildAvatar(
               name: name,
               size: 56,
-              photoPath: child['photo_url'] as String?,
             ),
           ),
           const SizedBox(width: 16),

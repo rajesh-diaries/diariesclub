@@ -41,19 +41,39 @@ final homeStateProvider = StreamProvider<HomeState>((ref) async* {
     return;
   }
 
-  final stream = Supabase.instance.client
+  final client = Supabase.instance.client;
+
+  // One-shot read so the screen renders even if Realtime later fails. On
+  // iOS prod builds we've seen the Realtime subscribe time out on the first
+  // post-login attempt (JWT propagation race); the one-shot uses the
+  // already-attached PostgREST client and reliably succeeds.
+  final initialRows = await client
       .from('sessions')
-      .stream(primaryKey: ['id'])
+      .select()
       .eq('family_id', familyId)
       .order('created_at', ascending: false)
       .limit(5);
+  yield _classify(
+    (initialRows as List).cast<Map<String, dynamic>>(),
+  );
 
-  await for (final rows in stream) {
-    final classified = _classify(rows);
+  // Best-effort Realtime subscription for live updates. If it errors
+  // (timeout, transport drop), keep the last emitted state instead of
+  // bubbling the error up to the home screen as E-HOME.
+  try {
+    final stream = client
+        .from('sessions')
+        .stream(primaryKey: ['id'])
+        .eq('family_id', familyId)
+        .order('created_at', ascending: false)
+        .limit(5);
+
+    await for (final rows in stream) {
+      yield _classify(rows);
+    }
+  } catch (e) {
     // ignore: avoid_print
-    print('[BUG-038] homeStateProvider stream emitted ${rows.length} rows '
-        '→ ${classified.runtimeType}');
-    yield classified;
+    print('[home_state_provider] realtime stream error (non-fatal): $e');
   }
 });
 
@@ -77,29 +97,9 @@ HomeState _classify(List<Map<String, dynamic>> rows) {
     return HomeStateInSession(r);
   }
 
-  // PostSession branch re-enabled in 87a4fec. Customer who has just
-  // completed a session and hasn't reflected yet sees the Hero Recap
-  // card here — the entry point that drives children.total_xp > 0 and
-  // unlocks the Adventure tab dashboard.
-  for (final r in rows) {
-    final status = r['status'] as String?;
-    if (status != 'completed' && status != 'auto_closed') continue;
-
-    final reflection = r['reflection_status'] as String?;
-    if (reflection != 'pending') continue;
-
-    final completedAt = r['completed_at'] as String?;
-    if (completedAt == null) continue;
-
-    try {
-      final closedAt = DateTime.parse(completedAt);
-      if (DateTime.now().toUtc().difference(closedAt.toUtc()).inMinutes > 30) {
-        continue; // older than 30 min, not in post-session window
-      }
-    } catch (_) { continue; }
-
-    return HomeStatePostSession(r);
-  }
-
+  // Pending reflections are now surfaced by `PendingReflectionsSection`
+  // (renders one card per pending reflection inside both Idle and
+  // MultiSession home views, for the full 24h reflection window). The
+  // top-level home state is just idle vs in-session.
   return const HomeStateIdle();
 }

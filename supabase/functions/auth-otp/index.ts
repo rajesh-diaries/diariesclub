@@ -76,6 +76,17 @@ const RATE_LIMIT_MAX_SENDS    = 3;
 const MAX_VERIFY_ATTEMPTS     = 3;
 const MOCK_CODE               = "123456";
 
+// Apple App Store Review test accounts. These +91 phone numbers don't
+// trigger MSG91 / SMS — instead, the configured OTP is stored in
+// otp_codes and the standard verify path accepts it. Documented in
+// App Store Connect's Demo Account field so Apple's review team can
+// log in without owning an Indian phone number. Add a number here in
+// a PR, not via env var, so the change goes through review.
+const TEST_PHONES: Record<string, string> = {
+  "+919999999991": "555444",  // Apple App Store Review primary
+  "+919999999992": "555444",  // Apple App Store Review backup
+};
+
 const E164_REGEX = /^\+91[6-9]\d{9}$/;
 
 const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -129,7 +140,12 @@ async function handleSend(phone: string): Promise<Response> {
 
   try { await admin.rpc("otp_codes_cleanup"); } catch (_e) { /* ignore */ }
 
-  if (OTP_MODE !== "mock") {
+  const testCode = TEST_PHONES[phone];
+  const isTestPhone = testCode !== undefined;
+
+  // Test phones skip rate limiting + SMS. Real phones go through the
+  // usual MSG91 + per-phone rate-limit path.
+  if (!isTestPhone && OTP_MODE !== "mock") {
     const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MIN * 60_000).toISOString();
     const { count, error: countError } = await admin
       .from("otp_codes")
@@ -150,7 +166,9 @@ async function handleSend(phone: string): Promise<Response> {
     }
   }
 
-  const code = OTP_MODE === "mock" ? MOCK_CODE : generateOtp();
+  const code = isTestPhone
+    ? testCode
+    : OTP_MODE === "mock" ? MOCK_CODE : generateOtp();
   const codeHash = await sha256Hex(code);
   const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000).toISOString();
 
@@ -164,7 +182,9 @@ async function handleSend(phone: string): Promise<Response> {
     });
   }
 
-  if (OTP_MODE === "mock") {
+  if (isTestPhone) {
+    console.log(`auth-otp.send.test_phone phone=${phone} code=${testCode} expires=${expiresAt}`);
+  } else if (OTP_MODE === "mock") {
     console.log(`auth-otp.send.mock phone=${phone} code=${MOCK_CODE} expires=${expiresAt}`);
   } else {
     if (!MSG91_AUTH_KEY || !MSG91_TEMPLATE_ID) {
@@ -179,7 +199,11 @@ async function handleSend(phone: string): Promise<Response> {
           template_id: MSG91_TEMPLATE_ID,
           sender:      MSG91_SENDER_ID,
           short_url:   "0",
-          recipients:  [{ mobiles: mobile, var1: code }],
+          // TRAI 2026 DLT update: templates use typed placeholders like
+          // {#numeric#}, which MSG91 surfaces as a flow variable literally
+          // named "numeric". Sending "var1" leaves the placeholder unfilled
+          // and customers receive an SMS with an empty OTP slot.
+          recipients:  [{ mobiles: mobile, numeric: code }],
         }),
       });
       const result = await res.json();
@@ -338,12 +362,48 @@ async function handleVerify(phone: string, code: string): Promise<Response> {
     console.error(`auth-otp.verify.family_lookup_warn msg=${famErr.message}`);
   }
 
-  // Soft-treat soft-deleted / anonymised families as "no family" so the
-  // client routes through onboarding rather than into a tombstoned row.
-  const family = (familyRow &&
-    !familyRow.deleted_at &&
-    !familyRow.is_anonymised)
-    ? familyRow
+  // BUG-069 fix: if the row is tombstoned (deleted_at OR is_anonymised set)
+  // and the same phone is signing back up, revive the row server-side so
+  // onboarding starts cleanly. family_anonymise already scrubbed PII +
+  // wiped wallet/children/sessions/etc., so revival just clears the
+  // tombstone flags and restores the real phone. coupon_redemptions and
+  // referral_conversions are intentionally preserved by family_anonymise
+  // (post BUG-069 migration) so welcome-coupon and referral dedup keep
+  // working across the delete/re-signup cycle.
+  let effectiveFamily = familyRow;
+  if (familyRow && (familyRow.deleted_at || familyRow.is_anonymised)) {
+    const { data: revived, error: reviveErr } = await admin
+      .from("families")
+      .update({
+        deleted_at:               null,
+        is_anonymised:            false,
+        phone:                    phone,
+        name:                     null,
+        has_children:             false,
+        is_cafe_only:             false,
+        marketing_consent:        false,
+        notification_preferences: {},
+        last_active_at:           new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select("id, name, phone, has_children, is_cafe_only, deleted_at, is_anonymised")
+      .maybeSingle();
+    if (reviveErr) {
+      console.error(`auth-otp.verify.revive_failed user_id=${userId} msg=${reviveErr.message}`);
+    } else {
+      console.log(`auth-otp.verify.revived user_id=${userId} phone=${phone}`);
+      effectiveFamily = revived;
+    }
+  }
+
+  // After potential revival, the family is null-shaped (no name, no
+  // children) so the client routes through onboarding. A truly live
+  // family (name set) returns as-is and the client proceeds.
+  const family = (effectiveFamily &&
+    !effectiveFamily.deleted_at &&
+    !effectiveFamily.is_anonymised &&
+    effectiveFamily.name)
+    ? effectiveFamily
     : null;
 
   console.log(`auth-otp.verify.ok phone=${phone} user_id=${userId} has_family=${family !== null}`);

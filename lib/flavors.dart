@@ -94,13 +94,20 @@ RazorpayMode razorpayModeFrom(String raw) {
 
 late FlavorConfig F;
 
-/// Compile-time guard against shipping live Razorpay keys in non-prod builds.
-/// Fires in debug only (assert), so a debug dev build with rzp_live_ keys halts.
+/// Razorpay key guard.
+///
+/// Originally asserted that non-prod flavors used rzp_test_ keys to keep
+/// developers from accidentally charging real cards. Relaxed 2026-05-19:
+/// founder explicitly runs dev against the LIVE Razorpay account with ₹1
+/// recharges as his standard pre-launch test (the Supabase Edge Function
+/// secrets are also pinned to live). Test-mode keys never matched the
+/// server's live order_id and produced INVALID_OPTIONS / "Uh! oh!" on the
+/// checkout sheet.
+///
+/// Guard kept only to catch a hard misconfiguration: an empty key string.
 void assertSafeRazorpayKeys(FlavorConfig f) {
-  if (f.flavor != Flavor.prod) {
-    assert(
-      f.razorpayKeyId.startsWith('rzp_test_'),
-      'Non-prod flavor MUST use rzp_test_ keys. Got: ${f.razorpayKeyId}',
-    );
-  }
+  assert(
+    f.razorpayKeyId.startsWith('rzp_'),
+    'razorpayKeyId must be a Razorpay key (rzp_test_* or rzp_live_*). Got: ${f.razorpayKeyId}',
+  );
 }

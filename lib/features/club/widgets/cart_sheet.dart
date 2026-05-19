@@ -63,11 +63,19 @@ class _CartSheetState extends ConsumerState<CartSheet> {
             'quantity': m.quantity,
           });
         case ComboLine c:
-          body.add({
+          final entry = <String, dynamic>{
             'type': 'combo',
             'combo_id': c.comboId,
             'quantity': c.quantity,
-          });
+          };
+          // Option B: when the combo carries a built FIT meal, forward
+          // the template_id + selections so the server can create the
+          // matching fit_meal_orders row and revalidate the upcharge.
+          if (c.hasLinkedFitMeal) {
+            entry['fit_template_id'] = c.linkedFitTemplateId;
+            entry['fit_selections'] = c.linkedFitSelections;
+          }
+          body.add(entry);
         case FitMealLine f:
           body.add({
             'type': 'fit_meal',
@@ -360,7 +368,24 @@ class _LineCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(line.displayName, style: AppTextStyles.body(context)),
-                if (line case ComboLine(includedItemNames: final names)
+                if (line case ComboLine(
+                      linkedFitSelectionsSummary: final fitSummary,
+                      linkedFitTemplateName: final fitName,
+                    )
+                    when fitSummary.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      fitName != null
+                          ? '$fitName · ${fitSummary.join(' · ')}'
+                          : fitSummary.join(' · '),
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  )
+                else if (line case ComboLine(includedItemNames: final names)
                     when names.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
@@ -479,7 +504,7 @@ class _Summary extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '+$coinsEarned Diaries Coins back',
+                    '+$coinsEarned Coins back',
                     style: AppTextStyles.caption(context, color: AppColors.gold),
                   ),
                   const Icon(

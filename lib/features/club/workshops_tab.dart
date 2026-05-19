@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import 'providers/workshops_provider.dart';
@@ -14,6 +15,8 @@ class WorkshopsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(workshopFilterProvider);
     final async = ref.watch(workshopsProvider);
+    final cfg = ref.watch(venueConfigProvider).valueOrNull ?? const {};
+    final tagline = (cfg['workshops_tagline'] as String?)?.trim() ?? '';
 
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -28,18 +31,19 @@ class WorkshopsTab extends ConsumerWidget {
                 child: Text('Workshops', style: AppTextStyles.h2(context)),
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Text(
-                  'Themed sessions earn extra XP.',
-                  style: AppTextStyles.body(
-                    context,
-                    color: AppColors.lightTextSecondary,
+            if (tagline.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Text(
+                    tagline,
+                    style: AppTextStyles.body(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    ),
                   ),
                 ),
               ),
-            ),
             SliverToBoxAdapter(
               child: SizedBox(
                 height: 48,

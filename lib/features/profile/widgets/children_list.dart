@@ -70,7 +70,6 @@ class _ChildRow extends StatelessWidget {
       leading: ChildAvatar(
         name: (child['name'] as String?) ?? '',
         size: 40,
-        photoPath: child['photo_url'] as String?,
       ),
       title: Text((child['name'] as String?) ?? '—'),
       subtitle: age == null

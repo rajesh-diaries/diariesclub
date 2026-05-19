@@ -48,6 +48,12 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
   String? _errorText;
   String? _idempotencyKey;
   String? _orderId;
+  // Server diagnostic echoed back by razorpay-topup v13. Stored so the
+  // error handler can surface the server's actual RAZORPAY_MODE / key
+  // prefix alongside the SDK error code — that's how we'll know whether
+  // a "code 1" failure is really a client/server key-pair mismatch.
+  String? _serverMode;
+  String? _serverKeyPrefix;
   StreamSubscription<List<Map<String, dynamic>>>? _txSub;
   Timer? _txTimeout;
 
@@ -157,6 +163,8 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
       }
 
       _orderId = data['order_id'] as String?;
+      _serverMode = data['server_mode'] as String?;
+      _serverKeyPrefix = data['server_key_prefix'] as String?;
       final mock = data['mock'] == true || F.isMockRazorpay;
       Sentry.addBreadcrumb(Breadcrumb(
         category: 'razorpay',
@@ -207,8 +215,11 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
       final data = (res.data as Map?)?.cast<String, dynamic>() ?? {};
       if (data['ok'] != true) {
         _failProcessing(_mapError(data['error'] as String?));
+        return;
       }
-      // If ok, the wallet_transactions listener will flip the stage.
+      // Confirmed — now start the polling fallback (in case Realtime
+      // misses the wallet_transactions insert).
+      if (_idempotencyKey != null) _startCreditPolling(_idempotencyKey!);
     } catch (_) {
       _failProcessing("Couldn't credit wallet. Please try again.");
     }
@@ -220,17 +231,56 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
       'key': F.razorpayKeyId,
       'amount': _selectedAmountPaise,
       'order_id': _orderId,
-      'name': 'Diaries Club',
+      'name': 'Play Diaries',
       'description': 'Wallet top-up',
       'prefill': {
         'contact': family?['phone'] ?? '',
-        'email': family?['email'] ?? '',
       },
       'notes': {
         'family_id': family?['id'],
         'idempotency_key': _idempotencyKey,
       },
       'theme': {'color': '#1E3A7B'},
+      // Show GPay / PhonePe / Paytm app icons that deep-link into the
+      // app for one-tap pay. Requires LSApplicationQueriesSchemes in
+      // Info.plist (added 2026-05-19) — without it Razorpay's iOS SDK
+      // can't probe canOpenURL and silently falls back to the collect
+      // flow ("Pay with UPI ID").
+      //
+      // The earlier attempt to use this `apps` shape failed with
+      // "Uh! oh!" because the Info.plist whitelist was missing. With
+      // the schemes whitelisted, Razorpay returns the app-icon block
+      // and the order is accepted.
+      'config': {
+        'display': {
+          'blocks': {
+            'upi': {
+              'name': 'Pay using a UPI app',
+              'instruments': [
+                {
+                  'method': 'upi',
+                  'flows': ['intent'],
+                  'apps': ['google_pay', 'phonepe', 'paytm'],
+                },
+              ],
+            },
+            'other': {
+              'name': 'Other Payment methods',
+              'instruments': [
+                {'method': 'card'},
+                {'method': 'netbanking'},
+                {'method': 'wallet'},
+                {
+                  'method': 'upi',
+                  'flows': ['collect', 'qr'],
+                },
+              ],
+            },
+          },
+          'sequence': ['block.upi', 'block.other'],
+          'preferences': {'show_default_blocks': false},
+        },
+      },
     };
     try {
       _razorpay.open(options);
@@ -269,8 +319,14 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
           data: {'error': data['error']},
         ));
         _failProcessing(_mapError(data['error'] as String?));
+        return;
       }
-      // The wallet_transactions listener handles success.
+      // Server has confirmed the payment — the wallet_topup RPC should
+      // insert the wallet_transactions row within ~1s. Start the polling
+      // fallback now (NOT at order-create time) so the 56-second budget
+      // is spent waiting for the credit, not for the parent to finish
+      // typing card / OTP on the Razorpay sheet.
+      if (_idempotencyKey != null) _startCreditPolling(_idempotencyKey!);
     } catch (e, st) {
       Sentry.captureException(e, stackTrace: st, withScope: (scope) {
         scope.setTag('integration', 'razorpay');
@@ -295,7 +351,23 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
       message: 'sheet failure',
       data: {'code': res.code, 'message': res.message},
     ));
-    _failProcessing(res.message ?? 'Payment failed.');
+    // Surface the actual code + message in the UI so we can diagnose
+    // why the Razorpay sheet failed (key mismatch, amount issue, etc.).
+    // Generic "Payment failed" hides the cause and led to a whole
+    // diagnostic detour 2026-05-19.
+    final code = res.code;
+    final msg  = res.message ?? 'Payment failed.';
+    // Append the server diag echoed by v13 + the client key prefix. If
+    // server is in test mode with rzp_test_* but the client opened the
+    // sheet with a rzp_live_* key (or vice-versa), Razorpay rejects the
+    // order with code 1 (INVALID_OPTIONS) — and this single snackbar
+    // line makes that mismatch obvious.
+    final cliPrefix = F.razorpayKeyId.isNotEmpty
+        ? F.razorpayKeyId.substring(0, F.razorpayKeyId.length < 8 ? F.razorpayKeyId.length : 8)
+        : '(empty)';
+    final diagSuffix =
+        ' [srv=${_serverMode ?? "?"}/${_serverKeyPrefix ?? "?"} cli=$cliPrefix]';
+    _failProcessing('$msg (code $code)$diagSuffix');
   }
 
   void _onExternalWallet(ExternalWalletResponse res) {
@@ -306,6 +378,15 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
 
   // ---------------------------------------------------------------------
   //  Wallet Realtime listener — drives transition to success.
+  //
+  //  We arm the Realtime listener as soon as the Razorpay order is
+  //  created (so we never miss the wallet_transactions insert), but we
+  //  DON'T start the polling fallback until payment is actually
+  //  confirmed. The polling timeout was previously firing while parents
+  //  were still on the Razorpay authorize screen — by the time they
+  //  finished and the credit hit, our 56-second timer had already
+  //  expired and cancelled the listener, leaving the sheet stuck on
+  //  "Took longer than expected." even though the wallet was funded.
   // ---------------------------------------------------------------------
   void _listenForCreditRow(String idem) {
     _txSub?.cancel();
@@ -329,23 +410,46 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
       if (hit.isEmpty) return;
       _markSuccess();
     });
+  }
 
-    // 30s safety net — if Realtime is wedged, fall back to polling once.
-    _txTimeout = Timer(const Duration(seconds: 30), () async {
-      if (_stage != _SheetStage.processing) return;
+  /// Kick off the progressive polling fallback. Called *after* Razorpay
+  /// (or mock) confirms payment — not before — so the 56s budget is
+  /// spent waiting for the wallet row, not for the parent to finish
+  /// typing card / OTP details on Razorpay.
+  void _startCreditPolling(String idem) {
+    _txTimeout?.cancel();
+    _schedulePollForCreditRow(idem, attempt: 0);
+  }
+
+  void _schedulePollForCreditRow(String idem, {required int attempt}) {
+    final delay = attempt == 0
+        ? const Duration(seconds: 8)
+        : const Duration(seconds: 3);
+    _txTimeout = Timer(delay, () => _pollForCreditRow(idem, attempt: attempt));
+  }
+
+  Future<void> _pollForCreditRow(String idem, {required int attempt}) async {
+    if (!mounted || _stage != _SheetStage.processing) return;
+    try {
       final rows = await Supabase.instance.client
           .from('wallet_transactions')
-          .select()
+          .select('id')
           .eq('idempotency_key', idem)
           .limit(1);
       if ((rows as List).isNotEmpty) {
         _markSuccess();
-      } else {
-        _failProcessing(
-          'Took longer than expected. The credit will appear shortly.',
-        );
+        return;
       }
-    });
+    } catch (_) {
+      // Network blip — fall through to retry/give-up logic.
+    }
+    if (attempt < 17) {
+      _schedulePollForCreditRow(idem, attempt: attempt + 1);
+    } else {
+      _failProcessing(
+        'Took longer than expected. The credit will appear shortly.',
+      );
+    }
   }
 
   void _markSuccess() {
@@ -403,16 +507,25 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
     final offers = (cfg?['topup_offers'] as List?) ?? const [];
     final balance = ref.watch(walletBalancePaiseProvider);
 
+    final canPay = _selectedAmountPaise != null;
+    final payLabel = canPay
+        ? 'Pay ${Money.fromPaise(_selectedAmountPaise!)}'
+        : 'Choose an amount';
+
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      // Bottom padding mirrors the keyboard inset so the sticky Pay
+      // footer (rendered below) lifts above the keypad instead of
+      // hiding behind it. Without this, parents had to scroll the
+      // sheet to find the Pay button after typing a custom amount.
       padding: EdgeInsets.only(
         top: 12,
         left: 24,
         right: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -429,25 +542,52 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          if (_stage == _SheetStage.success)
-            _SuccessView(
-              totalPaise:
-                  (_selectedAmountPaise ?? 0) + (_selectedBonusPaise ?? 0),
-            )
-          else if (_stage == _SheetStage.processing)
-            const _ProcessingView()
-          else
-            _PickingView(
-              offers: offers,
-              balancePaise: balance,
-              selectedAmountPaise: _selectedAmountPaise,
-              selectedBonusPaise: _selectedBonusPaise,
-              customController: _customController,
-              errorText: _errorText,
-              onSelectQuick: _selectQuick,
-              onCustomChanged: _customAmountChanged,
-              onPay: _initiatePayment,
+          // Scrollable body — picks up only the part of the sheet that
+          // *needs* to scroll, so the Pay footer below stays pinned
+          // even when the keyboard is up.
+          Flexible(
+            child: SingleChildScrollView(
+              child: _stage == _SheetStage.success
+                  ? _SuccessView(
+                      totalPaise: (_selectedAmountPaise ?? 0) +
+                          (_selectedBonusPaise ?? 0),
+                    )
+                  : _stage == _SheetStage.processing
+                      ? const _ProcessingView()
+                      : _PickingBody(
+                          offers: offers,
+                          balancePaise: balance,
+                          selectedAmountPaise: _selectedAmountPaise,
+                          selectedBonusPaise: _selectedBonusPaise,
+                          customController: _customController,
+                          errorText: _errorText,
+                          onSelectQuick: _selectQuick,
+                          onCustomChanged: _customAmountChanged,
+                        ),
             ),
+          ),
+          if (_stage == _SheetStage.picking) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: PrimaryButton(
+                label: payLabel,
+                onPressed: canPay ? _initiatePayment : null,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                'Secure payment by Razorpay',
+                style: AppTextStyles.caption(
+                  context,
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ] else
+            const SizedBox(height: 24),
         ],
       ),
     );
@@ -455,9 +595,12 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
 }
 
 // ---------------------------------------------------------------------------
-//  Picking view
+//  Picking body — everything that scrolls. The Pay button + Razorpay
+//  caption live in the sheet's pinned footer, not here, so the CTA
+//  stays visible above the keyboard while a parent types a custom
+//  amount.
 // ---------------------------------------------------------------------------
-class _PickingView extends StatelessWidget {
+class _PickingBody extends StatelessWidget {
   final List<dynamic> offers;
   final int? balancePaise;
   final int? selectedAmountPaise;
@@ -466,9 +609,8 @@ class _PickingView extends StatelessWidget {
   final String? errorText;
   final void Function(int amount, int bonus) onSelectQuick;
   final ValueChanged<String> onCustomChanged;
-  final VoidCallback onPay;
 
-  const _PickingView({
+  const _PickingBody({
     required this.offers,
     required this.balancePaise,
     required this.selectedAmountPaise,
@@ -477,16 +619,10 @@ class _PickingView extends StatelessWidget {
     required this.errorText,
     required this.onSelectQuick,
     required this.onCustomChanged,
-    required this.onPay,
   });
 
   @override
   Widget build(BuildContext context) {
-    final canPay = selectedAmountPaise != null;
-    final payLabel = canPay
-        ? 'Pay ${Money.fromPaise(selectedAmountPaise!)}'
-        : 'Choose an amount';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -560,24 +696,6 @@ class _PickingView extends StatelessWidget {
             style: AppTextStyles.caption(context, color: AppColors.adminRed),
           ),
         ],
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          child: PrimaryButton(
-            label: payLabel,
-            onPressed: canPay ? onPay : null,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Center(
-          child: Text(
-            'Secure payment by Razorpay',
-            style: AppTextStyles.caption(
-              context,
-              color: AppColors.lightTextSecondary,
-            ),
-          ),
-        ),
       ],
     );
   }

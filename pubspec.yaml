@@ -86,6 +86,8 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   custom_lint: ^0.6.4
   riverpod_lint: ^2.3.10
+  flutter_native_splash: ^2.4.6
+  flutter_launcher_icons: ^0.14.3
 
 flutter:
   uses-material-design: true
@@ -95,3 +97,27 @@ flutter:
     - assets/lottie/
     - assets/images/
     - assets/hero/
+    - assets/splash/
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/splash/play_diaries_splash.png
+  android_12:
+    color: "#FFFFFF"
+    image: assets/splash/play_diaries_splash.png
+    icon_background_color: "#FFFFFF"
+  ios: true
+  android: true
+  web: false
+  fullscreen: false
+
+flutter_launcher_icons:
+  image_path: "assets/icons/app_icon.png"
+  ios: true
+  remove_alpha_ios: true
+  android: "ic_launcher"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icons/app_icon.png"
+  min_sdk_android: 23
+  web:
+    generate: false

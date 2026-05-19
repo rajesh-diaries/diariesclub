@@ -129,7 +129,7 @@ class _Body extends StatelessWidget {
   }
 
   String _paymentLabel(String method) => switch (method) {
-        'wallet' => 'Diaries Wallet',
+        'wallet' => 'Wallet',
         'cash' => 'Cash at venue',
         'razorpay' => 'Razorpay',
         _ => method,

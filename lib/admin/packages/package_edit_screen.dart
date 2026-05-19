@@ -96,7 +96,10 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
   final _maxGuestsCtrl = TextEditingController();
   final _priceVegCtrl = TextEditingController();
   final _priceNonVegCtrl = TextEditingController();
-  final _pdfUrlCtrl = TextEditingController();
+  // Per-package PDF removed in favour of a single venue-level brochure
+  // (venue_config.birthday_brochure_url, managed in admin Config →
+  // Birthdays). The schema column stays for backwards-compat but the UI
+  // no longer exposes it.
   final _experienceCtrl = TextEditingController();
   final _tierCtrl = TextEditingController();
   String _category = 'birthday';
@@ -139,7 +142,6 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
     _maxGuestsCtrl.dispose();
     _priceVegCtrl.dispose();
     _priceNonVegCtrl.dispose();
-    _pdfUrlCtrl.dispose();
     _experienceCtrl.dispose();
     _tierCtrl.dispose();
     super.dispose();
@@ -191,7 +193,6 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
         _priceVegCtrl.text = pVeg == null ? '' : (pVeg ~/ 100).toString();
         final pNon = row['price_per_pax_non_veg_paise'] as int?;
         _priceNonVegCtrl.text = pNon == null ? '' : (pNon ~/ 100).toString();
-        _pdfUrlCtrl.text = (row['pdf_url'] as String?) ?? '';
         // Experience inclusions are an array of strings; render one per
         // line so admin can add/remove without thinking about JSON.
         final exp = (row['experience_inclusions'] as List?)?.cast<String>()
@@ -343,9 +344,7 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
         'p_max_guests': maxG,
         'p_price_per_pax_veg_paise': priceVeg * 100,
         'p_price_per_pax_non_veg_paise': priceNonVeg * 100,
-        'p_pdf_url': _pdfUrlCtrl.text.trim().isEmpty
-            ? null
-            : _pdfUrlCtrl.text.trim(),
+        'p_pdf_url': null,
         'p_experience_inclusions': _experienceCtrl.text
             .split('\n')
             .map((s) => s.trim())
@@ -526,19 +525,6 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
                         const SizedBox(width: 12),
                         Expanded(child: _numField('Sort order', _sortCtrl)),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _pdfUrlCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Menu PDF URL (optional)',
-                        hintText: 'https://...packages-poster.pdf',
-                        helperText:
-                            'Upload the PDF to Supabase Storage (or any '
-                            'public URL) and paste it here. Customer sees a '
-                            '"View full menu (PDF)" link if filled.',
-                        border: OutlineInputBorder(),
-                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(

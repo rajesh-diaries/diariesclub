@@ -1,35 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Realtime list of active birthday packages. Switched from FutureProvider
-/// to StreamProvider in migration 0051 — admin can now edit packages
-/// (price, inclusions, photos) via the admin web's package_edit_screen,
-/// and customers in active sessions should see those edits within ~2s
-/// rather than only after an app refresh. The previous one-shot fetch
-/// pre-dated the admin CRUD landing.
-///
-/// `birthday_packages` was added to the supabase_realtime publication in
-/// migration 0051 to make this stream possible.
+/// List of active birthday packages. Reverted from StreamProvider back
+/// to FutureProvider — the realtime subscription was timing out on a
+/// repeat visit after a completed birthday flow (E2E, 2026-05-18) with
+/// `RealtimeSubscribeException: timedOut`. Packages change rarely (admin
+/// edits price/inclusions a few times a week, not a few times a second),
+/// so a one-shot REST fetch is more reliable and removes a whole class
+/// of realtime-channel failures. Pull-to-refresh refetches.
 final birthdayPackagesProvider =
-    StreamProvider<List<Map<String, dynamic>>>((ref) async* {
-  // Filter to birthday-category only. Other categories (snack_play,
-  // weekly, etc.) live in the same table but render on their own
-  // surfaces. Note: Supabase realtime stream doesn't support chained
-  // .eq filters cleanly across versions, so we keep the existing
-  // is_active stream filter and apply category client-side. Volume
-  // is tiny (<50 rows total).
-  final stream = Supabase.instance.client
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final rows = await Supabase.instance.client
       .from('birthday_packages')
-      .stream(primaryKey: ['id'])
+      .select()
       .eq('is_active', true)
       .order('sort_order', ascending: true);
-  await for (final rows in stream) {
-    yield rows
-        .where((r) =>
-            (r['category'] as String? ?? 'birthday') == 'birthday')
-        .map((r) => Map<String, dynamic>.from(r))
-        .toList();
-  }
+  return List<Map<String, dynamic>>.from(rows)
+      .where((r) => (r['category'] as String? ?? 'birthday') == 'birthday')
+      .map((r) => Map<String, dynamic>.from(r))
+      .toList();
 });
 
 /// Single package by id (package detail screen).

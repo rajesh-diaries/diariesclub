@@ -9,7 +9,7 @@ final heroRecapBySessionProvider = FutureProvider.family<
     Map<String, dynamic>?, String>((ref, sessionId) async {
   final row = await Supabase.instance.client
       .from('hero_recaps')
-      .select('*, children(name, photo_url)')
+      .select('*, children(name)')
       .eq('session_id', sessionId)
       .maybeSingle();
   if (row == null) return null;

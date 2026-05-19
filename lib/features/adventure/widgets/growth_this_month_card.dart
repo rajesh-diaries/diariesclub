@@ -30,23 +30,11 @@ const _heroIcons = {
   'zena': PhosphorIconsFill.palette,
 };
 
-// Conversation prompts surfaced to the parent based on the kid's
-// top-growing trait this month. Designed to spark a specific question
-// at dinner instead of a generic "how was the venue?".
-const _heroPrompts = {
-  'rafi':
-      'What made [name] brave this month? Pick one moment together.',
-  'ellie':
-      'Who did [name] help this month? What did it feel like?',
-  'gerry':
-      'What did [name] discover this month that they\'re still curious about?',
-  'zena':
-      'What\'s the one thing [name] made or invented that they\'re proudest of?',
-};
-
 /// Adventure-tab card showing the kid's last-30-day growth — per-trait
-/// XP earned, top growing trait, and a parent conversation prompt.
-/// Auto-hides if no XP earned in the window.
+/// XP earned plus a top-trait headline. Auto-hides if no XP earned in
+/// the window.
+/// (Earlier versions also rendered a seeded "Conversation starter"
+/// prompt; that was removed per founder-content policy.)
 class GrowthThisMonthCard extends ConsumerWidget {
   final String childId;
   final String childName;
@@ -79,7 +67,6 @@ class GrowthThisMonthCard extends ConsumerWidget {
           (a, b) => totals[a]! >= totals[b]! ? a : b,
         );
         final color = _heroColors[top]!;
-        final prompt = (_heroPrompts[top] ?? '').replaceAll('[name]', childName);
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -136,44 +123,7 @@ class GrowthThisMonthCard extends ConsumerWidget {
                     Expanded(child: _TraitDelta(hero: 'zena', xp: totals['zena']!)),
                   ],
                 ),
-                if (prompt.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(PhosphorIconsFill.chatCircleText,
-                            color: color, size: 18),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Conversation starter',
-                                style: AppTextStyles.caption(context).copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: color,
-                                  letterSpacing: 0.6,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                prompt,
-                                style: AppTextStyles.body(context),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                // Conversation starter removed — was hardcoded copy.
               ],
             ),
           ),

@@ -188,7 +188,7 @@ class _Body extends ConsumerWidget {
                   if (coins > 0) ...[
                     const SizedBox(height: 4),
                     Text(
-                      '+$coins Diaries Coins earned',
+                      '+$coins Coins earned',
                       style: AppTextStyles.caption(
                         context,
                         color: AppColors.gold,
@@ -239,7 +239,7 @@ class _Body extends ConsumerWidget {
   }
 
   String _paymentLabel(String p) => switch (p) {
-        'wallet' => 'Diaries Wallet',
+        'wallet' => 'Wallet',
         'cash' => 'cash at counter',
         'razorpay' => 'Razorpay',
         _ => p,
@@ -378,7 +378,7 @@ class _TaxInvoiceHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bizName = (cfg['business_name'] as String?) ?? 'Diaries Club';
+    final bizName = (cfg['business_name'] as String?) ?? 'Play Diaries';
     final gstin = (cfg['gstin'] as String?) ?? '';
     final address = (cfg['venue_address'] as String?) ?? '';
     final phone = (cfg['venue_phone'] as String?) ?? '';

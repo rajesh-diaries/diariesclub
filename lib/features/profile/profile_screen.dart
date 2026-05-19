@@ -8,7 +8,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/providers/app_theme_mode_provider.dart';
+import '../../core/providers/admin_role_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/current_family_provider.dart';
 import '../../core/router/app_router.dart';
@@ -24,7 +24,6 @@ import 'widgets/profile_header.dart';
 import 'widgets/profile_nav_row.dart';
 import 'widgets/profile_section.dart';
 import 'widgets/referral_card.dart';
-import 'widgets/theme_selector_sheet.dart';
 
 /// Tab 4 — single sectioned Profile screen (iOS Settings style). Most
 /// rows just navigate; everything reactive (header, children, wallet
@@ -71,7 +70,7 @@ class _Body extends ConsumerWidget {
         ProfileSectionHeader(title: 'Wallet'),
         _WalletSection(),
 
-        ProfileSectionHeader(title: 'Diaries Coins'),
+        ProfileSectionHeader(title: 'Coins'),
         _CoinsSection(),
 
         ProfileSectionHeader(title: 'Adventure perks'),
@@ -186,7 +185,7 @@ class _CoinsSectionState extends ConsumerState<_CoinsSection> {
       builder: (dialogCtx) => AlertDialog(
         title: const Text('Redeem coins?'),
         content: Text(
-          'Convert $amount Diaries Coins → ₹$amount in your wallet.',
+          'Convert $amount Coins → ₹$amount in your wallet.',
         ),
         actions: [
           TextButton(
@@ -855,7 +854,7 @@ class _ActivitySection extends StatelessWidget {
           leading: PhosphorIconsRegular.coffee,
         ),
         ProfileNavRow(
-          label: 'Workshops attended',
+          label: 'Workshops',
           route: '/profile/workshops',
           leading: PhosphorIconsRegular.paintBrush,
         ),
@@ -877,26 +876,27 @@ class _SettingsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(appThemeModeProvider);
     return ProfileSectionCard(
       children: [
-        ProfileActionRow(
-          label: 'Theme',
-          leading: PhosphorIconsRegular.palette,
-          trailing: _themeLabel(mode),
-          onTap: () {
-            showModalBottomSheet<void>(
-              context: context,
-              backgroundColor: Colors.transparent,
-              builder: (_) => const ThemeSelectorSheet(),
-            );
-          },
-        ),
+        // Theme picker hidden for v1 — customer app is locked to light
+        // theme until the dark-theme audit lands. Restore once dark
+        // surfaces, borders, and text colours are properly tier-coded.
         const ProfileNavRow(
           label: 'Notifications',
           route: '/profile/notifications-settings',
           leading: PhosphorIconsRegular.bell,
         ),
+        // Diagnostics entry, only visible to active admins (admin_users
+        // table check). Regular customers get false from the provider
+        // and the row collapses to SizedBox.shrink.
+        if (ref
+                .watch(isCurrentUserAdminProvider)
+                .maybeWhen(data: (v) => v, orElse: () => false))
+          const ProfileNavRow(
+            label: 'Notifications debug',
+            route: '/profile/fcm-debug',
+            leading: PhosphorIconsRegular.bellRinging,
+          ),
         const ProfileNavRow(
           label: 'Language',
           route: '/profile/language',
@@ -906,12 +906,6 @@ class _SettingsSection extends ConsumerWidget {
       ],
     );
   }
-
-  static String _themeLabel(ThemeMode mode) => switch (mode) {
-        ThemeMode.system => 'System',
-        ThemeMode.light => 'Light',
-        ThemeMode.dark => 'Dark',
-      };
 }
 
 // ---------------------------------------------------------------------------
@@ -929,7 +923,7 @@ class _SupportSection extends ConsumerWidget {
     final waNum = whatsapp.replaceAll(RegExp(r'[^\d]'), '');
     final waUrl = waNum.isEmpty
         ? 'https://wa.me/'
-        : 'https://wa.me/$waNum?text=${Uri.encodeComponent("Hi, I need help with Diaries Club.")}';
+        : 'https://wa.me/$waNum?text=${Uri.encodeComponent("Hi, I need help with Play Diaries.")}';
 
     return ProfileSectionCard(
       children: [

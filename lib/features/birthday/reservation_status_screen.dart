@@ -10,7 +10,6 @@ import '../../core/providers/family_children_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/error_screen.dart';
-import '../../core/widgets/primary_button.dart';
 import 'providers/birthday_packages_provider.dart';
 import 'providers/reservation_providers.dart';
 
@@ -188,22 +187,33 @@ class _StatusBody extends ConsumerWidget {
       birthdayPackageByIdProvider(reservation['package_id'] as String),
     );
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _StatusHeader(reservation: reservation, childName: childName),
-          _SummaryCard(
-            reservation: reservation,
-            packageName: pkgAsync.valueOrNull?['name'] as String?,
-          ),
-          _PipelineTimeline(reservation: reservation),
-          _ActionCard(reservation: reservation),
-          if (reservation['status'] == 'confirmed')
-            _PartyDetailsCard(reservation: reservation),
-          const _ContactCard(),
-        ],
+    // Pull-to-refresh: family reservations and the per-package async are
+    // both REST one-shots now (realtime stream was crashing with channel
+    // errors). Pull to refetch when admin advances the status.
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(familyReservationsProvider);
+        ref.invalidate(birthdayPackageByIdProvider(
+            reservation['package_id'] as String));
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _StatusHeader(reservation: reservation, childName: childName),
+            _SummaryCard(
+              reservation: reservation,
+              packageName: pkgAsync.valueOrNull?['name'] as String?,
+            ),
+            _PipelineTimeline(reservation: reservation),
+            _ActionCard(reservation: reservation),
+            if (reservation['status'] == 'confirmed')
+              _PartyDetailsCard(reservation: reservation),
+            const _ContactCard(),
+          ],
+        ),
       ),
     );
   }
@@ -253,7 +263,6 @@ class _StatusHeader extends StatelessWidget {
 
   _HeaderSpec _resolveSpec(Map<String, dynamic> r, String name) {
     final status = r['status'] as String?;
-    final albumReady = r['album_ready_at'] != null;
     final isToday = _isPartyToday(r);
 
     return switch (status) {
@@ -264,7 +273,7 @@ class _StatusHeader extends StatelessWidget {
           ],
           icon: PhosphorIconsFill.envelope,
           title: 'Reservation request received',
-          subtitle: "We'll WhatsApp you within 24 hours.",
+          subtitle: 'Our team will be in touch.',
         ),
       'admin_contacted' => const _HeaderSpec(
           gradient: [Color(0xFF2A4A8B), AppColors.navy],
@@ -287,12 +296,6 @@ class _StatusHeader extends StatelessWidget {
           title: "You're confirmed!",
           subtitle: 'Date locked. See party details below.',
         ),
-      'completed' when albumReady => const _HeaderSpec(
-          gradient: [AppColors.gold, AppColors.activeGreen],
-          icon: PhosphorIconsFill.gift,
-          title: 'A little memory from us',
-          subtitle: 'Tap below to open it.',
-        ),
       'completed' => _HeaderSpec(
           gradient: [
             AppColors.lightTextSecondary.withValues(alpha: 0.55),
@@ -300,7 +303,7 @@ class _StatusHeader extends StatelessWidget {
           ],
           icon: PhosphorIconsFill.confetti,
           title: 'Thank you for celebrating',
-          subtitle: 'A small keepsake is on its way.',
+          subtitle: 'We hope $name had a wonderful day.',
         ),
       'cancelled' => const _HeaderSpec(
           gradient: [
@@ -445,14 +448,12 @@ class _PipelineTimeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = reservation['status'] as String? ?? '';
-    final hasAlbum = reservation['album_ready_at'] != null;
 
     final steps = <(String, String?)>[
       ('Interest received', null),
       ('Team reaching out', null),
       ('Date confirmed', null),
       ('Party day', null),
-      ('A little memory', 'A small keepsake from us, after the party'),
     ];
 
     // If the confirmed slot_date is today or in the past, the party is
@@ -473,7 +474,7 @@ class _PipelineTimeline extends StatelessWidget {
       'interested' => 0,
       'admin_contacted' => 1,
       'confirmed' => slotIsTodayOrPast ? 3 : 2,
-      'completed' => hasAlbum ? 4 : 3,
+      'completed' => 3,
       _ => -1,
     };
 
@@ -590,18 +591,15 @@ class _ActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = reservation['status'] as String?;
-    final albumReady = reservation['album_ready_at'] != null;
 
     final body = switch (status) {
       'interested' =>
-        "We'll WhatsApp you within 24 hours to confirm available dates.",
+        'Our team will reach out to confirm available dates.',
       'admin_contacted' =>
         'Our team has been in touch. Check your WhatsApp for the next steps.',
       'confirmed' =>
         'See party details below. Bring the cake — we handle the rest.',
-      'completed' when albumReady => 'Tap below to open your keepsake.',
-      'completed' =>
-        "We'll let you know the moment your little memory arrives.",
+      'completed' => 'Thank you for celebrating with us.',
       _ => null,
     };
     if (body == null) return const SizedBox.shrink();
@@ -618,14 +616,6 @@ class _ActionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(body, style: AppTextStyles.body(context)),
-          if (status == 'completed' && albumReady) ...[
-            const SizedBox(height: 12),
-            PrimaryButton(
-              label: 'Open keepsake',
-              onPressed: () =>
-                  context.push('/birthday/album/${reservation['id']}'),
-            ),
-          ],
           if (status == 'confirmed') ...[
             const SizedBox(height: 12),
             OutlinedButton.icon(

@@ -112,7 +112,7 @@ class TransactionRow extends StatelessWidget {
         'coins_credit' => (
             PhosphorIconsRegular.star,
             AppColors.gold,
-            'Diaries Coins earned',
+            'Coins earned',
           ),
         'coins_debit' => (
             PhosphorIconsRegular.star,

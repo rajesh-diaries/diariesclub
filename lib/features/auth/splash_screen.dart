@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers/app_version_provider.dart';
@@ -31,11 +30,10 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
-  // Asset paths reserved for when art lands; not loaded yet.
-  // ignore: unused_field
-  static const _logoAsset = 'assets/images/logo_white.png';
-  // ignore: unused_field
-  static const _lottieAsset = 'assets/lottie/splash_pulse.json';
+  // Matches the asset wired into flutter_native_splash so the native and
+  // Flutter-side splash look continuous — no jarring colour or logo flip
+  // when control passes from iOS/Android to the Dart engine.
+  static const _logoAsset = 'assets/splash/play_diaries_splash.png';
 
   static const _minSplashDuration = Duration(milliseconds: 800);
 
@@ -103,28 +101,27 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.navy,
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                'Diaries Club',
-                style: GoogleFonts.nunito(
-                  fontSize: 40,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.gold,
-                  letterSpacing: -0.5,
-                ),
+              Image.asset(
+                _logoAsset,
+                width: 240,
+                height: 240,
+                fit: BoxFit.contain,
               ),
               const SizedBox(height: 32),
-              const SizedBox(
-                width: 28,
-                height: 28,
+              SizedBox(
+                width: 22,
+                height: 22,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(AppColors.gold),
+                  valueColor: AlwaysStoppedAnimation(
+                    AppColors.navy.withValues(alpha: 0.55),
+                  ),
                 ),
               ),
             ],

@@ -38,66 +38,218 @@ class WorkshopDetailScreen extends ConsumerStatefulWidget {
 
 class _WorkshopDetailScreenState
     extends ConsumerState<WorkshopDetailScreen> {
-  String? _selectedChildId;
+  // Set of child IDs the parent picked in this visit. Multi-select so a
+  // parent with two kids can register both at once; on a second visit
+  // already-registered kids are filtered out before this set is built.
+  final Set<String> _selectedChildIds = <String>{};
   String _payment = 'wallet';
   bool _busy = false;
   String? _errorText;
+  // Once we've auto-seeded the selection from the eligible-kids list we
+  // stop doing it on every rebuild — otherwise toggles get undone.
+  bool _autoSeedDone = false;
+
+  Future<bool> _confirmRegister({
+    required String workshopTitle,
+    required int pricePaise,
+    required List<String> childNames,
+  }) async {
+    final totalPaise = pricePaise * childNames.length;
+    final who = _joinNames(childNames);
+    final priceLine = childNames.length == 1
+        ? Money.fromPaise(pricePaise)
+        : '${Money.fromPaise(totalPaise)} (${childNames.length} × ${Money.fromPaise(pricePaise)})';
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Register for this workshop?'),
+        content: Text(
+          '$who will be registered for "$workshopTitle". '
+          '$priceLine will be deducted from your '
+          '${_payment == 'wallet' ? 'wallet' : 'cash payment at venue'}.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Yes, register'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  String _joinNames(List<String> names) {
+    if (names.length == 1) return names.first;
+    if (names.length == 2) return '${names[0]} and ${names[1]}';
+    return '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+  }
+
+  Future<void> _showSuccessSheet({
+    required String workshopTitle,
+    required List<String> childNames,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          24, 28, 24, 24 + MediaQuery.of(ctx).padding.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                color: AppColors.activeGreen,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_rounded,
+                  color: Colors.white, size: 36),
+            ),
+            const SizedBox(height: 16),
+            Text("You're in!", style: AppTextStyles.h2(context)),
+            const SizedBox(height: 8),
+            Text(
+              '${_joinNames(childNames)} '
+              '${childNames.length == 1 ? 'is' : 'are'} registered for '
+              '"$workshopTitle". '
+              "We'll send a reminder before it starts.",
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: PrimaryButton(
+                label: 'Done',
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _register({
     required int pricePaise,
+    required String workshopTitle,
+    required List<Map<String, dynamic>> selectedKids,
   }) async {
     final familyId = ref.read(currentFamilyIdProvider);
-    if (familyId == null || _selectedChildId == null) return;
+    if (familyId == null || selectedKids.isEmpty) return;
+
+    final childNames = selectedKids
+        .map((c) => (c['name'] as String?) ?? 'your kid')
+        .toList();
+
+    final confirmed = await _confirmRegister(
+      workshopTitle: workshopTitle,
+      pricePaise: pricePaise,
+      childNames: childNames,
+    );
+    if (!confirmed || !mounted) return;
+
     setState(() {
       _busy = true;
       _errorText = null;
     });
 
-    try {
-      await Supabase.instance.client
-          .rpc<Map<String, dynamic>>('workshop_register', params: {
-        'p_workshop_id': widget.workshopId,
-        'p_family_id': familyId,
-        'p_child_id': _selectedChildId,
-        'p_payment_method': _payment,
-        'p_idempotency_key': const Uuid().v4(),
-      });
+    final registeredNames = <String>[];
+    String? error;
+    bool insufficient = false;
+
+    // Register kids sequentially. Each call gets its own idempotency_key
+    // so a retry on a network blip won't double-book the same kid.
+    for (final kid in selectedKids) {
+      try {
+        await Supabase.instance.client
+            .rpc<Map<String, dynamic>>('workshop_register', params: {
+          'p_workshop_id': widget.workshopId,
+          'p_family_id': familyId,
+          'p_child_id': kid['id'],
+          'p_payment_method': _payment,
+          'p_idempotency_key': const Uuid().v4(),
+        });
+        registeredNames.add((kid['name'] as String?) ?? 'your kid');
+      } on PostgrestException catch (e) {
+        if (e.message.contains('workshop_full')) {
+          error = 'Sorry, that just filled up. Try another?';
+        } else if (e.message.contains('insufficient_balance')) {
+          insufficient = true;
+        } else if (e.message.contains('already_registered')) {
+          // Server-side dedup; treat as if it succeeded silently.
+          registeredNames.add((kid['name'] as String?) ?? 'your kid');
+          continue;
+        } else {
+          error = "Couldn't register. Please try again.";
+        }
+        break; // stop the loop on any error
+      } catch (_) {
+        error = "Couldn't register. Please try again.";
+        break;
+      }
+    }
+
+    if (!mounted) return;
+    ref.invalidate(myWorkshopRegistrationsProvider);
+    ref.invalidate(workshopByIdProvider(widget.workshopId));
+
+    if (registeredNames.isNotEmpty) {
+      await _showSuccessSheet(
+        workshopTitle: workshopTitle,
+        childNames: registeredNames,
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppColors.activeGreen,
-          content: Text('Registered. See you there!'),
+      // If everyone we wanted got in and no leftover error, leave the
+      // detail screen. If we stopped mid-loop, stay so the parent sees
+      // the error and can retry the remaining kids.
+      if (error == null && !insufficient) {
+        context.pop();
+        return;
+      }
+    }
+
+    setState(() {
+      _busy = false;
+      _selectedChildIds.removeWhere(
+        (id) => registeredNames.contains(
+          selectedKids.firstWhere((k) => k['id'] == id,
+              orElse: () => const {})['name'],
         ),
       );
-      context.pop();
-    } on PostgrestException catch (e) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      if (e.message.contains('workshop_full')) {
-        setState(() => _errorText =
-            'Sorry, that just filled up. Try another?');
-      } else if (e.message.contains('insufficient_balance')) {
-        showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (_) => InsufficientBalanceSheet(
-            requiredPaise: pricePaise,
-            onSwitchToCash: () {
-              if (!mounted) return;
-              setState(() => _payment = 'cash');
-            },
-          ),
-        );
-      } else {
-        setState(() => _errorText = "Couldn't register. Please try again.");
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _errorText = "Couldn't register. Please try again.";
-      });
+      if (error != null) _errorText = error;
+    });
+
+    if (insufficient) {
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => InsufficientBalanceSheet(
+          requiredPaise:
+              pricePaise * (selectedKids.length - registeredNames.length),
+          onSwitchToCash: () {
+            if (!mounted) return;
+            setState(() => _payment = 'cash');
+          },
+        ),
+      );
     }
   }
 
@@ -133,18 +285,37 @@ class _WorkshopDetailScreenState
           );
         }
 
-        if (children.isNotEmpty && _selectedChildId == null) {
-          _selectedChildId = children.first['id'] as String;
-        }
-
         final price = (workshop['price_paise'] as int?) ?? 0;
         final spots = (workshop['spots_remaining'] as int?) ?? 0;
         final capacity = (workshop['capacity'] as int?) ?? 0;
         final isFull = spots == 0;
         final isLow = spots > 0 && spots <= 3;
-        final alreadyRegistered = myRegs.any(
-          (r) => r['workshop_id'] == widget.workshopId,
-        );
+
+        // child_ids in this family already registered for *this* workshop.
+        // Surfaces a "Registered" pill on those avatars and prevents the
+        // parent from selecting them again.
+        final registeredChildIds = myRegs
+            .where((r) => r['workshop_id'] == widget.workshopId)
+            .map((r) => r['child_id'] as String?)
+            .whereType<String>()
+            .toSet();
+        final eligibleChildren = children
+            .where((c) => !registeredChildIds.contains(c['id'] as String))
+            .toList();
+        final anyRegistered = registeredChildIds.isNotEmpty;
+        final allChildrenRegistered =
+            children.isNotEmpty && eligibleChildren.isEmpty;
+
+        // Auto-seed selection once: if every eligible kid is unregistered
+        // and the parent hasn't picked yet, pre-select all eligibles when
+        // there's a single kid, or leave empty when there are multiple
+        // so the parent makes an explicit choice.
+        if (!_autoSeedDone && eligibleChildren.isNotEmpty) {
+          _autoSeedDone = true;
+          if (eligibleChildren.length == 1) {
+            _selectedChildIds.add(eligibleChildren.first['id'] as String);
+          }
+        }
 
         return Scaffold(
           appBar: AppBar(
@@ -153,7 +324,7 @@ class _WorkshopDetailScreenState
               onPressed: () => context.pop(),
             ),
             actions: [
-              if (alreadyRegistered)
+              if (anyRegistered)
                 Padding(
                   padding: const EdgeInsets.only(right: 16),
                   child: Center(
@@ -167,7 +338,9 @@ class _WorkshopDetailScreenState
                         borderRadius: BorderRadius.circular(100),
                       ),
                       child: Text(
-                        'Registered',
+                        children.length > 1
+                            ? '${registeredChildIds.length}/${children.length} registered'
+                            : 'Registered',
                         style: AppTextStyles.caption(
                           context,
                           color: AppColors.activeGreen,
@@ -213,13 +386,15 @@ class _WorkshopDetailScreenState
                                   style: AppTextStyles.body(context),
                                 ),
                               ],
-                              const SizedBox(height: 20),
-                              _AvailabilityRow(
-                                isFull: isFull,
-                                isLow: isLow,
-                                spots: spots,
-                                capacity: capacity,
-                              ),
+                              if (!allChildrenRegistered) ...[
+                                const SizedBox(height: 20),
+                                _AvailabilityRow(
+                                  isFull: isFull,
+                                  isLow: isLow,
+                                  spots: spots,
+                                  capacity: capacity,
+                                ),
+                              ],
                               const SizedBox(height: 20),
                               if (children.isEmpty)
                                 Container(
@@ -239,7 +414,9 @@ class _WorkshopDetailScreenState
                                 )
                               else ...[
                                 Text(
-                                  'WHO IS COMING?',
+                                  children.length > 1
+                                      ? 'WHO IS COMING? (TAP TO SELECT)'
+                                      : 'WHO IS COMING?',
                                   style: AppTextStyles.caption(
                                     context,
                                     color: AppColors.lightTextSecondary,
@@ -248,42 +425,72 @@ class _WorkshopDetailScreenState
                                 const SizedBox(height: 8),
                                 _ChildPicker(
                                   children: children,
-                                  selectedId: _selectedChildId,
-                                  onSelect: (id) =>
-                                      setState(() => _selectedChildId = id),
+                                  selectedIds: _selectedChildIds,
+                                  registeredIds: registeredChildIds,
+                                  onToggle: (id) => setState(() {
+                                    if (_selectedChildIds.contains(id)) {
+                                      _selectedChildIds.remove(id);
+                                    } else {
+                                      _selectedChildIds.add(id);
+                                    }
+                                  }),
+                                ),
+                                if (allChildrenRegistered) ...[
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.activeGreen
+                                          .withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      'All your kids are already registered for this workshop.',
+                                      style: AppTextStyles.caption(
+                                        context,
+                                        color: AppColors.lightTextPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                              if (!allChildrenRegistered) ...[
+                                const SizedBox(height: 20),
+                                Text(
+                                  'PAYMENT',
+                                  style: AppTextStyles.caption(
+                                    context,
+                                    color: AppColors.lightTextSecondary,
+                                  ).copyWith(letterSpacing: 1.0),
+                                ),
+                                RadioListTile<String>(
+                                  value: 'wallet',
+                                  groupValue: _payment,
+                                  title: Text(
+                                    'Wallet (${Money.fromPaise(balance)})',
+                                  ),
+                                  subtitle: balance <
+                                          (price *
+                                              (_selectedChildIds.isEmpty
+                                                  ? 1
+                                                  : _selectedChildIds.length))
+                                      ? const Text(
+                                          'Not enough balance',
+                                          style: TextStyle(
+                                              color: AppColors.adminRed),
+                                        )
+                                      : null,
+                                  onChanged: (v) =>
+                                      setState(() => _payment = v ?? 'wallet'),
+                                ),
+                                RadioListTile<String>(
+                                  value: 'cash',
+                                  groupValue: _payment,
+                                  title: const Text('Pay at venue'),
+                                  onChanged: (v) =>
+                                      setState(() => _payment = v ?? 'cash'),
                                 ),
                               ],
-                              const SizedBox(height: 20),
-                              Text(
-                                'PAYMENT',
-                                style: AppTextStyles.caption(
-                                  context,
-                                  color: AppColors.lightTextSecondary,
-                                ).copyWith(letterSpacing: 1.0),
-                              ),
-                              RadioListTile<String>(
-                                value: 'wallet',
-                                groupValue: _payment,
-                                title: Text(
-                                  'Wallet (${Money.fromPaise(balance)})',
-                                ),
-                                subtitle: balance < price
-                                    ? const Text(
-                                        'Not enough balance',
-                                        style:
-                                            TextStyle(color: AppColors.adminRed),
-                                      )
-                                    : null,
-                                onChanged: (v) =>
-                                    setState(() => _payment = v ?? 'wallet'),
-                              ),
-                              RadioListTile<String>(
-                                value: 'cash',
-                                groupValue: _payment,
-                                title: const Text('Pay at venue'),
-                                onChanged: (v) =>
-                                    setState(() => _payment = v ?? 'cash'),
-                              ),
                               if (_errorText != null) ...[
                                 const SizedBox(height: 12),
                                 Text(
@@ -314,18 +521,43 @@ class _WorkshopDetailScreenState
                     child: SizedBox(
                       width: double.infinity,
                       child: PrimaryButton(
-                        label: alreadyRegistered
-                            ? "You're already registered"
-                            : isFull
-                                ? 'Workshop full'
-                                : 'Register · ${Money.fromPaise(price)}',
+                        label: () {
+                          if (allChildrenRegistered) {
+                            return 'All kids registered';
+                          }
+                          if (isFull) return 'Workshop full';
+                          if (children.isEmpty) return 'Add a kid first';
+                          final n = _selectedChildIds.length;
+                          if (n == 0) {
+                            return eligibleChildren.length > 1
+                                ? 'Select a kid to register'
+                                : 'Register · ${Money.fromPaise(price)}';
+                          }
+                          final total = price * n;
+                          return n > 1
+                              ? 'Register $n kids · ${Money.fromPaise(total)}'
+                              : 'Register · ${Money.fromPaise(price)}';
+                        }(),
                         loading: _busy,
-                        onPressed: alreadyRegistered ||
+                        onPressed: allChildrenRegistered ||
                                 isFull ||
                                 children.isEmpty ||
+                                _selectedChildIds.isEmpty ||
                                 _busy
                             ? null
-                            : () => _register(pricePaise: price),
+                            : () {
+                                final picked = eligibleChildren
+                                    .where((c) => _selectedChildIds
+                                        .contains(c['id'] as String))
+                                    .toList();
+                                if (picked.isEmpty) return;
+                                _register(
+                                  pricePaise: price,
+                                  workshopTitle:
+                                      (workshop['title'] as String?) ?? 'this workshop',
+                                  selectedKids: picked,
+                                );
+                              },
                       ),
                     ),
                   ),
@@ -404,19 +636,19 @@ class _AvailabilityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isFull
-        ? AppColors.adminRed
-        : isLow
-            ? AppColors.warningYellow
-            : AppColors.lightTextSecondary;
-    final label = isFull
-        ? 'Workshop full'
-        : '$spots of $capacity spots remaining';
+    // "X of Y spots remaining" hidden per founder request — looked empty
+    // on barely-booked workshops. Workshop-full state stays so customers
+    // don't tap Register on a sold-out slot.
+    if (!isFull) return const SizedBox.shrink();
     return Row(
       children: [
-        Icon(PhosphorIconsRegular.users, color: color, size: 18),
+        const Icon(PhosphorIconsRegular.users,
+            color: AppColors.adminRed, size: 18),
         const SizedBox(width: 8),
-        Text(label, style: AppTextStyles.body(context, color: color)),
+        Text(
+          'Workshop full',
+          style: AppTextStyles.body(context, color: AppColors.adminRed),
+        ),
       ],
     );
   }
@@ -424,18 +656,20 @@ class _AvailabilityRow extends StatelessWidget {
 
 class _ChildPicker extends StatelessWidget {
   final List<Map<String, dynamic>> children;
-  final String? selectedId;
-  final ValueChanged<String> onSelect;
+  final Set<String> selectedIds;
+  final Set<String> registeredIds;
+  final ValueChanged<String> onToggle;
   const _ChildPicker({
     required this.children,
-    required this.selectedId,
-    required this.onSelect,
+    required this.selectedIds,
+    required this.registeredIds,
+    required this.onToggle,
   });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 96,
+      height: 112,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: children.length,
@@ -444,37 +678,73 @@ class _ChildPicker extends StatelessWidget {
           final c = children[i];
           final id = c['id'] as String;
           final name = (c['name'] as String?) ?? '';
-          final selected = id == selectedId;
+          final isRegistered = registeredIds.contains(id);
+          final selected = selectedIds.contains(id);
           return GestureDetector(
-            onTap: () => onSelect(id),
-            child: Column(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: selected ? AppColors.gold : AppColors.lightBorder,
-                      width: selected ? 3 : 1,
+            onTap: isRegistered ? null : () => onToggle(id),
+            child: Opacity(
+              opacity: isRegistered ? 0.55 : 1.0,
+              child: Column(
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: selected
+                                ? AppColors.gold
+                                : AppColors.lightBorder,
+                            width: selected ? 3 : 1,
+                          ),
+                        ),
+                        padding: const EdgeInsets.all(2),
+                        child: ChildAvatar(
+                          name: name,
+                          size: 56,
+                        ),
+                      ),
+                      if (selected)
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: const BoxDecoration(
+                              color: AppColors.gold,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.check_rounded,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    width: 76,
+                    child: Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption(context),
                     ),
                   ),
-                  padding: const EdgeInsets.all(2),
-                  child: ChildAvatar(
-                    name: name,
-                    size: 56,
-                    photoPath: c['photo_url'] as String?,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                SizedBox(
-                  width: 70,
-                  child: Text(
-                    name,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.caption(context),
-                  ),
-                ),
-              ],
+                  if (isRegistered)
+                    Text(
+                      'Registered',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.activeGreen,
+                      ).copyWith(fontSize: 10),
+                    ),
+                ],
+              ),
             ),
           );
         },
