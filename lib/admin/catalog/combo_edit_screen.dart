@@ -47,6 +47,12 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
   // billed on top at checkout. NULL = legacy fixed-items combo.
   String? _fitTemplateId;
 
+  // Optional bundled play session. When set, the customer's à la carte
+  // sum used for the home-strip "Save ₹X" badge picks up the venue's
+  // 1hr / 2hr session price. Stored under inclusions.session_minutes.
+  // Allowed: null (no session) | 60 | 120.
+  int? _sessionMinutes;
+
   bool _busy = false;
   bool _loading = true;
   String? _errorText;
@@ -101,6 +107,7 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
         // (menu_items: [{id, quantity}]) and legacy (menu_item_ids: [...]).
         final inc = row['inclusions'];
         if (inc is Map) {
+          _sessionMinutes = inc['session_minutes'] as int?;
           final items = inc['menu_items'];
           if (items is List) {
             for (final it in items) {
@@ -172,8 +179,14 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
       setState(() => _errorText = 'Price must be a positive number.');
       return;
     }
-    if (_selectedItems.isEmpty) {
-      setState(() => _errorText = 'Pick at least one item.');
+    // A combo must include SOMETHING — at minimum a session, a FIT
+    // template, or a list of menu items. Allow any combination of the
+    // three, but at least one must be set.
+    if (_selectedItems.isEmpty &&
+        _fitTemplateId == null &&
+        _sessionMinutes == null) {
+      setState(() => _errorText =
+          'Pick at least one item, a FIT template, or a bundled session.');
       return;
     }
 
@@ -184,10 +197,11 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
 
     try {
       final photoUrl = await _uploadPhotoIfNew();
-      final inclusions = {
+      final inclusions = <String, dynamic>{
         'menu_items': _selectedItems.entries
             .map((e) => {'id': e.key, 'quantity': e.value})
             .toList(),
+        if (_sessionMinutes != null) 'session_minutes': _sessionMinutes,
       };
       final params = {
         'p_name': _nameCtrl.text.trim(),
@@ -333,14 +347,62 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
                     const SizedBox(height: 10),
                     _FitTemplatePicker(
                       value: _fitTemplateId,
-                      onChanged: (v) => setState(() => _fitTemplateId = v),
+                      onChanged: (v) => setState(() {
+                        _fitTemplateId = v;
+                        // FIT template just took over the meal side —
+                        // any FIT items previously picked here become
+                        // double-billing. Drop them so the cart doesn't
+                        // charge the customer twice for a salad.
+                        if (v != null) {
+                          _selectedItems.removeWhere((id, _) {
+                            final item = menuAsync.valueOrNull?.firstWhere(
+                              (m) => m['id'] == id,
+                              orElse: () => const <String, dynamic>{},
+                            );
+                            return (item?['brand'] as String?) == 'fit';
+                          });
+                        }
+                      }),
+                    ),
+                    const SizedBox(height: 24),
+                    Text('Bundled play session (optional)',
+                        style: AppTextStyles.h3(context)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Pick a session length when the combo name starts with '
+                      '"Play +". The customer\'s à la carte total adds the '
+                      'venue\'s 1hr or 2hr price so the home-strip "Save ₹X" '
+                      'badge reflects the real discount.',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<int?>(
+                      value: _sessionMinutes,
+                      decoration: const InputDecoration(
+                        labelText: 'Bundled session',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text('None')),
+                        DropdownMenuItem(value: 60, child: Text('1 hour')),
+                        DropdownMenuItem(value: 120, child: Text('2 hours')),
+                      ],
+                      onChanged: _busy
+                          ? null
+                          : (v) => setState(() => _sessionMinutes = v),
                     ),
                     const SizedBox(height: 24),
                     Text('Items in this combo',
                         style: AppTextStyles.h3(context)),
                     const SizedBox(height: 4),
                     Text(
-                      'Pick from Coffee + FIT menus. Set quantity per item.',
+                      _fitTemplateId != null
+                          ? 'A FIT template is linked — only Coffee / non-FIT '
+                              'items can be added on top to avoid double-billing.'
+                          : 'Pick from Coffee + FIT menus. Set quantity per item.',
                       style: AppTextStyles.caption(
                         context,
                         color: AppColors.lightTextSecondary,
@@ -351,7 +413,12 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
                       loading: () => const LinearProgressIndicator(),
                       error: (e, _) => Text('Error: $e'),
                       data: (items) => _ItemPicker(
-                        items: items,
+                        items: _fitTemplateId == null
+                            ? items
+                            : items
+                                .where((m) =>
+                                    (m['brand'] as String?) != 'fit')
+                                .toList(),
                         selected: _selectedItems,
                         onChanged: (next) =>
                             setState(() {
