@@ -190,6 +190,8 @@ class _WorkshopDetailScreenState
       } on PostgrestException catch (e) {
         if (e.message.contains('workshop_full')) {
           error = 'Sorry, that just filled up. Try another?';
+        } else if (e.message.contains('workshop_registration_closed')) {
+          error = "Registrations are closed — this workshop has already started.";
         } else if (e.message.contains('insufficient_balance')) {
           insufficient = true;
         } else if (e.message.contains('already_registered')) {
@@ -290,6 +292,17 @@ class _WorkshopDetailScreenState
         final capacity = (workshop['capacity'] as int?) ?? 0;
         final isFull = spots == 0;
         final isLow = spots > 0 && spots <= 3;
+        // Server-side cutoff: registrations close 10 min after the
+        // workshop's scheduled start time. Mirror that in the UI so the
+        // Register button disables (and shows why) before the user
+        // submits.
+        final scheduledLocal = DateTime.tryParse(
+          (workshop['scheduled_at'] as String?) ?? '',
+        )?.toLocal();
+        final isClosedForReg = scheduledLocal != null &&
+            DateTime.now().isAfter(
+              scheduledLocal.add(const Duration(minutes: 10)),
+            );
 
         // child_ids in this family already registered for *this* workshop.
         // Surfaces a "Registered" pill on those avatars and prevents the
@@ -525,6 +538,9 @@ class _WorkshopDetailScreenState
                           if (allChildrenRegistered) {
                             return 'All kids registered';
                           }
+                          if (isClosedForReg) {
+                            return 'Registrations closed';
+                          }
                           if (isFull) return 'Workshop full';
                           if (children.isEmpty) return 'Add a kid first';
                           final n = _selectedChildIds.length;
@@ -540,6 +556,7 @@ class _WorkshopDetailScreenState
                         }(),
                         loading: _busy,
                         onPressed: allChildrenRegistered ||
+                                isClosedForReg ||
                                 isFull ||
                                 children.isEmpty ||
                                 _selectedChildIds.isEmpty ||
