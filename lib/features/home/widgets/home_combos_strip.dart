@@ -156,19 +156,45 @@ class _ComboMiniCardState extends ConsumerState<_ComboMiniCard> {
     final inclusions =
         (widget.combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
             const <String, dynamic>{};
-    final menuItemIds = ((inclusions['menu_item_ids'] as List?) ?? const [])
+    // Old shape: { menu_item_ids: ["uuid", "uuid"] }
+    // New shape: { menu_items: [{"id": "uuid", "quantity": 1}, ...] }
+    // We support both because legacy combos still use the array-of-ids
+    // form and the admin editor switched to the array-of-objects form
+    // when quantity support landed.
+    final legacyIds = ((inclusions['menu_item_ids'] as List?) ?? const [])
         .cast<String>();
+    final newItems = ((inclusions['menu_items'] as List?) ?? const [])
+        .whereType<Map>()
+        .toList();
     final sessionMinutes = inclusions['session_minutes'] as int?;
+    final fitTemplateId = widget.combo['fit_template_id'] as String?;
+
+    final allIds = <String>{...legacyIds};
+    final quantityById = <String, int>{};
+    for (final id in legacyIds) {
+      quantityById[id] = (quantityById[id] ?? 0) + 1;
+    }
+    for (final item in newItems) {
+      final id = item['id'] as String?;
+      if (id == null || id.isEmpty) continue;
+      final qty = (item['quantity'] as int?) ?? 1;
+      allIds.add(id);
+      quantityById[id] = (quantityById[id] ?? 0) + qty;
+    }
 
     var sum = 0;
-    if (menuItemIds.isNotEmpty) {
+    if (allIds.isNotEmpty) {
       try {
         final rows = await Supabase.instance.client
             .from('menu_items_with_brand')
-            .select('price_paise')
-            .inFilter('id', menuItemIds);
+            .select('id, price_paise')
+            .inFilter('id', allIds.toList());
         for (final r in (rows as List)) {
-          sum += ((r as Map)['price_paise'] as int?) ?? 0;
+          final m = r as Map;
+          final id = m['id'] as String?;
+          final price = (m['price_paise'] as int?) ?? 0;
+          final qty = (id == null ? 1 : (quantityById[id] ?? 1));
+          sum += price * qty;
         }
       } catch (_) {
         // Silent — savings just won't show.
@@ -183,6 +209,25 @@ class _ComboMiniCardState extends ConsumerState<_ComboMiniCard> {
             : sessionMinutes == 120
                 ? (cfg['session_2hr_price_paise'] as int?) ?? 110000
                 : 0;
+      }
+    }
+
+    // Combos that bundle a FIT meal carry a fit_template_id at the
+    // combo level (rather than a menu_item_id in inclusions). Pull the
+    // template's base_price so the à la carte total reflects what the
+    // customer would pay buying the FIT meal separately.
+    if (fitTemplateId != null && fitTemplateId.isNotEmpty) {
+      try {
+        final tmpl = await Supabase.instance.client
+            .from('fit_meal_templates')
+            .select('base_price_paise')
+            .eq('id', fitTemplateId)
+            .maybeSingle();
+        if (tmpl != null) {
+          sum += ((tmpl as Map)['base_price_paise'] as int?) ?? 0;
+        }
+      } catch (_) {
+        // Silent — savings just won't show.
       }
     }
 
