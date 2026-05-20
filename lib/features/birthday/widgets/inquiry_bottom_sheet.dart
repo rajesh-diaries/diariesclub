@@ -11,6 +11,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/venues.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../providers/reservation_providers.dart';
 
 const _venueId = Venues.kondapurId;
 
@@ -41,6 +42,11 @@ class _InquiryBottomSheetState extends ConsumerState<InquiryBottomSheet> {
   bool _dateManuallyEdited = false;
   bool _busy = false;
   String? _errorText;
+  // Cached across retries so that a transient network blip after the
+  // server completed doesn't strand the user — re-submit with the same
+  // key returns the existing reservation as success (RPC short-circuits
+  // on idempotency_key match).
+  String? _idempotencyKey;
 
   @override
   void initState() {
@@ -126,6 +132,8 @@ class _InquiryBottomSheetState extends ConsumerState<InquiryBottomSheet> {
         '${_slotDate!.month.toString().padLeft(2, '0')}-'
         '${_slotDate!.day.toString().padLeft(2, '0')}';
 
+    _idempotencyKey ??= const Uuid().v4();
+
     try {
       final result = await Supabase.instance.client
           .rpc<Map<String, dynamic>>('birthday_inquiry_submit', params: {
@@ -138,19 +146,26 @@ class _InquiryBottomSheetState extends ConsumerState<InquiryBottomSheet> {
         'p_guest_count': _guestCount,
         'p_special_requests': null,
         'p_triggered_by': 'packages_sheet',
-        'p_idempotency_key': const Uuid().v4(),
+        'p_idempotency_key': _idempotencyKey,
       });
 
       final reservationId = result['reservation_id'] as String?;
       if (reservationId == null) {
         throw StateError('birthday_inquiry_submit returned no id');
       }
+      ref.invalidate(familyReservationsProvider);
       if (!mounted) return;
       Navigator.of(context).pop();
       context.go('/birthday/status/$reservationId');
     } on PostgrestException catch (e) {
       debugPrint('[INQUIRY] PostgrestException code=${e.code} '
           'message=${e.message} details=${e.details} hint=${e.hint}');
+      // If the server says "you already have an open inquiry," surface
+      // the existing one instead of dead-ending the user.
+      if (e.message.contains('reservation_exists')) {
+        await _recoverToExistingReservation();
+        return;
+      }
       if (!mounted) return;
       setState(() {
         _busy = false;
@@ -158,11 +173,46 @@ class _InquiryBottomSheetState extends ConsumerState<InquiryBottomSheet> {
       });
     } catch (e, st) {
       debugPrint('[INQUIRY] generic exception: $e\n$st');
+      // Generic exception path covers the case where the server already
+      // committed the reservation but the client never saw the response
+      // (network blip, parsing edge case). Look up the active reservation
+      // for this child; if found, navigate to it as if the submit succeeded.
+      final recovered = await _recoverToExistingReservation();
+      if (recovered) return;
       if (!mounted) return;
       setState(() {
         _busy = false;
         _errorText = "Couldn't submit: $e";
       });
+    }
+  }
+
+  /// Look up the most-recent open reservation for the selected child and
+  /// navigate to its status page. Returns true if recovery worked.
+  Future<bool> _recoverToExistingReservation() async {
+    if (_selectedChildId == null) return false;
+    try {
+      final rows = await Supabase.instance.client
+          .from('birthday_reservations')
+          .select('id')
+          .eq('child_id', _selectedChildId!)
+          .inFilter('status', const [
+            'interested',
+            'admin_contacted',
+            'confirmed',
+          ])
+          .order('created_at', ascending: false)
+          .limit(1);
+      if (rows.isEmpty) return false;
+      final id = (rows.first as Map)['id'] as String?;
+      if (id == null) return false;
+      ref.invalidate(familyReservationsProvider);
+      if (!mounted) return true;
+      Navigator.of(context).pop();
+      context.go('/birthday/status/$id');
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -7,6 +10,18 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Release signing reads credentials from android/key.properties (gitignored,
+// never committed). If the file is missing (fresh clone, CI without
+// secrets), release builds fall back to the debug keystore — project still
+// builds, but the produced AAB cannot be uploaded to Play Console.
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        load(FileInputStream(keystorePropertiesFile))
+    }
+}
+val hasReleaseKey = keystorePropertiesFile.exists()
 
 android {
     namespace = "com.diariesclub.app"
@@ -31,6 +46,17 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String?
+                keyPassword = keystoreProperties["keyPassword"] as String?
+                storeFile = (keystoreProperties["storeFile"] as String?)?.let { file(it) }
+                storePassword = keystoreProperties["storePassword"] as String?
+            }
+        }
     }
 
     flavorDimensions += "default"
@@ -71,8 +97,15 @@ android {
 
     buildTypes {
         release {
-            // TODO: real signing config for prod release builds.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseKey) {
+                signingConfigs.getByName("release")
+            } else {
+                // Fallback so release builds still produce an artifact on
+                // machines without the upload keystore (e.g. fresh clone).
+                // Such an AAB cannot be uploaded to Play Console — it must
+                // be re-signed on a machine that has key.properties.
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

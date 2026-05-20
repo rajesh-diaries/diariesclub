@@ -38,9 +38,17 @@ final _myUpcomingWorkshopsProvider =
       (r as Map)['id'] as String: Map<String, dynamic>.from(r),
   };
 
+  // Dedupe registrations by workshop_id so the same workshop never
+  // renders twice if Realtime emits the same registration row more
+  // than once (known iOS 26 quirk — also possible if a parent later
+  // registers a sibling for the same workshop, in which case showing
+  // one card is still the right UX).
+  final seenWorkshops = <String>{};
   final result = <Map<String, dynamic>>[];
   for (final reg in regs) {
-    final w = byId[reg['workshop_id']];
+    final wid = reg['workshop_id'] as String?;
+    if (wid == null || !seenWorkshops.add(wid)) continue;
+    final w = byId[wid];
     if (w == null) continue;
     final scheduled =
         DateTime.tryParse((w['scheduled_at'] as String?) ?? '');

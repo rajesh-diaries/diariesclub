@@ -93,9 +93,9 @@ class ReferralDetailsScreen extends ConsumerWidget {
                 index: 2,
                 title: 'They sign up + play',
                 subtitle:
-                    'They get ${Money.fromPaise(newFamily)} when they sign up. '
-                    'You get ${Money.fromPaise(gifter)} when they play their '
-                    'first session.',
+                    'When they play their first session, they get '
+                    '${Money.fromPaise(newFamily)} and you get '
+                    '${Money.fromPaise(gifter)} — both credits land the same moment.',
               ),
               const _Step(
                 index: 3,

@@ -17,6 +17,7 @@ import '../../core/utils/venues.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/primary_button.dart';
 import 'providers/birthday_packages_provider.dart';
+import 'providers/reservation_providers.dart';
 
 const _venueId = Venues.kondapurId;
 
@@ -53,6 +54,10 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
   // re-prefill when the child selection changes.
   bool _dateManuallyEdited = false;
   final _specialRequests = TextEditingController();
+  // Cached across retries so a network blip after the server commits
+  // doesn't strand the user — same key returns the existing reservation
+  // as success (RPC short-circuits on idempotency_key match).
+  String? _idempotencyKey;
   bool _busy = false;
   String? _errorText;
 
@@ -123,7 +128,7 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
       _errorText = null;
     });
 
-    final idem = const Uuid().v4();
+    _idempotencyKey ??= const Uuid().v4();
     final dateOnly =
         '${_slotDate!.year.toString().padLeft(4, '0')}-'
         '${_slotDate!.month.toString().padLeft(2, '0')}-'
@@ -144,13 +149,14 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
                 ? null
                 : _specialRequests.text.trim(),
         'p_triggered_by': widget.triggeredBy ?? 'manual',
-        'p_idempotency_key': idem,
+        'p_idempotency_key': _idempotencyKey,
       });
 
       final reservationId = result['reservation_id'] as String?;
       if (reservationId == null) {
         throw StateError('birthday_inquiry_submit returned no id');
       }
+      ref.invalidate(familyReservationsProvider);
       if (!mounted) return;
       context.go('/birthday/status/$reservationId');
     } on PostgrestException catch (e) {
@@ -180,11 +186,42 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
         setState(() => _errorText = "Couldn't submit. Please try again.");
       }
     } catch (_) {
+      // Server may have committed but client never saw the response.
+      // Try to find the child's open reservation; if found, navigate
+      // to it as if the submit succeeded.
+      final recovered = await _recoverToExistingReservation();
+      if (recovered) return;
       if (!mounted) return;
       setState(() {
         _busy = false;
         _errorText = "Couldn't submit. Please try again.";
       });
+    }
+  }
+
+  Future<bool> _recoverToExistingReservation() async {
+    if (_selectedChildId == null) return false;
+    try {
+      final rows = await Supabase.instance.client
+          .from('birthday_reservations')
+          .select('id')
+          .eq('child_id', _selectedChildId!)
+          .inFilter('status', const [
+            'interested',
+            'admin_contacted',
+            'confirmed',
+          ])
+          .order('created_at', ascending: false)
+          .limit(1);
+      if (rows.isEmpty) return false;
+      final id = (rows.first as Map)['id'] as String?;
+      if (id == null) return false;
+      ref.invalidate(familyReservationsProvider);
+      if (!mounted) return true;
+      context.go('/birthday/status/$id');
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
