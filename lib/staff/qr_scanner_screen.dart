@@ -48,9 +48,14 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
     HapticFeedback.lightImpact();
 
     try {
+      // staffId may be empty when QR scan was launched without a PIN
+      // gate (the floor-flow shortcut). Send null so the RPC's staff
+      // existence check skips for this read-only validation.
+      final staffId =
+          widget.staffId.isEmpty ? null : widget.staffId;
       final raw = await Supabase.instance.client.rpc<dynamic>(
         'qr_scan_validate',
-        params: {'p_qr_payload': code, 'p_staff_pin_id': widget.staffId},
+        params: {'p_qr_payload': code, 'p_staff_pin_id': staffId},
       );
       final result =
           raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};

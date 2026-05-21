@@ -38,11 +38,13 @@ class StaffHomeScreen extends ConsumerWidget {
             _ActionTile(
               icon: PhosphorIconsRegular.qrCode,
               label: 'Scan QR',
-              onTap: () => _withPin(
-                context,
-                actionLabel: 'Scan session QR',
-                route: '/staff/qr',
-              ),
+              // QR scan is a read-mostly operation (validates a session +
+              // marks it scanned). It doesn't move money or change menu
+              // pricing, so we skip the PIN gate to keep the floor flow
+              // quick. The session row's staff_pin_id stays null for these
+              // scans; the tablet_device_id on the audit log still ties
+              // the action to a specific device.
+              onTap: () => context.push('/staff/qr'),
             ),
             _ActionTile(
               icon: PhosphorIconsRegular.phoneCall,
