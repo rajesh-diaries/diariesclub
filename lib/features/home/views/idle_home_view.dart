@@ -8,6 +8,7 @@ import '../widgets/announcements_feed.dart';
 import '../widgets/big_start_session_card.dart';
 import '../widgets/birthday_card.dart';
 import '../widgets/home_combos_strip.dart';
+import '../widgets/live_orders_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
 import '../widgets/pending_reflections_section.dart';
 import '../widgets/recent_activity_list.dart';
@@ -62,6 +63,14 @@ class IdleHomeBody extends ConsumerWidget {
         Text('Ready for adventure?', style: AppTextStyles.body(context)),
         const SizedBox(height: 20),
         const BigStartSessionCard(),
+        // Live orders the parent placed during a session that just
+        // ended — show them above reflections so they can track the
+        // kitchen without losing the cards behind a finished session.
+        // Self-hides when there are no in-flight orders.
+        const Padding(
+          padding: EdgeInsets.only(top: 16),
+          child: LiveOrdersCard(),
+        ),
         // Pending reflections (one card per kid whose session ended in
         // the last 24h without reflection). Self-margined: hides cleanly
         // when nothing's pending. Sits between the Start CTA and combos
