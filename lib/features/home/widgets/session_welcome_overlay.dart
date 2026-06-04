@@ -84,13 +84,12 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
 
   Future<void> _initVideo() async {
     final hero = widget.favouriteHero ?? 'rafi';
-    // Pick a random clip (max 1 clip per hero for now — bump when you add more).
     final clipPath = HeroClipPicker.randomClip(hero, maxClips: 1);
 
     try {
-      // Web uses network URL; mobile uses asset bundle.
       final controller = kIsWeb
-          ? VideoPlayerController.networkUrl(Uri.parse('assets/$clipPath'))
+          ? VideoPlayerController.networkUrl(
+              Uri.parse('assets/assets/welcome_clips/${hero}_1.mp4'))
           : VideoPlayerController.asset(clipPath);
       _videoController = controller;
 
@@ -101,15 +100,12 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
       }
 
       controller.setLooping(false);
-      controller.setVolume(0); // Mute — no audio distraction at check-in
-
-      // Auto-dismiss when video ends.
+      controller.setVolume(0);
       controller.addListener(_onVideoStateChanged);
 
       setState(() => _videoReady = true);
       controller.play();
     } catch (e) {
-      // Asset not found or unsupported — fall back to static image.
       debugPrint('[SessionWelcomeOverlay] video init failed: $e');
       if (mounted) setState(() => _videoReady = false);
     }
@@ -119,7 +115,6 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
     final controller = _videoController;
     if (controller == null || !controller.value.isInitialized) return;
 
-    // Video finished playing — dismiss overlay.
     if (controller.value.position >= controller.value.duration) {
       controller.removeListener(_onVideoStateChanged);
       widget.onDismissed();
@@ -144,7 +139,6 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Hero avatar — video if available, else waving static image
               if (_videoReady && _videoController != null)
                 _VideoAvatar(
                   controller: _videoController!,
@@ -157,7 +151,6 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
                   heroColor: _heroColor,
                 ),
               const SizedBox(height: 32),
-              // Greeting text
               Text(
                 'Welcome, ${widget.childName}!',
                 style: AppTextStyles.h1(context).copyWith(
@@ -182,7 +175,6 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
                   .fadeIn(delay: 400.ms, duration: 500.ms)
                   .slideY(begin: 0.2, end: 0, duration: 500.ms),
               const SizedBox(height: 48),
-              // Skip hint
               Text(
                 'Tap anywhere to skip',
                 style: AppTextStyles.caption(
@@ -198,9 +190,6 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
   }
 }
 
-// ---------------------------------------------------------------------------
-//  Video avatar — plays the MP4 clip inside a circular container.
-// ---------------------------------------------------------------------------
 class _VideoAvatar extends StatelessWidget {
   final VideoPlayerController controller;
   final Color heroColor;
@@ -213,8 +202,8 @@ class _VideoAvatar extends StatelessWidget {
       width: 200,
       height: 200,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
         color: heroColor.withValues(alpha: 0.20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: heroColor.withValues(alpha: 0.50),
           width: 3,
@@ -248,9 +237,6 @@ class _VideoAvatar extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-//  Static avatar fallback — waving PNG with flutter_animate.
-// ---------------------------------------------------------------------------
 class _StaticAvatar extends StatelessWidget {
   final AnimationController waveController;
   final String heroAsset;
@@ -275,11 +261,11 @@ class _StaticAvatar extends StatelessWidget {
         );
       },
       child: Container(
-        width: 160,
-        height: 160,
+        width: 180,
+        height: 180,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
           color: heroColor.withValues(alpha: 0.20),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: heroColor.withValues(alpha: 0.50),
             width: 3,
@@ -294,7 +280,7 @@ class _StaticAvatar extends StatelessWidget {
         ),
         clipBehavior: Clip.antiAlias,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Image.asset(
             heroAsset,
             fit: BoxFit.contain,
@@ -318,14 +304,9 @@ class _StaticAvatar extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-//  Random clip selector.
-// ---------------------------------------------------------------------------
 class HeroClipPicker {
   static final _random = Random();
 
-  /// Returns a random clip path for the given hero.
-  /// `maxClips` = how many clips exist for this hero (e.g. 1, 5, or 10).
   static String randomClip(String hero, {int maxClips = 1}) {
     final idx = _random.nextInt(maxClips) + 1;
     return 'assets/welcome_clips/${hero}_$idx.mp4';
