@@ -7,13 +7,15 @@ import 'package:video_player/video_player.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import 'welcome_video_js.dart'
+    if (dart.library.html) 'welcome_video_js_web.dart';
 
 /// Full-screen welcome overlay shown once when a session freshly starts.
-/// Plays a short 4-5s hero video clip (MP4). Falls back to a waving
-/// static hero PNG if the video fails to load or hasn't been uploaded yet.
+///
+/// Web: uses HtmlElementView with a native <video> element injected via JS.
+/// Mobile: uses video_player package.
 ///
 /// Place clips at: assets/welcome_clips/{hero}_1.mp4, {hero}_2.mp4, etc.
-/// The picker randomly selects one each time for variety.
 class SessionWelcomeOverlay extends StatefulWidget {
   final String childName;
   final String? favouriteHero;
@@ -30,12 +32,9 @@ class SessionWelcomeOverlay extends StatefulWidget {
   State<SessionWelcomeOverlay> createState() => _SessionWelcomeOverlayState();
 }
 
-class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
-    with SingleTickerProviderStateMixin {
+class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay> {
   VideoPlayerController? _videoController;
   bool _videoReady = false;
-
-  late final AnimationController _waveController;
 
   static const _heroAssets = <String, String>{
     'rafi': 'assets/hero/rafi.png',
@@ -71,60 +70,45 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
     return _greetings[idx];
   }
 
+  String get _videoUrl {
+    final hero = widget.favouriteHero ?? 'rafi';
+    return 'assets/assets/welcome_clips/${hero}_1.mp4';
+  }
+
   @override
   void initState() {
     super.initState();
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
 
-    _initVideo();
+    if (!kIsWeb) {
+      _initMobileVideo();
+    }
+
+    // Auto-dismiss after 5 seconds max.
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) widget.onDismissed();
+    });
   }
 
-  Future<void> _initVideo() async {
-    final hero = widget.favouriteHero ?? 'rafi';
-    final clipPath = HeroClipPicker.randomClip(hero, maxClips: 1);
-
+  Future<void> _initMobileVideo() async {
     try {
-      final controller = kIsWeb
-          ? VideoPlayerController.networkUrl(
-              Uri.parse('assets/assets/welcome_clips/${hero}_1.mp4'))
-          : VideoPlayerController.asset(clipPath);
-      _videoController = controller;
-
+      final clipPath = HeroClipPicker.randomClip(
+        widget.favouriteHero ?? 'rafi',
+        maxClips: 1,
+      );
+      final controller = VideoPlayerController.asset(clipPath);
       await controller.initialize();
-      if (!mounted) {
-        controller.dispose();
-        return;
-      }
-
+      if (!mounted) return;
       controller.setLooping(false);
       controller.setVolume(0);
-      controller.addListener(_onVideoStateChanged);
-
-      setState(() => _videoReady = true);
       controller.play();
+      setState(() => _videoReady = true);
     } catch (e) {
-      debugPrint('[SessionWelcomeOverlay] video init failed: $e');
-      if (mounted) setState(() => _videoReady = false);
-    }
-  }
-
-  void _onVideoStateChanged() {
-    final controller = _videoController;
-    if (controller == null || !controller.value.isInitialized) return;
-
-    if (controller.value.position >= controller.value.duration) {
-      controller.removeListener(_onVideoStateChanged);
-      widget.onDismissed();
+      debugPrint('[SessionWelcomeOverlay] mobile video failed: $e');
     }
   }
 
   @override
   void dispose() {
-    _waveController.dispose();
-    _videoController?.removeListener(_onVideoStateChanged);
     _videoController?.dispose();
     super.dispose();
   }
@@ -139,14 +123,20 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (_videoReady && _videoController != null)
-                _VideoAvatar(
+              // Hero avatar — flat square, no rotation
+              if (kIsWeb)
+                _WebVideoBox(
+                  videoUrl: _videoUrl,
+                  heroColor: _heroColor,
+                  onEnded: widget.onDismissed,
+                )
+              else if (_videoReady && _videoController != null)
+                _MobileVideoBox(
                   controller: _videoController!,
                   heroColor: _heroColor,
                 )
               else
-                _StaticAvatar(
-                  waveController: _waveController,
+                _StaticBox(
                   heroAsset: _heroAsset,
                   heroColor: _heroColor,
                 ),
@@ -190,11 +180,75 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
   }
 }
 
-class _VideoAvatar extends StatelessWidget {
+// ---------------------------------------------------------------------------
+//  Web native video — flat square, uses JS-injected <video> element.
+// ---------------------------------------------------------------------------
+class _WebVideoBox extends StatefulWidget {
+  final String videoUrl;
+  final Color heroColor;
+  final VoidCallback onEnded;
+
+  const _WebVideoBox({
+    required this.videoUrl,
+    required this.heroColor,
+    required this.onEnded,
+  });
+
+  @override
+  State<_WebVideoBox> createState() => _WebVideoBoxState();
+}
+
+class _WebVideoBoxState extends State<_WebVideoBox> {
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 100), () {
+      jsInjectVideo(widget.videoUrl, widget.onEnded);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 200,
+      height: 200,
+      decoration: BoxDecoration(
+        color: widget.heroColor.withValues(alpha: 0.20),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: widget.heroColor.withValues(alpha: 0.50),
+          width: 3,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: widget.heroColor.withValues(alpha: 0.30),
+            blurRadius: 40,
+            spreadRadius: 8,
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: const HtmlElementView(viewType: 'welcome-video-view'),
+    )
+        .animate()
+        .scale(
+          begin: const Offset(0.6, 0.6),
+          end: const Offset(1.0, 1.0),
+          duration: 600.ms,
+          curve: Curves.elasticOut,
+        )
+        .fadeIn(duration: 400.ms);
+  }
+}
+
+// ---------------------------------------------------------------------------
+//  Mobile video — flat square, no rotation.
+// ---------------------------------------------------------------------------
+class _MobileVideoBox extends StatelessWidget {
   final VideoPlayerController controller;
   final Color heroColor;
 
-  const _VideoAvatar({required this.controller, required this.heroColor});
+  const _MobileVideoBox({required this.controller, required this.heroColor});
 
   @override
   Widget build(BuildContext context) {
@@ -237,58 +291,45 @@ class _VideoAvatar extends StatelessWidget {
   }
 }
 
-class _StaticAvatar extends StatelessWidget {
-  final AnimationController waveController;
+// ---------------------------------------------------------------------------
+//  Static fallback — flat square, NO rotation/tilt.
+// ---------------------------------------------------------------------------
+class _StaticBox extends StatelessWidget {
   final String heroAsset;
   final Color heroColor;
 
-  const _StaticAvatar({
-    required this.waveController,
-    required this.heroAsset,
-    required this.heroColor,
-  });
+  const _StaticBox({required this.heroAsset, required this.heroColor});
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: waveController,
-      builder: (context, child) {
-        final angle = -0.15 + (waveController.value * 0.3);
-        return Transform.rotate(
-          angle: angle,
-          origin: const Offset(0, 40),
-          child: child,
-        );
-      },
-      child: Container(
-        width: 180,
-        height: 180,
-        decoration: BoxDecoration(
-          color: heroColor.withValues(alpha: 0.20),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: heroColor.withValues(alpha: 0.50),
-            width: 3,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: heroColor.withValues(alpha: 0.30),
-              blurRadius: 40,
-              spreadRadius: 8,
-            ),
-          ],
+    return Container(
+      width: 180,
+      height: 180,
+      decoration: BoxDecoration(
+        color: heroColor.withValues(alpha: 0.20),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: heroColor.withValues(alpha: 0.50),
+          width: 3,
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Image.asset(
-            heroAsset,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Icon(
-              Icons.face,
-              size: 80,
-              color: Colors.white,
-            ),
+        boxShadow: [
+          BoxShadow(
+            color: heroColor.withValues(alpha: 0.30),
+            blurRadius: 40,
+            spreadRadius: 8,
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Image.asset(
+          heroAsset,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.face,
+            size: 80,
+            color: Colors.white,
           ),
         ),
       ),
@@ -304,6 +345,9 @@ class _StaticAvatar extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+//  Random clip selector.
+// ---------------------------------------------------------------------------
 class HeroClipPicker {
   static final _random = Random();
 
