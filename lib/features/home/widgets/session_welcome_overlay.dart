@@ -2,17 +2,17 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
-/// Full-screen welcome overlay shown once when a session freshly starts
-/// (within 30s of started_at). Displays the child's favourite hero with a
-/// waving animation and a personalised greeting.
+/// Full-screen welcome overlay shown once when a session freshly starts.
+/// Plays a short 4-5s hero video clip (MP4). Falls back to a waving
+/// static hero PNG if the video fails to load or hasn't been uploaded yet.
 ///
-/// Placeholder: uses flutter_animate on the static hero PNG. When custom
-/// 4-5s animated clips are ready, swap the Image.asset for a VideoPlayer.
-/// Supports 5-10 clips per hero; a random one is picked each time.
+/// Place clips at: assets/welcome_clips/{hero}_1.mp4, {hero}_2.mp4, etc.
+/// The picker randomly selects one each time for variety.
 class SessionWelcomeOverlay extends StatefulWidget {
   final String childName;
   final String? favouriteHero;
@@ -31,6 +31,9 @@ class SessionWelcomeOverlay extends StatefulWidget {
 
 class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
     with SingleTickerProviderStateMixin {
+  VideoPlayerController? _videoController;
+  bool _videoReady = false;
+
   late final AnimationController _waveController;
 
   static const _heroAssets = <String, String>{
@@ -63,7 +66,6 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
   String get _greeting {
     final name = widget.childName.trim();
     if (name.isEmpty) return "Let's play!";
-    // Deterministic but seemingly random per session.
     final idx = name.hashCode.abs() % _greetings.length;
     return _greetings[idx];
   }
@@ -76,15 +78,54 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
       duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
 
-    // Auto-dismiss after 4 seconds.
-    Future.delayed(const Duration(seconds: 4), () {
-      if (mounted) widget.onDismissed();
-    });
+    _initVideo();
+  }
+
+  Future<void> _initVideo() async {
+    final hero = widget.favouriteHero ?? 'rafi';
+    // Pick a random clip (max 1 clip per hero for now — bump when you add more).
+    final clipPath = HeroClipPicker.randomClip(hero, maxClips: 1);
+
+    try {
+      final controller = VideoPlayerController.asset(clipPath);
+      _videoController = controller;
+
+      await controller.initialize();
+      if (!mounted) {
+        controller.dispose();
+        return;
+      }
+
+      controller.setLooping(false);
+      controller.setVolume(0); // Mute — no audio distraction at check-in
+
+      // Auto-dismiss when video ends.
+      controller.addListener(_onVideoStateChanged);
+
+      setState(() => _videoReady = true);
+      controller.play();
+    } catch (_) {
+      // Asset not found or unsupported — fall back to static image.
+      if (mounted) setState(() => _videoReady = false);
+    }
+  }
+
+  void _onVideoStateChanged() {
+    final controller = _videoController;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    // Video finished playing — dismiss overlay.
+    if (controller.value.position >= controller.value.duration) {
+      controller.removeListener(_onVideoStateChanged);
+      widget.onDismissed();
+    }
   }
 
   @override
   void dispose() {
     _waveController.dispose();
+    _videoController?.removeListener(_onVideoStateChanged);
+    _videoController?.dispose();
     super.dispose();
   }
 
@@ -98,59 +139,18 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Hero avatar with wave animation
-              AnimatedBuilder(
-                animation: _waveController,
-                builder: (context, child) {
-                  final angle =
-                      -0.15 + (_waveController.value * 0.3); // -15° to +15°
-                  return Transform.rotate(
-                    angle: angle,
-                    origin: const Offset(0, 40), // pivot from bottom
-                    child: child,
-                  );
-                },
-                child: Container(
-                  width: 160,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _heroColor.withValues(alpha: 0.20),
-                    border: Border.all(
-                      color: _heroColor.withValues(alpha: 0.50),
-                      width: 3,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _heroColor.withValues(alpha: 0.30),
-                        blurRadius: 40,
-                        spreadRadius: 8,
-                      ),
-                    ],
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Image.asset(
-                      _heroAsset,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.face,
-                        size: 80,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
+              // Hero avatar — video if available, else waving static image
+              if (_videoReady && _videoController != null)
+                _VideoAvatar(
+                  controller: _videoController!,
+                  heroColor: _heroColor,
                 )
-                    .animate()
-                    .scale(
-                      begin: const Offset(0.6, 0.6),
-                      end: const Offset(1.0, 1.0),
-                      duration: 600.ms,
-                      curve: Curves.elasticOut,
-                    )
-                    .fadeIn(duration: 400.ms),
-              ),
+              else
+                _StaticAvatar(
+                  waveController: _waveController,
+                  heroAsset: _heroAsset,
+                  heroColor: _heroColor,
+                ),
               const SizedBox(height: 32),
               // Greeting text
               Text(
@@ -193,16 +193,135 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
   }
 }
 
-/// Random clip selector for future video assets.
-/// When clips are uploaded, place them at:
-///   assets/welcome_clips/{hero}_{1..n}.mp4
-/// and this helper picks a random one per session.
+// ---------------------------------------------------------------------------
+//  Video avatar — plays the MP4 clip inside a circular container.
+// ---------------------------------------------------------------------------
+class _VideoAvatar extends StatelessWidget {
+  final VideoPlayerController controller;
+  final Color heroColor;
+
+  const _VideoAvatar({required this.controller, required this.heroColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 200,
+      height: 200,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: heroColor.withValues(alpha: 0.20),
+        border: Border.all(
+          color: heroColor.withValues(alpha: 0.50),
+          width: 3,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: heroColor.withValues(alpha: 0.30),
+            blurRadius: 40,
+            spreadRadius: 8,
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: controller.value.size.width,
+          height: controller.value.size.height,
+          child: VideoPlayer(controller),
+        ),
+      ),
+    )
+        .animate()
+        .scale(
+          begin: const Offset(0.6, 0.6),
+          end: const Offset(1.0, 1.0),
+          duration: 600.ms,
+          curve: Curves.elasticOut,
+        )
+        .fadeIn(duration: 400.ms);
+  }
+}
+
+// ---------------------------------------------------------------------------
+//  Static avatar fallback — waving PNG with flutter_animate.
+// ---------------------------------------------------------------------------
+class _StaticAvatar extends StatelessWidget {
+  final AnimationController waveController;
+  final String heroAsset;
+  final Color heroColor;
+
+  const _StaticAvatar({
+    required this.waveController,
+    required this.heroAsset,
+    required this.heroColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: waveController,
+      builder: (context, child) {
+        final angle = -0.15 + (waveController.value * 0.3);
+        return Transform.rotate(
+          angle: angle,
+          origin: const Offset(0, 40),
+          child: child,
+        );
+      },
+      child: Container(
+        width: 160,
+        height: 160,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: heroColor.withValues(alpha: 0.20),
+          border: Border.all(
+            color: heroColor.withValues(alpha: 0.50),
+            width: 3,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: heroColor.withValues(alpha: 0.30),
+              blurRadius: 40,
+              spreadRadius: 8,
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Image.asset(
+            heroAsset,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Icon(
+              Icons.face,
+              size: 80,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    )
+        .animate()
+        .scale(
+          begin: const Offset(0.6, 0.6),
+          end: const Offset(1.0, 1.0),
+          duration: 600.ms,
+          curve: Curves.elasticOut,
+        )
+        .fadeIn(duration: 400.ms);
+  }
+}
+
+// ---------------------------------------------------------------------------
+//  Random clip selector.
+// ---------------------------------------------------------------------------
 class HeroClipPicker {
   static final _random = Random();
 
   /// Returns a random clip path for the given hero.
-  /// `maxClips` = how many clips exist for this hero (e.g. 5 or 10).
-  static String randomClip(String hero, {int maxClips = 5}) {
+  /// `maxClips` = how many clips exist for this hero (e.g. 1, 5, or 10).
+  static String randomClip(String hero, {int maxClips = 1}) {
     final idx = _random.nextInt(maxClips) + 1;
     return 'assets/welcome_clips/${hero}_$idx.mp4';
   }

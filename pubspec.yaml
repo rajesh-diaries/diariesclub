@@ -30,6 +30,9 @@ dependencies:
   rive: ^0.13.0
   lottie: ^3.3.3
 
+  # Video — hero welcome clips (4-5s MP4s per character)
+  video_player: ^2.9.1
+
   # Fonts and icons
   google_fonts: ^6.2.1
   phosphor_flutter: ^2.1.0
@@ -101,6 +104,7 @@ flutter:
     - assets/images/
     - assets/hero/
     - assets/splash/
+    - assets/welcome_clips/
 
 flutter_native_splash:
   color: "#FFFFFF"
