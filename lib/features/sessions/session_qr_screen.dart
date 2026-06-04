@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:confetti/confetti.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:screen_brightness/screen_brightness.dart';
@@ -364,13 +366,13 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
         if (!didPop) _confirmExit();
       },
       child: Scaffold(
+        backgroundColor: AppColors.navy,
         appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          elevation: 0,
           title: Text(
-            status == 'pending'
-                ? 'Show this to staff'
-                : status == 'cancelled_pre_scan'
-                    ? 'Session cancelled'
-                    : 'Show this at the desk',
+            status == 'cancelled_pre_scan' ? 'Session cancelled' : 'Adventure Pass',
           ),
           leading: IconButton(
             tooltip: 'Done',
@@ -409,7 +411,7 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
   }
 }
 
-class _Body extends StatelessWidget {
+class _Body extends StatefulWidget {
   final Map<String, dynamic> session;
   final String qrPayload;
   final bool iAmOwner;
@@ -428,6 +430,32 @@ class _Body extends StatelessWidget {
     required this.onCancelNow,
   });
 
+  @override
+  State<_Body> createState() => _BodyState();
+}
+
+class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
+  late final ConfettiController _confetti;
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _confetti = ConfettiController(duration: const Duration(seconds: 2));
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+    _confetti.play();
+  }
+
+  @override
+  void dispose() {
+    _confetti.dispose();
+    _pulse.dispose();
+    super.dispose();
+  }
+
   String _formatRemaining(Duration d) {
     final m = d.inMinutes.toString().padLeft(2, '0');
     final s = (d.inSeconds % 60).toString().padLeft(2, '0');
@@ -436,49 +464,119 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final duration = session['duration_minutes'] as int? ?? 0;
-    final amount = session['amount_paise'] as int? ?? 0;
-    final paymentMethod = (session['payment_method'] as String?) ?? '—';
+    final duration = widget.session['duration_minutes'] as int? ?? 0;
+    final amount = widget.session['amount_paise'] as int? ?? 0;
+    final paymentMethod = (widget.session['payment_method'] as String?) ?? '—';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.gold, width: 3),
-              borderRadius: BorderRadius.circular(20),
-              color: Colors.white,
+          const SizedBox(height: 8),
+          // Confetti burst at top
+          SizedBox(
+            height: 120,
+            child: ConfettiWidget(
+              confettiController: _confetti,
+              blastDirectionality: BlastDirectionality.explosive,
+              maxBlastForce: 15,
+              minBlastForce: 3,
+              emissionFrequency: 0.03,
+              numberOfParticles: 20,
+              gravity: 0.4,
+              colors: const [
+                AppColors.gold,
+                AppColors.rafiCoral,
+                AppColors.ellieBlue,
+                AppColors.gerryAmber,
+                AppColors.zenaGreen,
+              ],
             ),
-            child: QrImageView(
-              data: qrPayload,
-              size: 280,
-              version: QrVersions.auto,
-              eyeStyle: const QrEyeStyle(
-                eyeShape: QrEyeShape.square,
-                color: AppColors.navy,
+          ),
+          // Sparkle icon
+          const Icon(
+            PhosphorIconsFill.sparkle,
+            color: AppColors.gold,
+            size: 48,
+          )
+              .animate()
+              .fadeIn(duration: 400.ms)
+              .scale(
+                begin: const Offset(0.5, 0.5),
+                duration: 500.ms,
+                curve: Curves.easeOutBack,
               ),
-              dataModuleStyle: const QrDataModuleStyle(
-                dataModuleShape: QrDataModuleShape.square,
-                color: AppColors.navy,
+          const SizedBox(height: 12),
+          // Title
+          Text(
+            'Your Adventure Pass',
+            style: AppTextStyles.h2(context, color: Colors.white),
+            textAlign: TextAlign.center,
+          )
+              .animate(delay: 200.ms)
+              .fadeIn(duration: 400.ms)
+              .slideY(
+                begin: 0.3,
+                duration: 400.ms,
+                curve: Curves.easeOutCubic,
               ),
-            ),
+          const SizedBox(height: 4),
+          Text(
+            'is ready!',
+            style: AppTextStyles.body(context, color: Colors.white70),
+            textAlign: TextAlign.center,
+          ).animate(delay: 300.ms).fadeIn(duration: 400.ms),
+          const SizedBox(height: 24),
+          // Pulsing QR card
+          AnimatedBuilder(
+            animation: _pulse,
+            builder: (_, __) {
+              final glow = _pulse.value;
+              return Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AppColors.gold,
+                    width: 2 + glow * 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.gold.withValues(alpha: 0.2 + 0.3 * glow),
+                      blurRadius: 20 + 30 * glow,
+                      spreadRadius: 2 + 6 * glow,
+                    ),
+                  ],
+                ),
+                child: QrImageView(
+                  data: widget.qrPayload,
+                  size: 240,
+                  version: QrVersions.auto,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square,
+                    color: AppColors.navy,
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: AppColors.navy,
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 20),
+          // Subtitle
           Text(
-            isPending
-                ? 'Show this to staff. Once they scan, your session starts and the wallet hold becomes a debit.'
-                : "Show this to staff. They'll scan to confirm.",
+            'Show this at the desk. Staff will scan to start the adventure.',
             style: AppTextStyles.body(
               context,
-              color: AppColors.lightTextSecondary,
+              color: Colors.white70,
             ),
             textAlign: TextAlign.center,
-          ),
+          ).animate(delay: 500.ms).fadeIn(duration: 400.ms),
           const SizedBox(height: 24),
-          if (isPending) ...[
+          if (widget.isPending) ...[
             Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -501,7 +599,7 @@ class _Body extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Auto-cancels in ${_formatRemaining(remaining)}',
+                      'Auto-cancels in ${_formatRemaining(widget.remaining)}',
                       style: AppTextStyles.body(context).copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -536,7 +634,7 @@ class _Body extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  '${Money.fromPaise(amount)} · ${isPending ? 'on hold' : paymentMethod}',
+                  '${Money.fromPaise(amount)} · ${widget.isPending ? 'on hold' : paymentMethod}',
                   style: AppTextStyles.caption(
                     context,
                     color: AppColors.lightTextSecondary,
@@ -545,14 +643,14 @@ class _Body extends StatelessWidget {
               ],
             ),
           ),
-          if (isPending) ...[
+          if (widget.isPending) ...[
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 icon: const Icon(PhosphorIconsRegular.xCircle),
-                label: Text(cancelling ? 'Cancelling…' : 'Cancel session'),
-                onPressed: cancelling ? null : onCancelNow,
+                label: Text(widget.cancelling ? 'Cancelling…' : 'Cancel session'),
+                onPressed: widget.cancelling ? null : widget.onCancelNow,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.adminRed,
                   side: const BorderSide(color: AppColors.adminRed),
@@ -561,7 +659,7 @@ class _Body extends StatelessWidget {
               ),
             ),
           ],
-          if (!iAmOwner)
+          if (!widget.iAmOwner)
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: Text(
@@ -599,7 +697,7 @@ class _CancelledBody extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             'Session cancelled',
-            style: AppTextStyles.h2(context),
+            style: AppTextStyles.h2(context, color: Colors.white),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
@@ -608,7 +706,7 @@ class _CancelledBody extends StatelessWidget {
             'released. Start a new session whenever you like.',
             style: AppTextStyles.body(
               context,
-              color: AppColors.lightTextSecondary,
+              color: Colors.white70,
             ),
             textAlign: TextAlign.center,
           ),
