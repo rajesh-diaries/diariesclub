@@ -34,6 +34,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   // Session ID currently showing the welcome overlay (null = none).
   String? _welcomingSessionId;
+  String _welcomeChildName = '';
+  String? _welcomeFavouriteHero;
 
   @override
   void initState() {
@@ -103,11 +105,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return null;
   }
 
-  void _onWelcomeDismissed(String sessionId) {
+  void _onWelcomeDismissed() {
+    final id = _welcomingSessionId;
     setState(() {
       _welcomingSessionId = null;
-      _greetedSessionIds.add(sessionId);
+      _welcomeChildName = '';
+      _welcomeFavouriteHero = null;
     });
+    if (id != null) _greetedSessionIds.add(id);
   }
 
   @override
@@ -117,12 +122,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ref.watch(activeSessionsProvider).valueOrNull ?? const [];
 
     // Trigger welcome overlay for freshly-started sessions.
-    final greet = _welcomingSessionId == null
-        ? _freshSessionToGreet(activeSessions)
-        : null;
-    if (greet != null) {
-      // Defer to next frame so we don't call setState during build.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (_welcomingSessionId == null) {
+      final greet = _freshSessionToGreet(activeSessions);
+      if (greet != null) {
         final freshId = activeSessions
             .firstWhere((s) {
               final startedAt = DateTime.tryParse(
@@ -132,10 +134,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   DateTime.now().difference(startedAt).inSeconds <= 300;
             }, orElse: () => const <String, dynamic>{})['id']
             ?.toString();
-        if (freshId != null && mounted && _welcomingSessionId == null) {
-          setState(() => _welcomingSessionId = freshId);
+        if (freshId != null) {
+          setState(() {
+            _welcomingSessionId = freshId;
+            _welcomeChildName = greet.childName;
+            _welcomeFavouriteHero = greet.favouriteHero;
+          });
         }
-      });
+      }
     }
 
     Widget body = state.when(
@@ -165,15 +171,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
 
     // Layer welcome overlay on top when a fresh session is detected.
-    if (_welcomingSessionId != null && greet != null) {
+    if (_welcomingSessionId != null) {
       body = Stack(
         children: [
           body,
           Positioned.fill(
             child: SessionWelcomeOverlay(
-              childName: greet.childName,
-              favouriteHero: greet.favouriteHero,
-              onDismissed: () => _onWelcomeDismissed(_welcomingSessionId!),
+              childName: _welcomeChildName,
+              favouriteHero: _welcomeFavouriteHero,
+              onDismissed: _onWelcomeDismissed,
             ),
           ),
         ],
