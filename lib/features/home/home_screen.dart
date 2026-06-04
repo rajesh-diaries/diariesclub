@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/notifications/fcm_lifecycle_provider.dart';
 import '../../core/notifications/fcm_setup.dart';
 import '../../core/providers/active_sessions_provider.dart';
+import '../../core/providers/family_children_provider.dart';
 import '../../core/providers/home_state_provider.dart';
 import '../../core/providers/recent_activity_provider.dart';
 import '../../core/widgets/error_screen.dart';
@@ -12,6 +13,7 @@ import 'home_app_bar.dart';
 import 'views/idle_home_view.dart';
 import 'views/multi_session_home_view.dart';
 import 'views/post_session_home_view.dart';
+import 'widgets/session_welcome_overlay.dart';
 
 /// Tab 1 — Home. The single source of truth for which sub-view to render
 /// is `homeStateProvider` (DB-driven). Active vs grace within an open
@@ -26,27 +28,25 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   ProviderSubscription<AsyncValue<HomeState>>? _sub;
 
+  // Track which sessions have already shown the welcome overlay so we
+  // don't greet the same session twice on rebuilds.
+  final _greetedSessionIds = <String>{};
+
+  // Session ID currently showing the welcome overlay (null = none).
+  String? _welcomingSessionId;
+
   @override
   void initState() {
     super.initState();
-    // Whenever the home state's underlying sessions stream emits, we may
-    // also need to refresh the recent-activity view (a session row that
-    // just completed should appear there). Cheap to invalidate; the view
-    // is small.
     _sub = ref.listenManual<AsyncValue<HomeState>>(
       homeStateProvider,
       (_, __) => ref.invalidate(recentActivityProvider),
     );
 
-    // Cold-start FCM tap → consume the deep link saved by FcmSetup once
-    // we've reached Home (the safe, signed-in landing point).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _consumeIfPending();
     });
 
-    // Reactive subscription — fires whenever a notification tap pushes a
-    // new deep link AFTER home_screen has already mounted (background
-    // resume taps, foreground banner taps, second-notification taps).
     pendingFcmDeepLinkNotifier.addListener(_onPendingDeepLinkChanged);
   }
 
@@ -66,43 +66,123 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
+  /// Detects any session that started within the last 30s and hasn't
+  /// been greeted yet. Returns the child name + hero for the overlay.
+  ({String childName, String? favouriteHero})? _freshSessionToGreet(
+    List<Map<String, dynamic>> sessions,
+  ) {
+    final now = DateTime.now();
+    for (final s in sessions) {
+      final id = s['id'] as String?;
+      if (id == null || _greetedSessionIds.contains(id)) continue;
+
+      final startedAtStr = s['started_at'] as String?;
+      if (startedAtStr == null) continue;
+      final startedAt = DateTime.tryParse(startedAtStr);
+      if (startedAt == null) continue;
+
+      // Only greet sessions that started in the last 30 seconds.
+      if (now.difference(startedAt).inSeconds > 30) continue;
+
+      final childId = s['child_id'] as String?;
+      if (childId == null) continue;
+
+      final children =
+          ref.read(familyChildrenProvider).valueOrNull ?? const [];
+      final child = children.cast<Map<String, dynamic>?>().firstWhere(
+            (c) => c?['id'] == childId,
+            orElse: () => null,
+          );
+      if (child == null) continue;
+
+      return (
+        childName: child['name'] as String? ?? '',
+        favouriteHero: child['favourite_hero'] as String?,
+      );
+    }
+    return null;
+  }
+
+  void _onWelcomeDismissed(String sessionId) {
+    setState(() {
+      _welcomingSessionId = null;
+      _greetedSessionIds.add(sessionId);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(homeStateProvider);
     final activeSessions =
         ref.watch(activeSessionsProvider).valueOrNull ?? const [];
+
+    // Trigger welcome overlay for freshly-started sessions.
+    final greet = _welcomingSessionId == null
+        ? _freshSessionToGreet(activeSessions)
+        : null;
+    if (greet != null) {
+      // Defer to next frame so we don't call setState during build.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final freshId = activeSessions
+            .firstWhere((s) {
+              final startedAt = DateTime.tryParse(
+                (s['started_at'] as String?) ?? '',
+              );
+              return startedAt != null &&
+                  DateTime.now().difference(startedAt).inSeconds <= 30;
+            }, orElse: () => const <String, dynamic>{})['id']
+            ?.toString();
+        if (freshId != null && mounted && _welcomingSessionId == null) {
+          setState(() => _welcomingSessionId = freshId);
+        }
+      });
+    }
+
+    Widget body = state.when(
+      data: (s) {
+        if (activeSessions.isNotEmpty) {
+          return const MultiSessionHomeView();
+        }
+        return switch (s) {
+          HomeStateIdle() => const IdleHomeView(),
+          HomeStateInSession() => const MultiSessionHomeView(),
+          HomeStatePostSession(:final session) =>
+            PostSessionHomeView(session: session),
+        };
+      },
+      loading: () {
+        return const Center(child: CircularProgressIndicator());
+      },
+      error: (e, st) {
+        debugPrint('[E-HOME] homeStateProvider error: $e');
+        debugPrint('[E-HOME] stack: $st');
+        return FriendlyErrorScreen(
+          code: 'E-HOME',
+          userMessage: "Couldn't load home",
+          technicalDetails: e.toString(),
+        );
+      },
+    );
+
+    // Layer welcome overlay on top when a fresh session is detected.
+    if (_welcomingSessionId != null && greet != null) {
+      body = Stack(
+        children: [
+          body,
+          Positioned.fill(
+            child: SessionWelcomeOverlay(
+              childName: greet.childName,
+              favouriteHero: greet.favouriteHero,
+              onDismissed: () => _onWelcomeDismissed(_welcomingSessionId!),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: const HomeAppBar(),
-      body: state.when(
-        data: (s) {
-          // If the family has any open sessions (one or many), use the
-          // multi-session view that stacks cards + still surfaces idle
-          // features (wallet, Start playing for siblings).
-          if (activeSessions.isNotEmpty) {
-            return const MultiSessionHomeView();
-          }
-          return switch (s) {
-            HomeStateIdle() => const IdleHomeView(),
-            HomeStateInSession() => const MultiSessionHomeView(),
-            HomeStatePostSession(:final session) =>
-              PostSessionHomeView(session: session),
-          };
-        },
-        loading: () {
-          return const Center(child: CircularProgressIndicator());
-        },
-        error: (e, st) {
-          // BUG-033 diagnostic: surface the actual error so we can see
-          // what's failing instead of just "E-HOME". Console + UI.
-          debugPrint('[E-HOME] homeStateProvider error: $e');
-          debugPrint('[E-HOME] stack: $st');
-          return FriendlyErrorScreen(
-            code: 'E-HOME',
-            userMessage: "Couldn't load home",
-            technicalDetails: e.toString(),
-          );
-        },
-      ),
+      body: body,
     );
   }
 }
