@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
 /// Inline 2×2 hero picker reused by Add child + Edit child screens.
-/// Single source of truth for the hero metadata is here; if you change
-/// names or icons, update this list (the onboarding flow has its own
-/// copy intentionally — that one's about brand storytelling, this one's
-/// about quick selection).
+/// Shows the actual hero character images (from onboarding assets) so the
+/// parent sees the real face their kid will adventure with.
 class HeroPicker extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onChanged;
@@ -20,13 +17,13 @@ class HeroPicker extends StatelessWidget {
 
   static const _heroes = [
     _Hero('rafi', 'Rafi', 'Brave', AppColors.rafiCoral,
-        PhosphorIconsFill.shieldStar),
+        'assets/hero/rafi.png'),
     _Hero('ellie', 'Ellie', 'Kind', AppColors.ellieBlue,
-        PhosphorIconsFill.heart),
+        'assets/hero/ellie.png'),
     _Hero('gerry', 'Gerry', 'Curious', AppColors.gerryAmber,
-        PhosphorIconsFill.magnifyingGlass),
+        'assets/hero/gerry.png'),
     _Hero('zena', 'Zena', 'Creative', AppColors.zenaGreen,
-        PhosphorIconsFill.palette),
+        'assets/hero/zena.png'),
   ];
 
   @override
@@ -55,8 +52,8 @@ class _Hero {
   final String name;
   final String trait;
   final Color color;
-  final IconData icon;
-  const _Hero(this.id, this.name, this.trait, this.color, this.icon);
+  final String imagePath;
+  const _Hero(this.id, this.name, this.trait, this.color, this.imagePath);
 }
 
 class _HeroTile extends StatelessWidget {
@@ -89,14 +86,25 @@ class _HeroTile extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: hero.color.withValues(alpha: 0.18),
               ),
-              child: Icon(hero.icon, color: hero.color, size: 22),
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Image.asset(
+                  hero.imagePath,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Icon(
+                    Icons.face,
+                    color: hero.color,
+                    size: 22,
+                  ),
+                ),
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
