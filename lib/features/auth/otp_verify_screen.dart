@@ -87,7 +87,11 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
 
   void _clearBoxes() {
     _controller.clear();
-    _focusNode.requestFocus();
+    // Delay focus request so Android's IME re-attaches reliably
+    // after the keyboard was dismissed during verification.
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) _focusNode.requestFocus();
+    });
   }
 
   Future<void> _verify() async {
@@ -395,7 +399,11 @@ class _OtpBoxesState extends State<_OtpBoxes> {
     widget.controller.addListener(_onTextChanged);
     widget.focusNode.addListener(_onFocusChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) widget.focusNode.requestFocus();
+      // Small delay so Android's IME attaches reliably after
+      // the screen transition animation settles.
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) widget.focusNode.requestFocus();
+      });
     });
   }
 
@@ -442,6 +450,7 @@ class _OtpBoxesState extends State<_OtpBoxes> {
                 child: TextField(
                   controller: widget.controller,
                   focusNode: widget.focusNode,
+                  autofocus: true,
                   enabled: !widget.isVerifying,
                   keyboardType: TextInputType.number,
                   textAlign: TextAlign.center,

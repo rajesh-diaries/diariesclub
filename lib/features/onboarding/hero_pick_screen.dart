@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers/current_family_provider.dart';
@@ -29,10 +29,10 @@ class _HeroPickScreenState extends ConsumerState<HeroPickScreen> {
   String? _errorText;
 
   static const _heroes = <_Hero>[
-    _Hero('rafi', 'Rafi', 'Brave', AppColors.rafiCoral, PhosphorIconsFill.shieldStar),
-    _Hero('ellie', 'Ellie', 'Kind', AppColors.ellieBlue, PhosphorIconsFill.heart),
-    _Hero('gerry', 'Gerry', 'Curious', AppColors.gerryAmber, PhosphorIconsFill.magnifyingGlass),
-    _Hero('zena', 'Zena', 'Creative', AppColors.zenaGreen, PhosphorIconsFill.palette),
+    _Hero('rafi', 'Rafi', 'Brave', AppColors.rafiCoral, 'assets/hero/rafi.png'),
+    _Hero('ellie', 'Ellie', 'Kind', AppColors.ellieBlue, 'assets/hero/ellie.png'),
+    _Hero('gerry', 'Gerry', 'Curious', AppColors.gerryAmber, 'assets/hero/gerry.png'),
+    _Hero('zena', 'Zena', 'Creative', AppColors.zenaGreen, 'assets/hero/zena.png'),
   ];
 
   Future<void> _submit() async {
@@ -161,8 +161,8 @@ class _Hero {
   final String name;
   final String trait;
   final Color color;
-  final IconData icon;
-  const _Hero(this.id, this.name, this.trait, this.color, this.icon);
+  final String imagePath;
+  const _Hero(this.id, this.name, this.trait, this.color, this.imagePath);
 }
 
 class _HeroCard extends StatelessWidget {
@@ -206,7 +206,14 @@ class _HeroCard extends StatelessWidget {
                     color: hero.color.withValues(alpha: 0.20),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(hero.icon, color: hero.color, size: 40),
+                  clipBehavior: Clip.antiAlias,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Image.asset(
+                      hero.imagePath,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(hero.name, style: AppTextStyles.h3(context)),

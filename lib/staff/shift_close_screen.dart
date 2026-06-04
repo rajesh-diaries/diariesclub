@@ -40,6 +40,13 @@ class _ShiftCloseScreenState extends ConsumerState<ShiftCloseScreen> {
     _loadSummary();
   }
 
+  @override
+  void dispose() {
+    _countedCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadSummary() async {
     final venueId = ref.read(currentTabletVenueIdProvider);
     if (venueId == null) return;

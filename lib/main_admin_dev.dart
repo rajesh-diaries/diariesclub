@@ -24,8 +24,6 @@ void main() async {
     // Admin web doesn't take payments → no Razorpay key needed.
     razorpayKeyId: 'rzp_test_placeholder',
     razorpayMode: RazorpayMode.mock,
-    sentryDsn: String.fromEnvironment('SENTRY_DSN'),
-    sentryEnabled: false,
     otpMode: OtpMode.mock,
   );
   assertSafeRazorpayKeys(F);

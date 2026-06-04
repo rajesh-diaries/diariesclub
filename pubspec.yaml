@@ -1,7 +1,7 @@
 name: diaries_club
 description: "Diaries Club — Premium kids play area app"
 publish_to: none
-version: 1.0.0+2
+version: 1.0.1+6
 
 environment:
   sdk: '>=3.11.0 <4.0.0'
@@ -28,7 +28,7 @@ dependencies:
 
   # Animations
   rive: ^0.13.0
-  lottie: ^3.1.0
+  lottie: ^3.3.3
 
   # Fonts and icons
   google_fonts: ^6.2.1
@@ -64,8 +64,8 @@ dependencies:
   firebase_messaging: ^15.1.1
   flutter_local_notifications: ^17.1.2
 
-  # Crash reporting — bumped from spec's 8.5 to 9.x for Kotlin 1.8+ compat
-  sentry_flutter: ^9.0.0
+  # No third-party crash-reporting SDK — Privacy Policy §2.1 commits to
+  # this. Native iOS / Android crash logs remain the only error surface.
 
   # Deep links arrive via FCM `data.deep_link` payloads — see
   # lib/core/notifications/fcm_setup.dart. No Branch / Firebase Dynamic
@@ -76,6 +76,8 @@ dependencies:
   freezed_annotation: ^2.4.1
   json_annotation: ^4.9.0
   screen_brightness: ^2.1.7
+  flutter_animate: ^4.5.2
+  confetti: ^0.8.0
 
 dev_dependencies:
   flutter_test:

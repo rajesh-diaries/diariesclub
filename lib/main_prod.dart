@@ -10,8 +10,6 @@ void main() async {
     razorpayMode: razorpayModeFrom(
       const String.fromEnvironment('RAZORPAY_MODE', defaultValue: 'live'),
     ),
-    sentryDsn: const String.fromEnvironment('SENTRY_DSN'),
-    sentryEnabled: true,
     otpMode: otpModeFrom(
       const String.fromEnvironment('OTP_MODE', defaultValue: 'real'),
     ),

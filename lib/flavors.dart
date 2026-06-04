@@ -34,8 +34,6 @@ class FlavorConfig {
   final String supabaseAnonKey;
   final String razorpayKeyId; // TEST keys for dev/staging; LIVE only for prod
   final RazorpayMode razorpayMode;
-  final String sentryDsn;
-  final bool sentryEnabled;
   final OtpMode otpMode;
 
   const FlavorConfig({
@@ -44,8 +42,6 @@ class FlavorConfig {
     required this.supabaseAnonKey,
     required this.razorpayKeyId,
     required this.razorpayMode,
-    required this.sentryDsn,
-    required this.sentryEnabled,
     required this.otpMode,
   });
 

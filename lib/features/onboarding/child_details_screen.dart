@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -27,9 +28,11 @@ class ChildDetailsScreen extends ConsumerStatefulWidget {
 class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
+  final _dobController = TextEditingController();
   DateTime? _dob;
   bool _isLoading = false;
   String? _errorText;
+  String? _dobError;
 
   @override
   void initState() {
@@ -51,11 +54,14 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
           .eq('id', childId)
           .maybeSingle();
       if (row == null || !mounted) return;
+      final prefilledDob = DateTime.tryParse((row['dob'] as String?) ?? '');
       setState(() {
         _nameController.text = (row['name'] as String?) ?? '';
         _addressController.text = (row['delivery_address'] as String?) ?? '';
-        final dobStr = row['dob'] as String?;
-        if (dobStr != null) _dob = DateTime.tryParse(dobStr);
+        _dob = prefilledDob;
+        if (prefilledDob != null) {
+          _dobController.text = DateFormat('dd/MM/yyyy').format(prefilledDob);
+        }
       });
     } catch (_) {
       // Non-fatal — user will just see blank fields, same as today.
@@ -66,11 +72,68 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
   void dispose() {
     _nameController.dispose();
     _addressController.dispose();
+    _dobController.dispose();
     super.dispose();
   }
 
   bool get _canSubmit =>
-      _nameController.text.trim().isNotEmpty && _dob != null && !_isLoading;
+      _nameController.text.trim().isNotEmpty && _dob != null && _dobError == null && !_isLoading;
+
+  void _onDobChanged(String value) {
+    if (value.length != 10) {
+      setState(() {
+        _dob = null;
+        _dobError = null;
+      });
+      return;
+    }
+    final parts = value.split('/');
+    if (parts.length != 3) {
+      setState(() {
+        _dob = null;
+        _dobError = 'Use DD/MM/YYYY format';
+      });
+      return;
+    }
+    final day = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
+    if (day == null || month == null || year == null) {
+      setState(() {
+        _dob = null;
+        _dobError = 'Invalid date';
+      });
+      return;
+    }
+    final parsed = DateTime.tryParse('$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}');
+    if (parsed == null || parsed.day != day || parsed.month != month) {
+      setState(() {
+        _dob = null;
+        _dobError = 'That date does not exist';
+      });
+      return;
+    }
+    final today = DateTime.now();
+    final minDob = today.subtract(const Duration(days: 14 * 365));
+    if (parsed.isAfter(today)) {
+      setState(() {
+        _dob = null;
+        _dobError = 'Date cannot be in the future';
+      });
+      return;
+    }
+    if (parsed.isBefore(minDob)) {
+      setState(() {
+        _dob = null;
+        _dobError = 'Child must be under 14 years';
+      });
+      return;
+    }
+    setState(() {
+      _dob = parsed;
+      _dobError = null;
+    });
+  }
 
   Future<void> _pickDob() async {
     final today = DateTime.now();
@@ -83,7 +146,11 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
       helpText: "Pick your child's date of birth",
     );
     if (picked != null) {
-      setState(() => _dob = picked);
+      setState(() {
+        _dob = picked;
+        _dobController.text = DateFormat('dd/MM/yyyy').format(picked);
+        _dobError = null;
+      });
     }
   }
 
@@ -155,10 +222,6 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dobText = _dob == null
-        ? 'Pick a date'
-        : DateFormat('dd MMM yyyy').format(_dob!);
-
     return Scaffold(
       appBar: AppBar(
         title: const ProgressDots(currentStep: 3),
@@ -196,19 +259,26 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
                 style: AppTextStyles.body(context),
               ),
               const SizedBox(height: 16),
-              InkWell(
-                onTap: _pickDob,
-                borderRadius: BorderRadius.circular(12),
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: 'Date of birth',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    suffixIcon: const Icon(Icons.calendar_today, size: 20),
+              TextField(
+                controller: _dobController,
+                keyboardType: TextInputType.number,
+                maxLength: 10,
+                onChanged: _onDobChanged,
+                inputFormatters: [_DobInputFormatter()],
+                decoration: InputDecoration(
+                  labelText: 'Date of birth (DD/MM/YYYY)',
+                  hintText: '12/05/2020',
+                  counterText: '',
+                  errorText: _dobError,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(dobText, style: AppTextStyles.body(context)),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.calendar_today, size: 20),
+                    onPressed: _pickDob,
+                  ),
                 ),
+                style: AppTextStyles.body(context),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -248,5 +318,28 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Formats typed digits into DD/MM/YYYY. Only allows numbers; auto-inserts
+/// slashes after the day and month segments. Backspace works naturally.
+class _DobInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final raw = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final buffer = StringBuffer();
+    for (var i = 0; i < raw.length; i++) {
+      if (i == 2 || i == 4) buffer.write('/');
+      buffer.write(raw[i]);
+    }
+    final formatted = buffer.toString();
+    // Keep cursor at the end unless user is deleting.
+    final selection = newValue.selection.baseOffset > oldValue.selection.baseOffset
+        ? TextSelection.collapsed(offset: formatted.length)
+        : newValue.selection;
+    return TextEditingValue(text: formatted, selection: selection);
   }
 }

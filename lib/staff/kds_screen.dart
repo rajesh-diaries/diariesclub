@@ -5,7 +5,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
+import '../core/utils/currency.dart';
 import 'providers/venue_streams_provider.dart';
+import 'widgets/customer_summary_sheet.dart';
 
 /// Kitchen Display System. Three tabs (Pending / Preparing / Ready). Each
 /// card shows the order's items + age; the primary action advances status
@@ -103,6 +105,10 @@ class _OrderCardState extends ConsumerState<_OrderCard> {
   bool _busy = false;
   List<Map<String, dynamic>>? _items;
   Map<String, dynamic>? _family;
+  // Cached food-spend totals from staff_customer_summary. Loaded once
+  // per card lifetime; refreshes when the customer taps the ⓘ chip
+  // because the sheet itself re-queries.
+  int? _lifetimeFoodPaise;
 
   @override
   void initState() {
@@ -140,6 +146,28 @@ class _OrderCardState extends ConsumerState<_OrderCard> {
       // Walk-in / synthetic family — leave _family null; card shows
       // "Walk-in" as a fallback.
     }
+    // Best-effort lifetime-food spend for the card's inline stat. Same
+    // RPC the ⓘ chip uses — kitchen sees "Lifetime food: ₹X" without
+    // having to open the sheet.
+    try {
+      final raw = await Supabase.instance.client.rpc<dynamic>(
+        'staff_customer_summary',
+        params: {'p_family_id': familyId},
+      );
+      if (!mounted) return;
+      if (raw is Map) {
+        final paise = raw['food_spend_paise'];
+        setState(() => _lifetimeFoodPaise = paise is int ? paise : 0);
+      }
+    } catch (_) {
+      // Silent — card just won't show the lifetime food line.
+    }
+  }
+
+  void _openCustomerSheet() {
+    final familyId = widget.order['family_id'] as String?;
+    if (familyId == null) return;
+    CustomerSummarySheet.show<void>(context, familyId: familyId);
   }
 
   Future<void> _advance() async {
@@ -217,6 +245,9 @@ class _OrderCardState extends ConsumerState<_OrderCard> {
     final customerName = (_family?['name'] as String?) ?? 'Walk-in';
     final shortId = (o['id'] as String).substring(0, 4).toUpperCase();
     final mode = (o['fulfillment_mode'] as String?) ?? '';
+    final orderTotal = (o['total_paise'] as int?) ?? 0;
+    final hasFamily = (o['family_id'] as String?) != null;
+    final paymentMethod = (o['payment_method'] as String?) ?? '';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -240,28 +271,49 @@ class _OrderCardState extends ConsumerState<_OrderCard> {
                     // ID first + customer — two orders from the same
                     // family stay visually distinct ("#08CE Rajesh"
                     // vs "#7D67 Rajesh").
-                    RichText(
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      text: TextSpan(
-                        style: AppTextStyles.bodyLarge(context),
-                        children: [
-                          TextSpan(
-                            text: '#$shortId  ',
-                            style: const TextStyle(
-                              color: AppColors.navy,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'monospace',
+                    Row(
+                      children: [
+                        Flexible(
+                          child: RichText(
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            text: TextSpan(
+                              style: AppTextStyles.bodyLarge(context),
+                              children: [
+                                TextSpan(
+                                  text: '#$shortId  ',
+                                  style: const TextStyle(
+                                    color: AppColors.navy,
+                                    fontWeight: FontWeight.w900,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: customerName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          TextSpan(
-                            text: customerName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
+                        ),
+                        if (hasFamily) ...[
+                          const SizedBox(width: 6),
+                          InkWell(
+                            onTap: _openCustomerSheet,
+                            customBorder: const CircleBorder(),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(
+                                PhosphorIconsRegular.info,
+                                size: 16,
+                                color: AppColors.lightTextSecondary,
+                              ),
                             ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
                     Text(
                       _modeLabel(mode),
@@ -290,7 +342,12 @@ class _OrderCardState extends ConsumerState<_OrderCard> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          _KdsPaymentBadge(
+            paymentMethod: paymentMethod,
+            amountPaise: orderTotal,
+          ),
+          const SizedBox(height: 10),
           Expanded(
             child: _items == null
                 ? const Center(child: CircularProgressIndicator())
@@ -298,7 +355,37 @@ class _OrderCardState extends ConsumerState<_OrderCard> {
                     children: _renderItems(_items!, context),
                   ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+          // Inline spend stats — gives kitchen a sense of who this is
+          // without having to open the customer sheet for every order.
+          if (hasFamily)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.navy.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(PhosphorIconsRegular.receipt,
+                      size: 13, color: AppColors.lightTextSecondary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'This order ${Money.fromPaise(orderTotal)}'
+                      '${_lifetimeFoodPaise == null ? '' : '  ·  Lifetime ${Money.fromPaise(_lifetimeFoodPaise!)}'}',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
@@ -347,5 +434,57 @@ class _OrderCardState extends ConsumerState<_OrderCard> {
       }
     });
     return out;
+  }
+}
+
+/// Big at-a-glance "WALLET ₹X" (paid, green) vs "PAY AT VENUE ₹X" (gold,
+/// needs collection) row at the top of every KDS card so the kitchen
+/// instantly knows whether to chase cash from this table.
+class _KdsPaymentBadge extends StatelessWidget {
+  final String paymentMethod;
+  final int amountPaise;
+  const _KdsPaymentBadge({
+    required this.paymentMethod,
+    required this.amountPaise,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isCash = paymentMethod == 'cash' || paymentMethod == 'cash_walkin';
+    final color = isCash ? AppColors.gold : AppColors.fitGreen;
+    final label = isCash
+        ? 'PAY AT VENUE · ${Money.fromPaise(amountPaise)}'
+        : '${paymentMethod.toUpperCase()} ${Money.fromPaise(amountPaise)}';
+    final icon =
+        isCash ? PhosphorIconsFill.coins : PhosphorIconsFill.checkCircle;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

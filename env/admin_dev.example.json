@@ -1,10 +1,9 @@
 {
-  "_comment": "Admin web — dev flavor. No OTP/Razorpay/Branch. Sentry per-flavor project.",
+  "_comment": "Admin web \u2014 dev flavor. No OTP/Razorpay/Branch.",
   "SUPABASE_URL": "https://<your-project-ref>.supabase.co",
   "SUPABASE_ANON_KEY": "<anon-key-from-Supabase-dashboard>",
   "RAZORPAY_KEY_ID": "",
   "RAZORPAY_MODE": "mock",
-  "SENTRY_DSN": "<admin-app-sentry-dsn>",
   "OTP_MODE": "mock",
   "ENV": "admin_dev",
   "ADMIN_WEB": "true"

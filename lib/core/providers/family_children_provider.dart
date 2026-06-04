@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../bootstrap.dart' show registerChildNamesForScrub;
 import 'auth_provider.dart';
 
 /// Realtime stream of the current family's *live* (non-archived) children.
@@ -28,19 +27,10 @@ List<Map<String, dynamic>> _dedupeLive(List<dynamic> rows) {
   return out;
 }
 
-List<Map<String, dynamic>> _registerAndReturn(List<Map<String, dynamic>> rows) {
-  registerChildNamesForScrub(
-    rows.map((c) => (c['name'] as String?) ?? '').where((n) => n.isNotEmpty),
-  );
-  return rows;
-}
-
 final familyChildrenProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) async* {
   final familyId = ref.watch(currentFamilyIdProvider);
   if (familyId == null) {
-    // Sign-out — clear the Sentry scrub registry.
-    registerChildNamesForScrub(const []);
     yield const [];
     return;
   }
@@ -54,7 +44,7 @@ final familyChildrenProvider =
       .select()
       .eq('family_id', familyId)
       .order('created_at', ascending: true);
-  yield _registerAndReturn(_dedupeLive(initialRows as List));
+  yield _dedupeLive(initialRows as List);
 
   // Best-effort Realtime subscription for live updates.
   try {
@@ -65,7 +55,7 @@ final familyChildrenProvider =
         .order('created_at', ascending: true);
 
     await for (final rows in stream) {
-      yield _registerAndReturn(_dedupeLive(rows));
+      yield _dedupeLive(rows);
     }
   } catch (e) {
     // ignore: avoid_print

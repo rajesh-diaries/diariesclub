@@ -7,6 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
+import '../core/utils/currency.dart';
+import 'widgets/customer_summary_sheet.dart';
 import 'widgets/staff_pin_sheet.dart';
 
 /// Workshops list for the staff app. Two screens:
@@ -230,8 +232,18 @@ class _RegistrationRowState extends State<_RegistrationRow> {
     final ageLabel = dob == null
         ? ''
         : '${(DateTime.now().difference(dob).inDays / 365).floor()}y';
+    final paymentMethod = (r['payment_method'] as String?) ?? '';
+    final amountPaise = (r['amount_paise'] as int?) ?? 0;
+    final familyId = r['family_id'] as String?;
+    final familyPhone = (r['family_phone'] as String?) ?? '';
 
     return ListTile(
+      onTap: familyId == null
+          ? null
+          : () => CustomerSummarySheet.show<void>(
+                context,
+                familyId: familyId,
+              ),
       leading: CircleAvatar(
         backgroundColor: (attended ? AppColors.activeGreen : AppColors.navy)
             .withValues(alpha: 0.15),
@@ -252,14 +264,35 @@ class _RegistrationRowState extends State<_RegistrationRow> {
       ),
       subtitle: cancelled
           ? const Text('Cancelled')
-          : Text(
-              attended ? 'Attended · XP credited' : 'Not marked yet',
-              style: AppTextStyles.caption(
-                context,
-                color: attended
-                    ? AppColors.activeGreen
-                    : AppColors.lightTextSecondary,
-              ),
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  attended ? 'Attended · XP credited' : 'Not marked yet',
+                  style: AppTextStyles.caption(
+                    context,
+                    color: attended
+                        ? AppColors.activeGreen
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _PaymentBadge(
+                  paymentMethod: paymentMethod,
+                  amountPaise: amountPaise,
+                  unpaidContext: !attended,
+                ),
+                if (paymentMethod == 'cash' && familyPhone.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    familyPhone,
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    ),
+                  ),
+                ],
+              ],
             ),
       trailing: cancelled
           ? null
@@ -319,5 +352,60 @@ class _RegistrationRowState extends State<_RegistrationRow> {
       );
       setState(() => _busy = false);
     }
+  }
+}
+
+/// At-a-glance payment status. Gold "PAY AT VENUE ₹X" when the customer
+/// chose cash and hasn't been marked attended yet (= staff still needs
+/// to collect). Green "PAID" otherwise.
+class _PaymentBadge extends StatelessWidget {
+  final String paymentMethod;
+  final int amountPaise;
+  final bool unpaidContext;
+  const _PaymentBadge({
+    required this.paymentMethod,
+    required this.amountPaise,
+    required this.unpaidContext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isCash = paymentMethod == 'cash';
+    final color = isCash && unpaidContext
+        ? AppColors.gold
+        : AppColors.activeGreen;
+    final label = isCash
+        ? (unpaidContext
+            ? 'PAY AT VENUE · ${Money.fromPaise(amountPaise)}'
+            : 'CASH ${Money.fromPaise(amountPaise)}')
+        : '${paymentMethod.toUpperCase()} · ${Money.fromPaise(amountPaise)}';
+    final icon = isCash && unpaidContext
+        ? PhosphorIconsFill.coins
+        : PhosphorIconsFill.checkCircle;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

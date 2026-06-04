@@ -85,6 +85,17 @@ class BirthdayCardList extends ConsumerWidget {
             daysSincePartySlot =
                 DateTime.now().difference(slotDate).inDays;
           }
+        } else {
+          // Fallback: if slot_date is missing, use updated_at so completed
+          // reservations still hide after the post-party window.
+          final updatedAtStr = activeReservation['updated_at'] as String?;
+          if (updatedAtStr != null) {
+            final updatedAt = DateTime.tryParse(updatedAtStr);
+            if (updatedAt != null) {
+              daysSincePartySlot =
+                  DateTime.now().difference(updatedAt).inDays;
+            }
+          }
         }
 
         final variant = _resolveActiveVariant(
@@ -161,8 +172,9 @@ class BirthdayCardList extends ConsumerWidget {
     return switch (status) {
       'interested' => _Variant.interestSubmitted,
       'admin_contacted' => _Variant.adminContacted,
-      'confirmed' =>
-        daysUntil <= 1 ? _Variant.tomorrow : _Variant.confirmed,
+      'confirmed' => daysSincePartySlot > 0
+          ? _Variant.hidden
+          : (daysUntil <= 1 ? _Variant.tomorrow : _Variant.confirmed),
       'completed' => _Variant.thanksForCelebrating,
       _ => _Variant.hidden,
     };

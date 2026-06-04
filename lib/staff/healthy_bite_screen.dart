@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,7 +10,17 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
 import 'providers/staff_auth_provider.dart';
 import 'providers/venue_streams_provider.dart';
+import 'widgets/customer_summary_sheet.dart';
 import 'widgets/staff_pin_sheet.dart';
+
+void _openHealthyBiteCustomerSheet(
+  BuildContext context,
+  Map<String, dynamic> session,
+) {
+  final familyId = session['family_id'] as String?;
+  if (familyId == null) return;
+  CustomerSummarySheet.show<void>(context, familyId: familyId);
+}
 
 /// Healthy Bite decisions for the staff at this venue.
 ///
@@ -84,12 +96,44 @@ class HealthyBiteScreen extends ConsumerWidget {
 //  Pending tab — give / didn't-give decisions
 // =========================================================================
 
-class _PendingTab extends ConsumerWidget {
+class _PendingTab extends ConsumerStatefulWidget {
   final VoidCallback onBack;
   const _PendingTab({required this.onBack});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PendingTab> createState() => _PendingTabState();
+}
+
+class _PendingTabState extends ConsumerState<_PendingTab> {
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    // venuePendingHealthyBitesProvider is a one-shot FutureProvider — it
+    // doesn't auto-update when a new session starts mid-tab-view. Poll
+    // every 20s so the founder doesn't have to manually refresh after
+    // every QR scan downstairs. Cheap query, tiny payload.
+    _poll = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted) return;
+      ref.invalidate(venuePendingHealthyBitesProvider);
+    });
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Also kick the pending list whenever the active-sessions stream
+    // ticks — covers the "QR just scanned" case in <1s instead of waiting
+    // for the next 20s poll tick.
+    ref.listen(venueActiveSessionsProvider, (_, __) {
+      ref.invalidate(venuePendingHealthyBitesProvider);
+    });
     final async = ref.watch(venuePendingHealthyBitesProvider);
     final venueId = ref.watch(currentTabletVenueIdProvider);
 
@@ -98,7 +142,7 @@ class _PendingTab extends ConsumerWidget {
       error: (e, _) => _ErrorView(
         e: '$e',
         onRetry: () => ref.invalidate(venuePendingHealthyBitesProvider),
-        onBack: onBack,
+        onBack: widget.onBack,
       ),
       data: (rows) {
         if (rows.isEmpty) {
@@ -109,7 +153,7 @@ class _PendingTab extends ConsumerWidget {
                 'Active sessions + completed-but-undecided sessions in the '
                 'last 4 hours appear here. Tap refresh to check.',
             venueId: venueId,
-            onBack: onBack,
+            onBack: widget.onBack,
           );
         }
 
@@ -254,6 +298,7 @@ class _ActiveSessionTile extends StatelessWidget {
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        onTap: () => _openHealthyBiteCustomerSheet(context, session),
         leading: CircleAvatar(
           backgroundColor: earned
               ? AppColors.fitGreen.withValues(alpha: 0.85)
@@ -371,6 +416,7 @@ class _GivenTile extends StatelessWidget {
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        onTap: () => _openHealthyBiteCustomerSheet(context, session),
         leading: const CircleAvatar(
           backgroundColor: AppColors.fitGreen,
           child: Icon(
@@ -630,6 +676,7 @@ class _DecisionTileState extends ConsumerState<_DecisionTile> {
           ListTile(
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            onTap: () => _openHealthyBiteCustomerSheet(context, s),
             leading: const CircleAvatar(
               backgroundColor: AppColors.gold,
               child: Icon(PhosphorIconsFill.carrot, color: Colors.white),

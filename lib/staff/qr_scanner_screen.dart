@@ -64,17 +64,33 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
     } on PostgrestException catch (e) {
       if (!mounted) return;
       final msg = e.message;
-      setState(() {
-        _errorText = msg.contains('qr_already_scanned')
-            ? 'QR already scanned earlier.'
-            : msg.contains('session_not_active')
-                ? 'Session is not active.'
-                : msg.contains('session_not_found')
-                    ? 'Session not found.'
-                    : msg.contains('qr_payload_invalid')
-                        ? 'QR not recognised.'
-                        : 'Scan failed.';
-      });
+      // Map every exception the qr_scan_validate RPC can raise. The
+      // catch-all at the bottom surfaces the real server message instead
+      // of a generic "Scan failed." so unknown failures are debuggable
+      // from the floor instead of opaque.
+      String friendly;
+      if (msg.contains('qr_already_scanned')) {
+        friendly = 'QR already scanned earlier.';
+      } else if (msg.contains('session_not_active')) {
+        friendly = 'Session is not active.';
+      } else if (msg.contains('session_not_found')) {
+        friendly = 'Session not found.';
+      } else if (msg.contains('qr_payload_invalid')) {
+        friendly = 'Not a Diaries QR.';
+      } else if (msg.contains('session_wrong_venue')) {
+        friendly = 'QR belongs to a different venue.';
+      } else if (msg.contains('family_deleted')) {
+        friendly = 'Family account is closed.';
+      } else if (msg.contains('tablet_not_authorised')) {
+        friendly = 'This phone is no longer registered. Sign in again.';
+      } else if (msg.contains('staff_not_authorised')) {
+        friendly = 'Staff PIN no longer active.';
+      } else if (msg.contains('venue_config_not_found')) {
+        friendly = 'Venue config missing — contact admin.';
+      } else {
+        friendly = msg.isEmpty ? 'Scan failed.' : 'Scan failed: $msg';
+      }
+      setState(() => _errorText = friendly);
       await Future<void>.delayed(const Duration(milliseconds: 1500));
       if (!mounted) return;
       setState(() => _busy = false);

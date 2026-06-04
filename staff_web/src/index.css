@@ -1,0 +1,135 @@
+@import 'tailwindcss';
+
+/* ── Play Diaries Staff · design tokens ─────────────────────────────
+   Dark, premium, high-contrast. Built for thumbs on a phone during a
+   busy shift: big tap targets, calm surfaces, decisive accent colour.   */
+@theme {
+  --color-ink: #0a0e1a; /* app background */
+  --color-surface: #131a2a; /* cards */
+  --color-surface-2: #1c2538; /* raised / inputs */
+  --color-line: #273149; /* hairline borders */
+
+  --color-text: #f1f5f9;
+  --color-dim: #94a3b8; /* secondary text */
+  --color-faint: #5b6781; /* tertiary text */
+
+  --color-primary: #4f7cff; /* primary actions */
+  --color-primary-press: #3f68e6;
+  --color-gold: #ffc24b; /* brand spark / coins */
+  --color-active: #34d399; /* live / success */
+  --color-grace: #fbbf24; /* overage warning */
+  --color-danger: #f87171; /* destructive */
+
+  --color-rafi: #ff7a66; /* hero accents (brave) */
+  --color-ellie: #5cc8ff; /* kind */
+  --color-gerry: #ffce5c; /* curious */
+  --color-zena: #6ee7a8; /* creative */
+
+  --radius-xl: 1.25rem;
+  --font-sans: -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui,
+    'Segoe UI', Roboto, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+input,
+textarea {
+  user-select: text;
+}
+
+/* Subtle aurora glow behind the app for depth */
+#root {
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(79, 124, 255, 0.16), transparent 60%),
+    radial-gradient(90% 50% at 100% 0%, rgba(255, 194, 75, 0.06), transparent 55%);
+  background-attachment: fixed;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  scrollbar-width: none;
+}
+
+@keyframes pdpop {
+  0% {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes pdrise {
+  0% {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes pdpulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes pdsheet {
+  0% {
+    transform: translateY(100%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+@keyframes pdspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-pop {
+  animation: pdpop 0.18s ease-out both;
+}
+.animate-rise {
+  animation: pdrise 0.28s ease-out both;
+}
+.animate-sheet {
+  animation: pdsheet 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.live-dot {
+  animation: pdpulse 1.6s ease-in-out infinite;
+}
+.spin {
+  animation: pdspin 0.7s linear infinite;
+}
+
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top), 0.5rem);
+}
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+}

@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
 import 'providers/venue_streams_provider.dart';
+import 'widgets/customer_summary_sheet.dart';
 import 'widgets/staff_pin_sheet.dart';
 
 /// Realtime list of all sessions at this venue in active or grace state.
@@ -190,9 +191,9 @@ class _SessionTile extends ConsumerWidget {
       }
     }
 
+    final familyId = session['family_id'] as String?;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isGrace
             ? AppColors.warningYellow.withValues(alpha: 0.10)
@@ -203,9 +204,20 @@ class _SessionTile extends ConsumerWidget {
         ),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      // Whole tile is tappable to open the customer summary sheet. The
+      // inline action buttons below (Extend / Healthy Bite / Force close)
+      // intercept their own taps so InkWell only fires when the user taps
+      // the body, header, or meta lines.
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: familyId == null
+            ? null
+            : () => _openCustomerSheet(context, ref, familyId),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -213,11 +225,26 @@ class _SessionTile extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      kidName,
-                      style: AppTextStyles.bodyLarge(context).copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            kidName,
+                            style: AppTextStyles.bodyLarge(context).copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        if (familyId != null)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: Icon(
+                              PhosphorIconsRegular.info,
+                              size: 16,
+                              color: AppColors.lightTextSecondary,
+                            ),
+                          ),
+                      ],
                     ),
                     Text(
                       'Guardian: $guardianName',
@@ -228,6 +255,7 @@ class _SessionTile extends ConsumerWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 _remainingLabel(remaining, isGrace: isGrace),
                 style: AppTextStyles.bodyLarge(
@@ -337,9 +365,44 @@ class _SessionTile extends ConsumerWidget {
               ),
             ],
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  Future<void> _openCustomerSheet(
+    BuildContext context,
+    WidgetRef ref,
+    String familyId,
+  ) async {
+    final action = await CustomerSummarySheet.show<String>(
+      context,
+      familyId: familyId,
+      actions: [
+        const CustomerSheetAction<String>(
+          label: 'Extend +60m',
+          icon: PhosphorIconsRegular.plusCircle,
+          value: 'extend_60',
+        ),
+        const CustomerSheetAction<String>(
+          label: 'Force close',
+          icon: PhosphorIconsRegular.xCircle,
+          value: 'force_close',
+          destructive: true,
+        ),
+      ],
+    );
+    if (action == null || !context.mounted) return;
+    switch (action) {
+      case 'extend_60':
+        await _extend(context, ref, 60);
+        break;
+      case 'force_close':
+        await _forceClose(context, ref);
+        break;
+    }
   }
 
   static String _hhmm(DateTime dt) {

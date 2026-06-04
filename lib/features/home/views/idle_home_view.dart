@@ -3,11 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/current_family_provider.dart';
 import '../../../core/providers/referral_eligibility_provider.dart';
-import '../../../core/providers/upcoming_pre_bookings_provider.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../widgets/announcements_feed.dart';
 import '../widgets/big_start_session_card.dart';
-import '../widgets/start_session_card.dart';
 import '../widgets/birthday_card.dart';
 import '../widgets/home_combos_strip.dart';
 import '../widgets/live_orders_card.dart';
@@ -15,7 +13,6 @@ import '../widgets/my_upcoming_workshops.dart';
 import '../widgets/pending_reflections_section.dart';
 import '../widgets/recent_activity_list.dart';
 import '../widgets/referral_entry_card.dart';
-import '../widgets/session_launchpad_card.dart';
 
 /// "No active session" state. Greeting + wallet + start CTA + birthday +
 /// soft prompts + recent activity. Most users land here on every cold open.
@@ -48,12 +45,11 @@ class IdleHomeBody extends ConsumerWidget {
         .watch(referralRedeemEligibleProvider)
         .maybeWhen(data: (v) => v, orElse: () => false);
 
-    final upcomingPreBookings = ref.watch(upcomingPreBookingsProvider);
-    final nextPreBooking = upcomingPreBookings.valueOrNull?.firstOrNull;
-
-    // Order: greeting → launchpad (if booked) OR big start card → combos →
-    // birthday → workshops → announcements → activity. Sections that have
-    // nothing to show return SizedBox.shrink so they don't leave gaps.
+    // Order: greeting → big "Shall we start a session?" card (always
+    // pinned at top so the primary CTA is the first thing below the
+    // greeting) → combos → birthday → workshops → announcements →
+    // activity. Sections that have nothing to show return
+    // SizedBox.shrink so they don't leave phantom gaps.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -66,16 +62,7 @@ class IdleHomeBody extends ConsumerWidget {
         const SizedBox(height: 4),
         Text('Ready for adventure?', style: AppTextStyles.body(context)),
         const SizedBox(height: 20),
-        if (nextPreBooking != null) ...[
-          SessionLaunchpadCard(preBooking: nextPreBooking),
-          const SizedBox(height: 16),
-          // When a launchpad is visible, demote the start card to a compact
-          // outline so the parent can still start an impromptu session for
-          // a sibling without leaving the screen.
-          const StartSessionCard(),
-        ] else ...[
-          const BigStartSessionCard(),
-        ],
+        const BigStartSessionCard(),
         // Live orders the parent placed during a session that just
         // ended — show them above reflections so they can track the
         // kitchen without losing the cards behind a finished session.

@@ -131,11 +131,6 @@ PODS:
   - SDWebImage (5.21.7):
     - SDWebImage/Core (= 5.21.7)
   - SDWebImage/Core (5.21.7)
-  - Sentry/HybridSDK (8.58.1)
-  - sentry_flutter (9.19.0):
-    - Flutter
-    - FlutterMacOS
-    - Sentry/HybridSDK (= 8.58.1)
   - share_plus (0.0.1):
     - Flutter
   - shared_preferences_foundation (0.0.1):
@@ -167,7 +162,6 @@ DEPENDENCIES:
   - razorpay_flutter (from `.symlinks/plugins/razorpay_flutter/ios`)
   - rive_common (from `.symlinks/plugins/rive_common/ios`)
   - screen_brightness_ios (from `.symlinks/plugins/screen_brightness_ios/ios`)
-  - sentry_flutter (from `.symlinks/plugins/sentry_flutter/ios`)
   - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
@@ -190,7 +184,6 @@ SPEC REPOS:
     - razorpay-core-pod
     - razorpay-pod
     - SDWebImage
-    - Sentry
     - SwiftyGif
 
 EXTERNAL SOURCES:
@@ -226,8 +219,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/rive_common/ios"
   screen_brightness_ios:
     :path: ".symlinks/plugins/screen_brightness_ios/ios"
-  sentry_flutter:
-    :path: ".symlinks/plugins/sentry_flutter/ios"
   share_plus:
     :path: ".symlinks/plugins/share_plus/ios"
   shared_preferences_foundation:
@@ -270,8 +261,6 @@ SPEC CHECKSUMS:
   rive_common: dd421daaf9ae69f0125aa761dd96abd278399952
   screen_brightness_ios: 9953fd7da5bd480f1a93990daeec2eb42d4f3b52
   SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
-  Sentry: 958d9619ceccf6abb8c4736003fa336dac1a80a7
-  sentry_flutter: bdfd7a7b8931c4ecefa37fde9e44a15cd0af30b1
   share_plus: 50da8cb520a8f0f65671c6c6a99b3617ed10a58a
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0

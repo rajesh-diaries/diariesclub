@@ -114,7 +114,6 @@ class _DeleteAccountScreenState
         await prefs.clear();
         await const FlutterSecureStorage().deleteAll();
       } catch (_) {
-        // TODO(session-12): replace with Sentry.captureException
         debugPrint('local wipe failed during account deletion');
       }
       await Supabase.instance.client.auth.signOut();
@@ -122,7 +121,6 @@ class _DeleteAccountScreenState
       if (!mounted) return;
       context.go('/farewell');
     } catch (e) {
-      // TODO(session-12): replace with Sentry.captureException
       debugPrint('family_anonymise failed: $e');
       if (!mounted) return;
       setState(() {

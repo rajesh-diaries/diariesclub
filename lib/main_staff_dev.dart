@@ -26,10 +26,24 @@ void main() async {
     DeviceOrientation.landscapeRight,
   ]);
 
+  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  // Fail fast with a useful message instead of letting Supabase boot with
+  // an empty URL — the symptom otherwise is "invalid arguments: no host
+  // specified in URL /auth/v1/token?grant_type=password" on first login,
+  // which doesn't point at the real cause (missing --dart-define-from-file).
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    throw StateError(
+      'Staff app launched without env/staff_dev.json. '
+      'Run via ./run_staff_dev_android.sh or pass '
+      '--dart-define-from-file=env/staff_dev.json to flutter run.',
+    );
+  }
+
   F = FlavorConfig(
     flavor: Flavor.staffDev,
-    supabaseUrl: const String.fromEnvironment('SUPABASE_URL'),
-    supabaseAnonKey: const String.fromEnvironment('SUPABASE_ANON_KEY'),
+    supabaseUrl: supabaseUrl,
+    supabaseAnonKey: supabaseAnonKey,
     razorpayKeyId: const String.fromEnvironment(
       'RAZORPAY_KEY_ID',
       defaultValue: 'rzp_test_placeholder',
@@ -37,8 +51,6 @@ void main() async {
     razorpayMode: razorpayModeFrom(
       const String.fromEnvironment('RAZORPAY_MODE', defaultValue: 'mock'),
     ),
-    sentryDsn: const String.fromEnvironment('SENTRY_DSN'),
-    sentryEnabled: false,
     otpMode: otpModeFrom(
       const String.fromEnvironment('OTP_MODE', defaultValue: 'mock'),
     ),

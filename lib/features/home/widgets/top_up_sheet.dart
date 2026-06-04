@@ -1,10 +1,10 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -126,17 +126,12 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
     final idem = const Uuid().v4();
     _idempotencyKey = idem;
 
-    Sentry.addBreadcrumb(Breadcrumb(
-      category: 'razorpay',
-      type: 'user',
-      level: SentryLevel.info,
-      message: 'create_order initiate',
-      data: {
-        'amount_paise': _selectedAmountPaise,
-        'bonus_paise': _selectedBonusPaise ?? 0,
-        'mock_mode': F.isMockRazorpay,
-      },
-    ));
+    dev.log(
+      '[razorpay] create_order initiate '
+      'amount_paise=$_selectedAmountPaise '
+      'bonus_paise=${_selectedBonusPaise ?? 0} '
+      'mock_mode=${F.isMockRazorpay}',
+    );
 
     try {
       // 1) Ask the Edge Function to create an order.
@@ -152,12 +147,7 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
 
       final data = (res.data as Map?)?.cast<String, dynamic>() ?? {};
       if (data['ok'] != true) {
-        Sentry.addBreadcrumb(Breadcrumb(
-          category: 'razorpay',
-          level: SentryLevel.warning,
-          message: 'create_order rejected',
-          data: {'error': data['error']},
-        ));
+        dev.log('[razorpay] create_order rejected error=${data['error']}');
         _failProcessing(_mapError(data['error'] as String?));
         return;
       }
@@ -166,12 +156,7 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
       _serverMode = data['server_mode'] as String?;
       _serverKeyPrefix = data['server_key_prefix'] as String?;
       final mock = data['mock'] == true || F.isMockRazorpay;
-      Sentry.addBreadcrumb(Breadcrumb(
-        category: 'razorpay',
-        level: SentryLevel.info,
-        message: 'create_order ok',
-        data: {'mock': mock},
-      ));
+      dev.log('[razorpay] create_order ok mock=$mock');
 
       // Subscribe to wallet_transactions BEFORE confirming — this way we
       // never miss a row inserted between confirm() and the listener.
@@ -184,16 +169,12 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
         _openRazorpay();
       }
     } on FunctionException catch (e, st) {
-      Sentry.captureException(e, stackTrace: st, withScope: (scope) {
-        scope.setTag('integration', 'razorpay');
-        scope.setTag('step', 'create_order');
-      });
+      dev.log('[razorpay] create_order FunctionException',
+          error: e, stackTrace: st);
       _failProcessing(_mapError(e.details?.toString()));
     } catch (e, st) {
-      Sentry.captureException(e, stackTrace: st, withScope: (scope) {
-        scope.setTag('integration', 'razorpay');
-        scope.setTag('step', 'create_order_unknown');
-      });
+      dev.log('[razorpay] create_order unknown error',
+          error: e, stackTrace: st);
       _failProcessing("Couldn't reach the server. Please try again.");
     }
   }
@@ -290,15 +271,11 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
   }
 
   Future<void> _onPaymentSuccess(PaymentSuccessResponse res) async {
-    Sentry.addBreadcrumb(Breadcrumb(
-      category: 'razorpay',
-      level: SentryLevel.info,
-      message: 'sheet success',
-      // Don't log payment_id — Razorpay's id is not PII but tying our
-      // logs to it offers little debug value vs. the idempotency_key
-      // that's already in the create_order breadcrumb.
-      data: {'has_signature': res.signature?.isNotEmpty ?? false},
-    ));
+    // Don't log payment_id — Razorpay's id is not PII but tying our logs
+    // to it offers little debug value vs. the idempotency_key already
+    // logged in the create_order breadcrumb above.
+    dev.log('[razorpay] sheet success '
+        'has_signature=${res.signature?.isNotEmpty ?? false}');
     try {
       final result = await Supabase.instance.client.functions.invoke(
         'razorpay-topup',
@@ -312,12 +289,7 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
       );
       final data = (result.data as Map?)?.cast<String, dynamic>() ?? {};
       if (data['ok'] != true) {
-        Sentry.addBreadcrumb(Breadcrumb(
-          category: 'razorpay',
-          level: SentryLevel.error,
-          message: 'confirm rejected',
-          data: {'error': data['error']},
-        ));
+        dev.log('[razorpay] confirm rejected error=${data['error']}');
         _failProcessing(_mapError(data['error'] as String?));
         return;
       }
@@ -328,13 +300,10 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
       // typing card / OTP on the Razorpay sheet.
       if (_idempotencyKey != null) _startCreditPolling(_idempotencyKey!);
     } catch (e, st) {
-      Sentry.captureException(e, stackTrace: st, withScope: (scope) {
-        scope.setTag('integration', 'razorpay');
-        scope.setTag('step', 'confirm');
-        // Reconciliation cron (Session 13) backfills wallet credit if
-        // the webhook arrives but we miss this confirm; surface that
-        // expectation in the UI.
-      });
+      // Reconciliation cron (Session 13) backfills wallet credit if the
+      // webhook arrives but we miss this confirm; surface that
+      // expectation in the UI.
+      dev.log('[razorpay] confirm error', error: e, stackTrace: st);
       _failProcessing(
         "Payment received but couldn't credit wallet. It will appear shortly.",
       );
@@ -344,13 +313,9 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
   void _onPaymentError(PaymentFailureResponse res) {
     // Razorpay error codes: BAD_REQUEST_ERROR (user cancelled),
     // GATEWAY_ERROR, NETWORK_ERROR, SERVER_ERROR. Most are user-side; we
-    // log them as breadcrumb, not exception, to avoid Sentry noise.
-    Sentry.addBreadcrumb(Breadcrumb(
-      category: 'razorpay',
-      level: SentryLevel.warning,
-      message: 'sheet failure',
-      data: {'code': res.code, 'message': res.message},
-    ));
+    // log them at warning level only.
+    dev.log('[razorpay] sheet failure '
+        'code=${res.code} message=${res.message}');
     // Surface the actual code + message in the UI so we can diagnose
     // why the Razorpay sheet failed (key mismatch, amount issue, etc.).
     // Generic "Payment failed" hides the cause and led to a whole

@@ -8,11 +8,14 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
 import '../core/utils/currency.dart';
 import '../core/utils/phone.dart';
 import '../core/widgets/primary_button.dart';
+import 'widgets/customer_summary_sheet.dart';
 
 /// Find a recent transaction by family phone, then issue a refund. Wrapper
 /// RPC `refund_issue_by_staff` enforces the ₹500 staff cap (above-cap →
@@ -234,6 +237,44 @@ class _RefundScreenState extends ConsumerState<RefundScreen> {
                   ],
                 ),
               ),
+              if (_familyId != null) ...[
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () => CustomerSummarySheet.show<void>(
+                    context,
+                    familyId: _familyId!,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.navy.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: AppColors.navy.withValues(alpha: 0.20)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(PhosphorIconsRegular.userCircle,
+                            size: 18, color: AppColors.navy),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'More about this customer',
+                            style: AppTextStyles.body(
+                              context,
+                              color: AppColors.navy,
+                            ).copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const Icon(PhosphorIconsRegular.caretRight,
+                            size: 16, color: AppColors.navy),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               if (_txns.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Container(

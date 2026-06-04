@@ -71,9 +71,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final state = ref.watch(homeStateProvider);
     final activeSessions =
         ref.watch(activeSessionsProvider).valueOrNull ?? const [];
-
-    debugPrint('[BUG-038] HomeScreen.build state=$state '
-        'activeCount=${activeSessions.length}');
     return Scaffold(
       appBar: const HomeAppBar(),
       body: state.when(
@@ -84,7 +81,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           if (activeSessions.isNotEmpty) {
             return const MultiSessionHomeView();
           }
-          debugPrint('[BUG-038] HomeScreen state.data = ${s.runtimeType}');
           return switch (s) {
             HomeStateIdle() => const IdleHomeView(),
             HomeStateInSession() => const MultiSessionHomeView(),
@@ -93,7 +89,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           };
         },
         loading: () {
-          debugPrint('[BUG-038] HomeScreen state.loading');
           return const Center(child: CircularProgressIndicator());
         },
         error: (e, st) {

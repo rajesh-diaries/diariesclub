@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
+import 'widgets/customer_summary_sheet.dart';
 import 'widgets/staff_pin_sheet.dart';
 
 /// Staff path for redeeming a stage-perk code at the counter. Customer
@@ -203,6 +204,7 @@ class _SuccessCard extends StatelessWidget {
     final childName = (data['child_name'] as String?) ?? 'kid';
     final stage = (data['stage'] as String?) ?? '';
     final desc = data['perk_description'] as String?;
+    final familyId = data['family_id'] as String?;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -212,43 +214,85 @@ class _SuccessCard extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            PhosphorIconsFill.checkCircle,
-            color: AppColors.activeGreen,
-            size: 32,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Redeemed!',
-                  style: AppTextStyles.body(context).copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.activeGreen,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$perkLabel · for $childName · ${stage.toUpperCase()}',
-                  style: AppTextStyles.body(context),
-                ),
-                if (desc != null && desc.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    desc,
-                    style: AppTextStyles.caption(
-                      context,
-                      color: AppColors.lightTextSecondary,
+          Row(
+            children: [
+              const Icon(
+                PhosphorIconsFill.checkCircle,
+                color: AppColors.activeGreen,
+                size: 32,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Redeemed!',
+                      style: AppTextStyles.body(context).copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.activeGreen,
+                      ),
                     ),
-                  ),
-                ],
-              ],
-            ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$perkLabel · for $childName · ${stage.toUpperCase()}',
+                      style: AppTextStyles.body(context),
+                    ),
+                    if (desc != null && desc.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        desc,
+                        style: AppTextStyles.caption(
+                          context,
+                          color: AppColors.lightTextSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
+          if (familyId != null) ...[
+            const SizedBox(height: 10),
+            InkWell(
+              onTap: () => CustomerSummarySheet.show<void>(
+                context,
+                familyId: familyId,
+              ),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.navy.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: AppColors.navy.withValues(alpha: 0.20)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(PhosphorIconsRegular.userCircle,
+                        size: 16, color: AppColors.navy),
+                    const SizedBox(width: 6),
+                    Text(
+                      'See full customer profile',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.navy,
+                      ).copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    const Icon(PhosphorIconsRegular.caretRight,
+                        size: 14, color: AppColors.navy),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

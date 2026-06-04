@@ -157,8 +157,9 @@ class _ActionTile extends StatelessWidget {
   }
 }
 
-/// Today-at-a-glance dashboard panel — 6 live stats so staff doesn't
-/// have to drill into 4 screens to see "how's the floor right now".
+/// Today-at-a-glance dashboard panel — 4-tile grid of the must-see live
+/// counters (on-floor, sessions, orders, cash) plus a pending-bites
+/// alert banner that only appears when there's a queue.
 class _TodayPanel extends ConsumerWidget {
   const _TodayPanel();
 
@@ -166,7 +167,6 @@ class _TodayPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final onFloor = ref.watch(venueActiveSessionsProvider).valueOrNull?.length ?? 0;
     final sessionsToday = ref.watch(todaySessionsCountProvider).valueOrNull ?? 0;
-    final kidsToday = ref.watch(todayDistinctKidsCountProvider).valueOrNull ?? 0;
     final bitesGiven =
         ref.watch(venueDistributedHealthyBitesProvider).valueOrNull?.length ?? 0;
     final bitesPending =
@@ -203,7 +203,6 @@ class _TodayPanel extends ConsumerWidget {
                 onPressed: () {
                   ref.invalidate(venueActiveSessionsProvider);
                   ref.invalidate(todaySessionsCountProvider);
-                  ref.invalidate(todayDistinctKidsCountProvider);
                   ref.invalidate(venueDistributedHealthyBitesProvider);
                   ref.invalidate(venuePendingHealthyBitesProvider);
                   ref.invalidate(todayCashCollectedProvider);
@@ -213,19 +212,26 @@ class _TodayPanel extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
+          // Four-tile 2x2 grid — trimmed from six tiles 2026-05-21.
+          // "Kids today" removed (redundant with Sessions today). "Bites
+          // given" rolled into the carrot tile which now ONLY shows when
+          // there are pending decisions, freeing screen space when the
+          // queue is clear.
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 2.3,
+            childAspectRatio: 2.0,
             children: [
               _StatTile(
                 icon: PhosphorIconsFill.users,
                 label: 'On floor now',
                 value: '$onFloor',
-                accent: onFloor > 0 ? AppColors.fitGreen : AppColors.lightTextSecondary,
+                accent: onFloor > 0
+                    ? AppColors.fitGreen
+                    : AppColors.lightTextSecondary,
                 onTap: () => context.push('/staff/sessions'),
               ),
               _StatTile(
@@ -236,28 +242,11 @@ class _TodayPanel extends ConsumerWidget {
                 onTap: () => context.push('/staff/sessions'),
               ),
               _StatTile(
-                icon: PhosphorIconsFill.smileyWink,
-                label: 'Kids today',
-                value: '$kidsToday',
-                accent: AppColors.navy,
-              ),
-              _StatTile(
                 icon: PhosphorIconsFill.cookingPot,
                 label: 'Orders today',
                 value: '$ordersToday',
                 accent: AppColors.navy,
                 onTap: () => context.push('/staff/kds'),
-              ),
-              _StatTile(
-                icon: PhosphorIconsFill.carrot,
-                label: bitesPending > 0
-                    ? 'Bites · $bitesPending pending'
-                    : 'Bites given',
-                value: '$bitesGiven',
-                accent: bitesPending > 0
-                    ? AppColors.gold
-                    : AppColors.fitGreen,
-                onTap: () => context.push('/staff/healthy-bite'),
               ),
               _StatTile(
                 icon: PhosphorIconsFill.currencyInr,
@@ -267,6 +256,47 @@ class _TodayPanel extends ConsumerWidget {
               ),
             ],
           ),
+          // Pending-bites alert lives below the grid as a full-width
+          // banner — only renders when there's actually a queue, so it
+          // disappears when staff has nothing to do.
+          if (bitesPending > 0) ...[
+            const SizedBox(height: 10),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => context.push('/staff/healthy-bite'),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withValues(alpha: 0.10),
+                    border: Border.all(
+                        color: AppColors.gold.withValues(alpha: 0.40)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(PhosphorIconsFill.carrot,
+                          color: AppColors.gold, size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Healthy Bite · $bitesPending pending'
+                          '${bitesGiven > 0 ? '  ·  $bitesGiven given today' : ''}',
+                          style: AppTextStyles.body(context, color: AppColors.gold)
+                              .copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      const Icon(PhosphorIconsRegular.caretRight,
+                          color: AppColors.gold, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

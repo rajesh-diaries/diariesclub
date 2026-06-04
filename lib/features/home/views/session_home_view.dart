@@ -286,16 +286,8 @@ class _GraceCtaPair extends ConsumerWidget {
   const _GraceCtaPair({required this.onExtend, required this.sessionId});
 
   Future<void> _wrapUp(BuildContext context, WidgetRef ref) async {
-    debugPrint('[BUG-038] _wrapUp invoked, sessionId=$sessionId');
-    // BUG-038 root cause: previous version called `Navigator.pop(context, …)`
-    // inside the dialog actions, where `context` was the captured OUTER
-    // (SessionHomeView) context — not the dialog's own. On Flutter web that
-    // can resolve to the wrong Navigator (root vs dialog), silently fails to
-    // pop, and `await showDialog<bool>` hangs forever — which is exactly the
-    // symptom the BUG-038 instrumentation showed (only "_wrapUp invoked"
-    // printed; "dialog returned ok=…" never reached).
-    // Fix: bind the action callbacks to the dialog's own context (`dialogCtx`
-    // from the builder) so the pop targets the dialog's Navigator directly.
+    // Bind action callbacks to the dialog's own context (`dialogCtx`)
+    // so Navigator.pop targets the dialog's Navigator directly.
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
@@ -313,20 +305,15 @@ class _GraceCtaPair extends ConsumerWidget {
         ],
       ),
     );
-    debugPrint('[BUG-038] dialog returned ok=$ok mounted=${context.mounted}');
     if (ok != true || !context.mounted) {
-      debugPrint('[BUG-038] dialog cancelled or context unmounted, exiting');
       return;
     }
     try {
-      debugPrint('[BUG-038] calling session_complete RPC');
       final result = await Supabase.instance.client
           .rpc<dynamic>('session_complete', params: {
         'p_session_id': sessionId,
       });
-      debugPrint('[BUG-038] RPC returned: $result');
       if (!context.mounted) {
-        debugPrint('[BUG-038] context unmounted after RPC, skipping nav');
         return;
       }
       // Force-invalidate the active-sessions stream so the home view
@@ -337,12 +324,9 @@ class _GraceCtaPair extends ConsumerWidget {
       // exactly the symptom reported. Manual invalidation refetches
       // directly so the UI matches the success message.
       ref.invalidate(activeSessionsProvider);
-      debugPrint('[BUG-038] scheduling post-frame snackbar');
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        debugPrint('[BUG-038] post-frame fired, showing snackbar');
         final messenger = ScaffoldMessenger.maybeOf(context);
         if (messenger == null) {
-          debugPrint('[BUG-038] messenger is null, snackbar skipped');
           return;
         }
         messenger.showSnackBar(
@@ -351,22 +335,15 @@ class _GraceCtaPair extends ConsumerWidget {
             duration: Duration(seconds: 4),
           ),
         );
-        debugPrint('[BUG-038] snackbar shown');
       });
-      debugPrint('[BUG-038] before context.go(/home)');
       context.go('/home');
-      debugPrint('[BUG-038] after context.go(/home)');
     } on PostgrestException catch (e, st) {
-      debugPrint('[BUG-038] PostgrestException: code=${e.code} '
-          'message=${e.message} details=${e.details} hint=${e.hint}');
-      debugPrint('[BUG-038] stack: $st');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Couldn't wrap up: ${e.message}")),
       );
     } catch (e, st) {
-      debugPrint('[BUG-038] generic exception: $e');
-      debugPrint('[BUG-038] stack: $st');
+
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Couldn't wrap up: $e")),

@@ -16,7 +16,7 @@ class ForceUpdateScreen extends ConsumerWidget {
   const ForceUpdateScreen({super.key});
 
   static const _appStoreUrl =
-      'https://apps.apple.com/in/app/diaries-club/id000000000';
+      'https://apps.apple.com/in/app/play-diaries/id6770884221';
   static const _playStoreUrl =
       'https://play.google.com/store/apps/details?id=com.diariesclub.app';
 
