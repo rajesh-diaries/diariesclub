@@ -81,8 +81,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final startedAt = DateTime.tryParse(startedAtStr);
       if (startedAt == null) continue;
 
-      // Only greet sessions that started in the last 30 seconds.
-      if (now.difference(startedAt).inSeconds > 30) continue;
+      // Only greet sessions that started in the last 5 minutes.
+      if (now.difference(startedAt).inSeconds > 300) continue;
 
       final childId = s['child_id'] as String?;
       if (childId == null) continue;
@@ -129,7 +129,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 (s['started_at'] as String?) ?? '',
               );
               return startedAt != null &&
-                  DateTime.now().difference(startedAt).inSeconds <= 30;
+                  DateTime.now().difference(startedAt).inSeconds <= 300;
             }, orElse: () => const <String, dynamic>{})['id']
             ?.toString();
         if (freshId != null && mounted && _welcomingSessionId == null) {
