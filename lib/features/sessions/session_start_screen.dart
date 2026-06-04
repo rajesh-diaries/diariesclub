@@ -439,6 +439,8 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                     _selectedChildIds.contains(id);
                                 return _ChildAvatar(
                                   name: c['name'] as String? ?? '—',
+                                  favouriteHero:
+                                      c['favourite_hero'] as String?,
                                   selected: selected,
                                   onTap: () => setState(() {
                                     if (selected) {
@@ -458,6 +460,8 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                             children: [
                               _ChildAvatar(
                                 name: children.first['name'] as String? ?? '—',
+                                favouriteHero: children.first['favourite_hero']
+                                    as String?,
                                 selected: true,
                                 onTap: () {},
                               ),
@@ -606,18 +610,36 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
 
 class _ChildAvatar extends StatelessWidget {
   final String name;
+  final String? favouriteHero;
   final bool selected;
   final VoidCallback onTap;
   const _ChildAvatar({
     required this.name,
+    this.favouriteHero,
     required this.selected,
     required this.onTap,
   });
+
+  static const _heroAssets = <String, String>{
+    'rafi': 'assets/hero/rafi.png',
+    'ellie': 'assets/hero/ellie.png',
+    'gerry': 'assets/hero/gerry.png',
+    'zena': 'assets/hero/zena.png',
+  };
+
+  static const _heroColors = <String, Color>{
+    'rafi': AppColors.rafiCoral,
+    'ellie': AppColors.ellieBlue,
+    'gerry': AppColors.gerryAmber,
+    'zena': AppColors.zenaGreen,
+  };
 
   @override
   Widget build(BuildContext context) {
     final initial =
         name.trim().isEmpty ? '?' : name.trim().characters.first.toUpperCase();
+    final heroAsset = _heroAssets[favouriteHero];
+    final heroColor = _heroColors[favouriteHero] ?? AppColors.gold;
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -633,16 +655,33 @@ class _ChildAvatar extends StatelessWidget {
                 color: selected ? AppColors.gold : AppColors.lightBorder,
                 width: selected ? 3 : 1,
               ),
-              color: AppColors.gold.withValues(alpha: 0.18),
+              color: heroColor.withValues(alpha: 0.18),
             ),
-            child: Text(
-              initial,
-              style: const TextStyle(
-                color: AppColors.navy,
-                fontWeight: FontWeight.w800,
-                fontSize: 28,
-              ),
-            ),
+            clipBehavior: Clip.antiAlias,
+            child: heroAsset != null
+                ? Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Image.asset(
+                      heroAsset,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Text(
+                        initial,
+                        style: const TextStyle(
+                          color: AppColors.navy,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 28,
+                        ),
+                      ),
+                    ),
+                  )
+                : Text(
+                    initial,
+                    style: const TextStyle(
+                      color: AppColors.navy,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 28,
+                    ),
+                  ),
           ),
           const SizedBox(height: 6),
           SizedBox(
