@@ -97,9 +97,22 @@ HomeState _classify(List<Map<String, dynamic>> rows) {
     return HomeStateInSession(r);
   }
 
+  // After active sessions, check if the most recent session just completed
+  // (within 30 min) so we can show the celebration overlay + reflection prompt.
+  final latest = rows.first;
+  final latestStatus = latest['status'] as String?;
+  if (latestStatus == 'completed' || latestStatus == 'auto_closed') {
+    final completedAtStr = latest['completed_at'] as String?;
+    if (completedAtStr != null) {
+      final completedAt = DateTime.tryParse(completedAtStr);
+      if (completedAt != null && now.difference(completedAt).inMinutes < 30) {
+        return HomeStatePostSession(latest);
+      }
+    }
+  }
+
   // Pending reflections are now surfaced by `PendingReflectionsSection`
   // (renders one card per pending reflection inside both Idle and
-  // MultiSession home views, for the full 24h reflection window). The
-  // top-level home state is just idle vs in-session.
+  // MultiSession home views, for the full 24h reflection window).
   return const HomeStateIdle();
 }
