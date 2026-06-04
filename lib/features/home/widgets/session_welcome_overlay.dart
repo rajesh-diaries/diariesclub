@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:video_player/video_player.dart';
@@ -87,7 +88,10 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
     final clipPath = HeroClipPicker.randomClip(hero, maxClips: 1);
 
     try {
-      final controller = VideoPlayerController.asset(clipPath);
+      // Web uses network URL; mobile uses asset bundle.
+      final controller = kIsWeb
+          ? VideoPlayerController.networkUrl(Uri.parse('assets/$clipPath'))
+          : VideoPlayerController.asset(clipPath);
       _videoController = controller;
 
       await controller.initialize();
@@ -104,8 +108,9 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay>
 
       setState(() => _videoReady = true);
       controller.play();
-    } catch (_) {
+    } catch (e) {
       // Asset not found or unsupported — fall back to static image.
+      debugPrint('[SessionWelcomeOverlay] video init failed: $e');
       if (mounted) setState(() => _videoReady = false);
     }
   }
