@@ -128,9 +128,21 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
     } catch (e, st) {
       dev.log('[play_pass_purchase] error', error: e, stackTrace: st);
       if (!mounted) return;
+      final msg = e.toString().toLowerCase();
+      String display;
+      if (msg.contains('play_pass_purchase') &&
+          (msg.contains('does not exist') || msg.contains('unknown'))) {
+        display = 'Play Passes are not enabled yet. Please contact support.';
+      } else if (msg.contains('insufficient_balance')) {
+        display = 'Not enough wallet balance. Top up first.';
+      } else if (msg.contains('forbidden') || msg.contains('auth_required')) {
+        display = 'Please sign in again.';
+      } else {
+        display = 'Something went wrong. Please try again.';
+      }
       setState(() {
         _buyingType = null;
-        _errorText = 'Something went wrong. Please try again.';
+        _errorText = display;
       });
     }
   }
@@ -138,12 +150,20 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             // Handle bar
             Center(
               child: Container(
@@ -199,7 +219,8 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 

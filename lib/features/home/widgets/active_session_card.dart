@@ -216,6 +216,7 @@ class _Entry {
   }
 
   /// Short label shown INSIDE the ring (the headline number).
+  /// Format: mm:ss (or +mm:ss in grace).
   String ringLabel() {
     if (isPending) return '—';
     final end = expiresAt;
@@ -223,12 +224,14 @@ class _Entry {
     final now = DateTime.now();
     final diff = end.difference(now);
     if (isGrace) {
-      final over = (-diff.inMinutes).clamp(0, 999);
-      return over == 0 ? '0' : '+$over';
+      final over = diff.abs();
+      final mm = over.inMinutes.remainder(60).toString().padLeft(2, '0');
+      final ss = over.inSeconds.remainder(60).toString().padLeft(2, '0');
+      return '+$mm:$ss';
     }
-    final mins = diff.inMinutes;
-    if (mins >= 60) return '${mins ~/ 60}h ${mins % 60}m';
-    return '$mins';
+    final mm = diff.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final ss = diff.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$mm:$ss';
   }
 
   /// Status word beneath the kid's name.

@@ -16,7 +16,7 @@ class SafariPhilosophyCard extends StatelessWidget {
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'What makes Safari Club different?',
             style: TextStyle(
               color: SafariColors.jungleGreen,
@@ -24,25 +24,20 @@ class SafariPhilosophyCard extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          SizedBox(height: 16),
-          _PhilosophyItem(
-            icon: Icons.groups_outlined,
-            text: 'Small groups. Every child is seen, heard, and known.',
+          const SizedBox(height: 16),
+          const _PhilosophyItem(
+            icon: Icons.favorite_border,
+            text: 'Whole-child growth. Social, emotional and creative skills built through play.',
           ),
-          SizedBox(height: 12),
-          _PhilosophyItem(
+          const SizedBox(height: 12),
+          const _PhilosophyItem(
             icon: Icons.psychology_outlined,
-            text: 'Character-first. We nurture the traits that matter most.',
+            text: 'Guided exploration. Curiosity-led activities that build confidence and independence.',
           ),
-          SizedBox(height: 12),
-          _PhilosophyItem(
-            icon: Icons.nature_outlined,
-            text: 'Indoor-outdoor play. Nature is our greatest teacher.',
-          ),
-          SizedBox(height: 12),
-          _PhilosophyItem(
+          const SizedBox(height: 12),
+          const _PhilosophyItem(
             icon: Icons.school_outlined,
-            text: 'No screens, no worksheets. Learning through doing.',
+            text: 'Hands-on learning. No screens, no worksheets — just meaningful experiences.',
           ),
         ],
       ),

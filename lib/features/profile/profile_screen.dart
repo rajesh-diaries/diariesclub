@@ -206,14 +206,38 @@ class _PlayPassesSection extends ConsumerWidget {
         children: [
           ListTile(
             leading: const Icon(
-              PhosphorIconsRegular.warningCircle,
-              color: AppColors.lightTextSecondary,
+              PhosphorIconsRegular.ticket,
+              color: AppColors.navy,
             ),
             title: Text(
-              "Couldn't load passes. Pull to retry.",
-              style: AppTextStyles.body(
+              'Get Play Passes',
+              style: AppTextStyles.body(context),
+            ),
+            subtitle: Text(
+              'Membership coming soon — tap to explore',
+              style: AppTextStyles.caption(
                 context,
                 color: AppColors.lightTextSecondary,
+              ),
+            ),
+            trailing: Material(
+              color: AppColors.navy,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => _buy(context),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  child: Text(
+                    'Explore',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -237,11 +261,11 @@ class _PlayPassesSection extends ConsumerWidget {
                   color: AppColors.navy,
                 ),
                 title: Text(
-                  'No active passes',
+                  'Get Play Passes',
                   style: AppTextStyles.body(context),
                 ),
                 subtitle: Text(
-                  'Buy passes to save on every session',
+                  'Save on every session with membership',
                   style: AppTextStyles.caption(
                     context,
                     color: AppColors.lightTextSecondary,
@@ -261,7 +285,7 @@ class _PlayPassesSection extends ConsumerWidget {
                         vertical: 8,
                       ),
                       child: Text(
-                        'Buy',
+                        'Explore',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,

@@ -47,7 +47,8 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   final _couponCtrl = TextEditingController();
   bool _validatingCoupon = false;
   int? _couponDiscountPaise; // null = no coupon applied
-  String? _appliedCouponCode;
+  String? _appliedCouponCode; // display name (e.g. "Buddy Discount")
+  String? _couponBackendCode; // actual code sent to RPC (e.g. "SIBLING2")
   String? _couponError;
 
   late Future<List<Map<String, dynamic>>> _childrenFuture;
@@ -83,37 +84,43 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     return duration <= 60 ? 80000 : 110000;
   }
 
-  /// Auto sibling coupon based on number of selected kids.
-  /// Returns {code, discountPaise} or null for single kid.
+  /// Sibling coupon metadata: backend code, friendly display name, discount.
+  /// Returns null for single kid.
   Map<String, dynamic>? _siblingCouponFor(int kidCount) {
     return switch (kidCount) {
-      2 => {'code': 'SIBLING2', 'discount_paise': 15000},
-      3 => {'code': 'SIBLING3', 'discount_paise': 25000},
-      4 => {'code': 'SIBLING4', 'discount_paise': 40000},
-      >= 5 => {'code': 'SIBLING5', 'discount_paise': 50000},
+      2 => {
+          'code': 'SIBLING2',
+          'name': 'Buddy Discount',
+          'discount_paise': 15000,
+        },
+      3 => {
+          'code': 'SIBLING3',
+          'name': 'Sibling Saver',
+          'discount_paise': 25000,
+        },
+      4 => {
+          'code': 'SIBLING4',
+          'name': 'Triple Fun',
+          'discount_paise': 40000,
+        },
+      >= 5 => {
+          'code': 'SIBLING5',
+          'name': 'Squad Deal',
+          'discount_paise': 50000,
+        },
       _ => null,
     };
   }
 
-  void _applyAutoCoupon() {
-    // Only auto-apply if no manual coupon is active.
-    if (_appliedCouponCode != null &&
-        !_appliedCouponCode!.startsWith('SIBLING')) {
-      return;
-    }
-    final auto = _siblingCouponFor(_selectedChildIds.length);
-    if (auto != null) {
-      setState(() {
-        _couponDiscountPaise = auto['discount_paise'] as int;
-        _appliedCouponCode = auto['code'] as String;
-        _couponError = null;
-      });
-    } else {
-      setState(() {
-        _couponDiscountPaise = null;
-        _appliedCouponCode = null;
-      });
-    }
+  void _applySiblingCoupon() {
+    final coupon = _siblingCouponFor(_selectedChildIds.length);
+    if (coupon == null) return;
+    setState(() {
+      _couponDiscountPaise = coupon['discount_paise'] as int;
+      _appliedCouponCode = coupon['name'] as String;
+      _couponBackendCode = coupon['code'] as String;
+      _couponError = null;
+    });
   }
 
   Future<void> _applyCoupon() async {
@@ -139,10 +146,12 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       );
       if (!mounted) return;
       if (res['valid'] == true) {
+        final returnedCode = (res['code'] as String?) ?? code.toUpperCase();
         setState(() {
           _validatingCoupon = false;
           _couponDiscountPaise = res['discount_paise'] as int? ?? 0;
-          _appliedCouponCode = (res['code'] as String?) ?? code.toUpperCase();
+          _appliedCouponCode = returnedCode;
+          _couponBackendCode = returnedCode;
         });
       } else {
         setState(() {
@@ -168,6 +177,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     setState(() {
       _couponDiscountPaise = null;
       _appliedCouponCode = null;
+      _couponBackendCode = null;
       _couponError = null;
       _couponCtrl.clear();
     });
@@ -238,7 +248,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         final childId = children[i];
         final idem = const Uuid().v4();
         // Coupon attaches to first session only; remaining run full price.
-        final couponForCall = (i == 0) ? _appliedCouponCode : null;
+        final couponForCall = (i == 0) ? _couponBackendCode : null;
         final result = await Supabase.instance.client
             .rpc<Map<String, dynamic>>('session_create', params: {
           'p_venue_id': _venueId,
@@ -448,7 +458,6 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
           // CTA gets stuck on "Pick at least one kid" with nothing to tap.
           if (children.length == 1) {
             _selectedChildIds.add(children.first['id'] as String);
-            _applyAutoCoupon();
           }
 
           if (children.isEmpty) {
@@ -512,7 +521,19 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                     } else {
                                       _selectedChildIds.add(id);
                                     }
-                                    _applyAutoCoupon();
+                                    // Clearing a sibling coupon if kid
+                                    // count drops below its threshold keeps
+                                    // the tally honest.
+                                    if (_couponBackendCode != null &&
+                                        _couponBackendCode!
+                                            .startsWith('SIBLING')) {
+                                      final stillValid =
+                                          _siblingCouponFor(
+                                                  _selectedChildIds.length)
+                                              ?['code'] ==
+                                          _couponBackendCode;
+                                      if (!stillValid) _clearCoupon();
+                                    }
                                   }),
                                 );
                               },
@@ -609,6 +630,12 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                             enabled: _selectedDurationMinutes != null,
                             onApply: _applyCoupon,
                             onClear: _clearCoupon,
+                          ),
+                          const SizedBox(height: 12),
+                          _SiblingCouponChips(
+                            kidCount: _selectedChildIds.length,
+                            appliedCode: _couponBackendCode,
+                            onApply: _applySiblingCoupon,
                           ),
                           const SizedBox(height: 24),
                         ],
@@ -1034,6 +1061,91 @@ class _CouponSection extends StatelessWidget {
                   ),
           ),
           onSubmitted: (_) => enabled ? onApply() : null,
+        ),
+      ],
+    );
+  }
+}
+
+/// Manual sibling-coupon chips. Shown below the coupon input when 2+ kids
+/// are selected. Tapping a chip applies the discount; the backend still
+/// receives SIBLING2/SIBLING3/etc. for validation.
+class _SiblingCouponChips extends StatelessWidget {
+  final int kidCount;
+  final String? appliedCode;
+  final VoidCallback onApply;
+
+  const _SiblingCouponChips({
+    required this.kidCount,
+    required this.appliedCode,
+    required this.onApply,
+  });
+
+  Map<String, dynamic>? _couponFor(int count) => switch (count) {
+        2 => {'code': 'SIBLING2', 'name': 'Buddy Discount'},
+        3 => {'code': 'SIBLING3', 'name': 'Sibling Saver'},
+        4 => {'code': 'SIBLING4', 'name': 'Triple Fun'},
+        >= 5 => {'code': 'SIBLING5', 'name': 'Squad Deal'},
+        _ => null,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final coupon = _couponFor(kidCount);
+    if (coupon == null) return const SizedBox.shrink();
+
+    final code = coupon['code'] as String;
+    final name = coupon['name'] as String;
+    final isApplied = appliedCode == code;
+
+    return Row(
+      children: [
+        Expanded(
+          child: InkWell(
+            onTap: isApplied ? null : onApply,
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: isApplied
+                    ? AppColors.activeGreen.withValues(alpha: 0.12)
+                    : AppColors.lightSurface,
+                border: Border.all(
+                  color: isApplied
+                      ? AppColors.activeGreen
+                      : AppColors.lightBorder,
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isApplied
+                        ? Icons.check_circle_outline
+                        : Icons.local_offer_outlined,
+                    color: isApplied
+                        ? AppColors.fitGreen
+                        : AppColors.lightTextSecondary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isApplied ? '$name applied' : 'Tap to apply $name',
+                      style: AppTextStyles.caption(context).copyWith(
+                        color: isApplied
+                            ? AppColors.fitGreen
+                            : AppColors.lightTextSecondary,
+                        fontWeight:
+                            isApplied ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
     );

@@ -13,10 +13,10 @@ class StartSessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       onTap: () => context.push('/session/start'),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
@@ -26,7 +26,7 @@ class StartSessionCard extends StatelessWidget {
               AppColors.navy,
             ],
           ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
               color: AppColors.navy.withValues(alpha: 0.20),
@@ -38,28 +38,30 @@ class StartSessionCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 52,
-              height: 52,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: AppColors.gold.withValues(alpha: 0.20),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
                 PhosphorIconsFill.usersThree,
                 color: AppColors.gold,
-                size: 28,
+                size: 22,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     'Add a friend to play!',
-                    style: AppTextStyles.h3(context, color: Colors.white),
+                    style: AppTextStyles.bodyLarge(context)
+                        .copyWith(color: Colors.white, fontWeight: FontWeight.w800),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Text(
                     'Bring a sibling or friend along',
                     style: AppTextStyles.caption(
@@ -70,17 +72,10 @@ class StartSessionCard extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.arrow_forward,
-                color: Colors.white,
-                size: 18,
-              ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white54,
+              size: 14,
             ),
           ],
         ),

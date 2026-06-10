@@ -20,28 +20,28 @@ class SafariWhatItIs extends StatelessWidget {
             ),
           ),
           SizedBox(height: 20),
-          _InfoCard(
+          const _InfoCard(
             icon: Icons.calendar_today_outlined,
-            title: 'Age 2–4 years',
+            title: 'Age 2–5 years',
             subtitle: 'Monday – Friday',
           ),
-          SizedBox(height: 12),
-          _InfoCard(
+          const SizedBox(height: 12),
+          const _InfoCard(
             icon: Icons.schedule_outlined,
             title: '9:30 AM – 12:30 PM',
             subtitle: 'Morning sessions',
           ),
-          SizedBox(height: 12),
-          _InfoCard(
+          const SizedBox(height: 12),
+          const _InfoCard(
             icon: Icons.location_on_outlined,
             title: 'Play Diaries Centre',
-            subtitle: 'Indoor & outdoor spaces',
+            subtitle: 'A safe, inspiring space to explore',
           ),
-          SizedBox(height: 12),
-          _InfoCard(
+          const SizedBox(height: 12),
+          const _InfoCard(
             icon: Icons.restaurant_outlined,
-            title: 'Healthy snacks included',
-            subtitle: 'Fresh, wholesome, and fun',
+            title: 'Healthy snacks & meals',
+            subtitle: 'Optional, wholesome add-ons available',
           ),
         ],
       ),

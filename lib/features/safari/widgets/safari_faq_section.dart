@@ -14,19 +14,19 @@ class _SafariFaqSectionState extends State<SafariFaqSection> {
   final List<Map<String, String>> _faqs = const [
     {
       'q': 'When will Safari Club open?',
-      'a': 'We are finalizing our space and will share a timeline with waitlisted families first. Join the list to be the first to know.',
+      'a': 'We are preparing the space and will share the launch timeline with waitlisted families first. Add your name to get early access.',
     },
     {
       'q': 'What age is Safari Club for?',
-      'a': 'Safari Club is designed for children aged 2 to 4 years.',
+      'a': 'Safari Club is open to children aged 2 to 5 years. Activities are adapted to each age group so every child stays engaged.',
     },
     {
       'q': 'What will a typical day look like?',
-      'a': 'Free play, structured activities, outdoor exploration, story time, and healthy snacks — all designed around our four character traits.',
+      'a': 'A mix of guided play, creative projects, music and movement, story time, and calm reflection — all woven around our four character traits.',
     },
     {
       'q': 'Will there be screens or devices?',
-      'a': 'No. Safari Club is intentionally screen-free. We believe children learn best through hands-on play, nature, and social interaction.',
+      'a': 'No screens. We keep the day tactile and social so children learn through doing, creating, and connecting with others.',
     },
   ];
 

@@ -3,10 +3,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/widgets/child_avatar.dart';
 
-/// One child tile in the multi-child Adventure picker. Hero-color ring +
-/// avatar + name + level badge + overall stage chip.
+/// One child tile in the multi-child Adventure picker. Rectangular card
+/// with the kid's favourite hero image, name, level and stage chip.
 class ChildSelectCard extends StatelessWidget {
   final Map<String, dynamic> child;
   final VoidCallback onTap;
@@ -24,12 +23,12 @@ class ChildSelectCard extends StatelessWidget {
     final level = (child['current_level'] as int?) ?? 1;
     final stage = (child['current_overall_stage'] as String?) ?? 'seedling';
     final color = _heroColor(favouriteHero);
+    final heroPath = 'assets/hero/$favouriteHero.png';
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.lightSurface,
           border: Border.all(
@@ -38,42 +37,81 @@ class ChildSelectCard extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(20),
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: color, width: 3),
-              ),
-              child: ChildAvatar(
-                name: name,
-                size: 80,
+            // Hero image area with rounded top corners.
+            Expanded(
+              flex: 3,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.08),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(18),
+                  ),
+                ),
+                padding: const EdgeInsets.all(10),
+                child: Image.asset(
+                  heroPath,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Center(
+                    child: Icon(
+                      _heroIcon(favouriteHero),
+                      color: color,
+                      size: 48,
+                    ),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            Text(name, style: AppTextStyles.h3(context)),
-            const SizedBox(height: 4),
-            Text(
-              'Level $level',
-              style: AppTextStyles.caption(
-                context,
-                color: AppColors.lightTextSecondary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.gold.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(100),
-              ),
-              child: Text(
-                _stageLabel(stage),
-                style: AppTextStyles.caption(context, color: AppColors.gold)
-                    .copyWith(letterSpacing: 1.0, fontWeight: FontWeight.w800),
+            // Text info.
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      name,
+                      style: AppTextStyles.bodyLarge(context)
+                          .copyWith(fontWeight: FontWeight.w800),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Level $level',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.gold.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                      child: Text(
+                        _stageLabel(stage),
+                        style: AppTextStyles.caption(
+                          context,
+                          color: AppColors.gold,
+                        ).copyWith(
+                          letterSpacing: 0.8,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -93,8 +131,6 @@ class ChildSelectCard extends StatelessWidget {
         _ => AppColors.gold,
       };
 
-  // Unused helper kept for potential trait-icon future use.
-  // ignore: unused_element
   static IconData _heroIcon(String h) => switch (h) {
         'rafi' => PhosphorIconsFill.shieldStar,
         'ellie' => PhosphorIconsFill.heart,

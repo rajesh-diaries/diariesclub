@@ -35,16 +35,16 @@ class SafariHeroBanner extends StatelessWidget {
               fontWeight: FontWeight.w400,
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _HeroAvatar(imagePath: 'assets/hero/rafi.png'),
-              SizedBox(width: 12),
+              const SizedBox(width: 10),
               _HeroAvatar(imagePath: 'assets/hero/gerry.png'),
-              SizedBox(width: 12),
+              const SizedBox(width: 10),
               _HeroAvatar(imagePath: 'assets/hero/ellie.png'),
-              SizedBox(width: 12),
+              const SizedBox(width: 10),
               _HeroAvatar(imagePath: 'assets/hero/zena.png'),
             ],
           ),
@@ -62,14 +62,19 @@ class _HeroAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 56,
-      height: 56,
+      width: 60,
+      height: 60,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white24, width: 2),
-        image: DecorationImage(
-          image: AssetImage(imagePath),
-          fit: BoxFit.cover,
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white24, width: 1.5),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.asset(
+          imagePath,
+          fit: BoxFit.contain,
         ),
       ),
     );

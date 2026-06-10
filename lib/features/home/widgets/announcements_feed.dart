@@ -12,26 +12,66 @@ import '../../../core/theme/app_text_styles.dart';
 /// is_published+visible. We additionally cap to top 5 and sort by
 /// type-priority (workshop > promo > event > general > closure) then
 /// recency.
-class AnnouncementsFeed extends ConsumerWidget {
+class AnnouncementsFeed extends ConsumerStatefulWidget {
   const AnnouncementsFeed({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AnnouncementsFeed> createState() => _AnnouncementsFeedState();
+}
+
+class _AnnouncementsFeedState extends ConsumerState<AnnouncementsFeed> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onPageChanged(int page) {
+    setState(() => _currentPage = page);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final async = ref.watch(_announcementsStreamProvider);
     final rows = async.valueOrNull ?? const [];
     if (rows.isEmpty) return const SizedBox.shrink();
 
-    // Top margin baked in so this widget pulls its own 16px gap when
-    // it renders content; no phantom gap when it auto-hides. Internal
-    // cards stacked with 12px between them, no trailing space.
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (var i = 0; i < rows.length; i++) ...[
-            if (i > 0) const SizedBox(height: 12),
-            _AnnouncementCard(row: rows[i]),
+          SizedBox(
+            height: 110,
+            child: PageView.builder(
+              controller: _pageController,
+              onPageChanged: _onPageChanged,
+              itemCount: rows.length,
+              itemBuilder: (_, i) => _AnnouncementBanner(row: rows[i]),
+            ),
+          ),
+          if (rows.length > 1) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(rows.length, (i) {
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: _currentPage == i ? 16 : 6,
+                  height: 6,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    color: _currentPage == i
+                        ? AppColors.navy
+                        : AppColors.lightBorder,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                );
+              }),
+            ),
           ],
         ],
       ),
@@ -39,9 +79,9 @@ class AnnouncementsFeed extends ConsumerWidget {
   }
 }
 
-class _AnnouncementCard extends StatelessWidget {
+class _AnnouncementBanner extends StatelessWidget {
   final Map<String, dynamic> row;
-  const _AnnouncementCard({required this.row});
+  const _AnnouncementBanner({required this.row});
 
   @override
   Widget build(BuildContext context) {
@@ -60,102 +100,136 @@ class _AnnouncementCard extends StatelessWidget {
       _ => AppColors.lightTextSecondary,
     };
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      // context.go (not push): some cta_routes target shell-tab paths
-      // like /club/workshops whose redirect lands on the /club shell
-      // branch. push() on a shell branch path silently keeps you on the
-      // current branch (Home); go() correctly switches branches.
-      onTap: ctaRoute == null || ctaRoute.isEmpty
-          ? null
-          : () => context.go(ctaRoute),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.lightSurface,
-          border: Border.all(color: AppColors.lightBorder),
-          borderRadius: BorderRadius.circular(14),
+    final bgGradient = switch (type) {
+      'promo' => const LinearGradient(
+          colors: [Color(0xFFFFF9E6), Color(0xFFFFF3CC)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (photo != null && photo.isNotEmpty)
-              AspectRatio(
-                aspectRatio: 16 / 8,
-                child: Image.network(
-                  photo,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: accent.withValues(alpha: 0.10),
+      'workshop' => const LinearGradient(
+          colors: [Color(0xFFF0F4FF), Color(0xFFE2EBF5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      'event' => const LinearGradient(
+          colors: [Color(0xFFF0FFF4), Color(0xFFE6F5EA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      _ => const LinearGradient(
+          colors: [Color(0xFFF7FBFF), Color(0xFFEDF3FA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: ctaRoute == null || ctaRoute.isEmpty
+            ? null
+            : () => context.go(ctaRoute),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: bgGradient,
+            border: Border.all(color: accent.withValues(alpha: 0.25)),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: accent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            type.toUpperCase(),
+                            style: AppTextStyles.caption(
+                              context,
+                              color: accent,
+                            ).copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.0,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        title,
+                        style: AppTextStyles.bodyLarge(context).copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (body != null && body.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          body,
+                          style: AppTextStyles.caption(
+                            context,
+                            color: AppColors.lightTextSecondary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      if (ctaLabel != null && ctaLabel.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              ctaLabel,
+                              style: AppTextStyles.caption(
+                                context,
+                                color: accent,
+                              ).copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(width: 2),
+                            Icon(
+                              PhosphorIconsRegular.arrowRight,
+                              size: 12,
+                              color: accent,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        type.toUpperCase(),
-                        style: AppTextStyles.caption(
-                          context,
-                          color: accent,
-                        ).copyWith(
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ],
+              if (photo != null && photo.isNotEmpty)
+                SizedBox(
+                  width: 100,
+                  height: double.infinity,
+                  child: Image.network(
+                    photo,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: accent.withValues(alpha: 0.10),
+                    ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(title, style: AppTextStyles.h3(context)),
-                  if (body != null && body.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      body,
-                      style: AppTextStyles.body(
-                        context,
-                        color: AppColors.lightTextSecondary,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  if (ctaLabel != null && ctaLabel.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Text(
-                          ctaLabel,
-                          style: AppTextStyles.body(
-                            context,
-                            color: accent,
-                          ).copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          PhosphorIconsRegular.arrowRight,
-                          size: 14,
-                          color: accent,
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
+                ),
+            ],
+          ),
         ),
       ),
     );

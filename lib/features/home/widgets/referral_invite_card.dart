@@ -36,26 +36,39 @@ class ReferralInviteCard extends ConsumerWidget {
         ? gifterPaise
         : newFamilyPaise;
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       onTap: () => context.push('/profile/referral-details'),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.navy,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           children: [
-            const Icon(PhosphorIconsFill.gift,
-                color: AppColors.gold, size: 22),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.20),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                PhosphorIconsFill.gift,
+                color: AppColors.gold,
+                size: 22,
+              ),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     'Refer friends',
-                    style: AppTextStyles.h3(context, color: Colors.white),
+                    style: AppTextStyles.bodyLarge(context)
+                        .copyWith(color: Colors.white, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -69,8 +82,11 @@ class ReferralInviteCard extends ConsumerWidget {
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios,
-                color: Colors.white, size: 14),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white54,
+              size: 14,
+            ),
           ],
         ),
       ),
