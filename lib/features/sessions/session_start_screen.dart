@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/providers/active_sessions_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/current_wallet_provider.dart';
+import '../../core/providers/play_passes_provider.dart';
 import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -87,9 +88,9 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   Map<String, dynamic>? _siblingCouponFor(int kidCount) {
     return switch (kidCount) {
       2 => {'code': 'SIBLING2', 'discount_paise': 15000},
-      3 => {'code': 'SIBLING3', 'discount_paise': 30000},
-      4 => {'code': 'SIBLING4', 'discount_paise': 50000},
-      >= 5 => {'code': 'SIBLING5', 'discount_paise': 70000},
+      3 => {'code': 'SIBLING3', 'discount_paise': 25000},
+      4 => {'code': 'SIBLING4', 'discount_paise': 40000},
+      >= 5 => {'code': 'SIBLING5', 'discount_paise': 50000},
       _ => null,
     };
   }
@@ -192,8 +193,8 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       return;
     }
 
-    // Pre-check wallet balance so we don't half-create the batch and
-    // leave orphaned holds.
+    // Pre-check wallet balance (or passes) so we don't half-create the
+    // batch and leave orphaned holds / consumed passes.
     if (_paymentMethod == 'wallet') {
       final balance = ref.read(walletBalancePaiseProvider) ?? 0;
       if (balance < totalAmount) {
@@ -212,6 +213,16 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
             },
           ),
         );
+        return;
+      }
+    } else if (_paymentMethod == 'play_pass') {
+      final passes = ref.read(remainingPassesCountProvider);
+      if (passes < _selectedChildIds.length) {
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _errorText = 'Not enough Play Passes for all selected kids.';
+        });
         return;
       }
     }
@@ -298,6 +309,18 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         });
         return;
       }
+      if (e.message.contains('no_active_play_pass')) {
+        if (!mounted) return;
+        if (createdCount[0] > 0) {
+          _handlePartialOrFullFailure(createdCount[0], children.length);
+          return;
+        }
+        setState(() {
+          _busy = false;
+          _errorText = 'Not enough Play Passes. Buy more in Profile.';
+        });
+        return;
+      }
       if (e.message.contains('insufficient_balance')) {
         if (!mounted) return;
         // If some sessions already started before the wallet drained,
@@ -362,6 +385,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   Widget build(BuildContext context) {
     final cfg = ref.watch(venueConfigProvider).valueOrNull;
     final balance = ref.watch(walletBalancePaiseProvider) ?? 0;
+    final remainingPasses = ref.watch(remainingPassesCountProvider);
 
     // Hardcoded prices — 1hr ₹800, 2hr ₹1100
     const price1hr = 80000;
@@ -372,6 +396,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     final subtotal = perKidPrice * _selectedChildIds.length;
     final finalAmount = (subtotal - discount).clamp(0, 1 << 30);
     final walletEnough = balance >= finalAmount;
+    final passesEnough = remainingPasses >= _selectedChildIds.length;
 
     final canSubmit = !_busy &&
         _selectedDurationMinutes != null &&
@@ -573,21 +598,46 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                           ),
                           const SizedBox(height: 24),
                         ],
-                        _CouponSection(
-                          controller: _couponCtrl,
-                          appliedCode: _appliedCouponCode,
-                          discountPaise: _couponDiscountPaise,
-                          baseAmountPaise: subtotal,
-                          validating: _validatingCoupon,
-                          error: _couponError,
-                          enabled: _selectedDurationMinutes != null,
-                          onApply: _applyCoupon,
-                          onClear: _clearCoupon,
-                        ),
-                        const SizedBox(height: 24),
+                        if (_paymentMethod != 'play_pass') ...[
+                          _CouponSection(
+                            controller: _couponCtrl,
+                            appliedCode: _appliedCouponCode,
+                            discountPaise: _couponDiscountPaise,
+                            baseAmountPaise: subtotal,
+                            validating: _validatingCoupon,
+                            error: _couponError,
+                            enabled: _selectedDurationMinutes != null,
+                            onApply: _applyCoupon,
+                            onClear: _clearCoupon,
+                          ),
+                          const SizedBox(height: 24),
+                        ],
                         Text('Pay with',
                             style: AppTextStyles.bodyLarge(context)),
                         const SizedBox(height: 4),
+                        if (remainingPasses > 0)
+                          RadioListTile<String>(
+                            value: 'play_pass',
+                            groupValue: _paymentMethod,
+                            title: Text(
+                                'Play Pass ($remainingPasses left)'),
+                            subtitle: !passesEnough &&
+                                    _selectedDurationMinutes != null
+                                ? Text(
+                                    'Need ${_selectedChildIds.length} pass${_selectedChildIds.length == 1 ? '' : 'es'}',
+                                    style: const TextStyle(
+                                        color: AppColors.adminRed),
+                                  )
+                                : const Text(
+                                    '1 pass = 1 session for any kid'),
+                            onChanged: (v) => setState(() {
+                              _paymentMethod = v ?? 'wallet';
+                              // Coupons can't be combined with passes.
+                              if (_paymentMethod == 'play_pass') {
+                                _clearCoupon();
+                              }
+                            }),
+                          ),
                         RadioListTile<String>(
                           value: 'wallet',
                           groupValue: _paymentMethod,
@@ -600,8 +650,9 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                   style: TextStyle(color: AppColors.adminRed),
                                 )
                               : null,
-                          onChanged: (v) =>
-                              setState(() => _paymentMethod = v ?? 'wallet'),
+                          onChanged: (v) => setState(() {
+                            _paymentMethod = v ?? 'wallet';
+                          }),
                         ),
                         RadioListTile<String>(
                           value: 'cash',
@@ -610,8 +661,9 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                           subtitle: const Text(
                             'Pay our team when you check in',
                           ),
-                          onChanged: (v) =>
-                              setState(() => _paymentMethod = v ?? 'cash'),
+                          onChanged: (v) => setState(() {
+                            _paymentMethod = v ?? 'cash';
+                          }),
                         ),
                         if (_errorText != null) ...[
                           const SizedBox(height: 12),
@@ -632,11 +684,19 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                       ? 'Pick a duration'
                       : _selectedChildIds.isEmpty
                           ? 'Pick at least one kid'
-                          : _paymentMethod == 'wallet'
-                              ? 'Pay ${Money.fromPaise(finalAmount)} '
-                                  'from wallet'
-                              : 'Continue with cash',
-                  onPressed: canSubmit ? _start : null,
+                          : _paymentMethod == 'play_pass'
+                              ? passesEnough
+                                  ? 'Use ${_selectedChildIds.length} '
+                                      'Play Pass${_selectedChildIds.length == 1 ? '' : 'es'}'
+                                  : 'Not enough passes'
+                              : _paymentMethod == 'wallet'
+                                  ? 'Pay ${Money.fromPaise(finalAmount)} '
+                                      'from wallet'
+                                  : 'Continue with cash',
+                  onPressed: canSubmit &&
+                          (_paymentMethod != 'play_pass' || passesEnough)
+                      ? _start
+                      : null,
                   loading: _busy,
                 ),
               ],

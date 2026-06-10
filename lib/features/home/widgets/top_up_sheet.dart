@@ -525,6 +525,7 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
                   : _stage == _SheetStage.processing
                       ? const _ProcessingView()
                       : _PickingBody(
+                          offers: offers,
                           balancePaise: balance,
                           selectedAmountPaise: _selectedAmountPaise,
                           selectedBonusPaise: _selectedBonusPaise,
@@ -570,6 +571,7 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
 //  amount.
 // ---------------------------------------------------------------------------
 class _PickingBody extends StatelessWidget {
+  final List<Map<String, int>> offers;
   final int? balancePaise;
   final int? selectedAmountPaise;
   final int? selectedBonusPaise;
@@ -579,6 +581,7 @@ class _PickingBody extends StatelessWidget {
   final ValueChanged<String> onCustomChanged;
 
   const _PickingBody({
+    required this.offers,
     required this.balancePaise,
     required this.selectedAmountPaise,
     required this.selectedBonusPaise,

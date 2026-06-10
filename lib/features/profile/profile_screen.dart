@@ -14,12 +14,14 @@ import '../../core/providers/current_family_provider.dart';
 import '../../core/router/app_router.dart';
 import '../../core/providers/current_wallet_provider.dart';
 import '../../core/providers/family_children_provider.dart';
+import '../../core/providers/play_passes_provider.dart';
 import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/hero_avatar.dart';
+import '../home/widgets/play_pass_purchase_sheet.dart';
 import '../home/widgets/top_up_sheet.dart';
 import 'widgets/children_list.dart';
 import 'widgets/profile_header.dart';
@@ -71,6 +73,9 @@ class _Body extends ConsumerWidget {
 
         ProfileSectionHeader(title: 'Wallet'),
         _WalletSection(),
+
+        ProfileSectionHeader(title: 'Play Passes'),
+        _PlayPassesSection(),
 
         ProfileSectionHeader(title: 'Coins'),
         _CoinsSection(),
@@ -163,6 +168,189 @@ class _WalletSection extends ConsumerWidget {
           leading: PhosphorIconsRegular.clockCounterClockwise,
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+//  Play Passes section
+// ---------------------------------------------------------------------------
+class _PlayPassesSection extends ConsumerWidget {
+  const _PlayPassesSection();
+
+  void _buy(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const PlayPassPurchaseSheet(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final passesAsync = ref.watch(playPassesProvider);
+
+    return passesAsync.when(
+      loading: () => const ProfileSectionCard(children: [
+        ListTile(
+          leading: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          title: Text('Loading…'),
+        ),
+      ]),
+      error: (_, __) => ProfileSectionCard(
+        children: [
+          ListTile(
+            leading: const Icon(
+              PhosphorIconsRegular.warningCircle,
+              color: AppColors.lightTextSecondary,
+            ),
+            title: Text(
+              "Couldn't load passes. Pull to retry.",
+              style: AppTextStyles.body(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+      data: (passes) {
+        final totalRemaining = passes.fold<int>(
+          0,
+          (sum, p) =>
+              sum +
+              ((p['total_passes'] as int? ?? 0) -
+                  (p['used_passes'] as int? ?? 0)),
+        );
+
+        if (passes.isEmpty) {
+          return ProfileSectionCard(
+            children: [
+              ListTile(
+                leading: const Icon(
+                  PhosphorIconsRegular.ticket,
+                  color: AppColors.navy,
+                ),
+                title: Text(
+                  'No active passes',
+                  style: AppTextStyles.body(context),
+                ),
+                subtitle: Text(
+                  'Buy passes to save on every session',
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.lightTextSecondary,
+                  ),
+                ),
+                trailing: Material(
+                  color: AppColors.navy,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => _buy(context),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        'Buy',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        return ProfileSectionCard(
+          children: [
+            ListTile(
+              leading: const Icon(
+                PhosphorIconsFill.ticket,
+                color: AppColors.gold,
+              ),
+              title: Text(
+                '$totalRemaining active pass${totalRemaining == 1 ? '' : 'es'}',
+                style: AppTextStyles.body(context),
+              ),
+              trailing: Material(
+                color: AppColors.navy,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => _buy(context),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      'Buy more',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            for (final p in passes)
+              _PassRow(pass: p),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PassRow extends StatelessWidget {
+  final Map<String, dynamic> pass;
+  const _PassRow({required this.pass});
+
+  @override
+  Widget build(BuildContext context) {
+    final total = (pass['total_passes'] as int?) ?? 0;
+    final used = (pass['used_passes'] as int?) ?? 0;
+    final remaining = total - used;
+    final expiresAt =
+        DateTime.tryParse((pass['expires_at'] as String?) ?? '');
+    final daysLeft = expiresAt == null
+        ? null
+        : expiresAt.difference(DateTime.now()).inDays;
+
+    return ListTile(
+      leading: const Icon(
+        PhosphorIconsRegular.ticket,
+        color: AppColors.gold,
+      ),
+      title: Text(
+        '$total-session pack',
+        style: AppTextStyles.body(context).copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        '$used used · $remaining left'
+        '${daysLeft != null ? ' · expires in $daysLeft day${daysLeft == 1 ? '' : 's'}' : ''}',
+        style: AppTextStyles.caption(
+          context,
+          color: AppColors.lightTextSecondary,
+        ),
+      ),
     );
   }
 }

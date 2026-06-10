@@ -6,9 +6,9 @@ INSERT INTO public.coupons (
   max_uses, max_per_family, valid_from, valid_until, is_active, description
 ) VALUES
   ('SIBLING2', 'flat_off', 15000, NULL, 0, NULL, 1, now(), NULL, true, '₹150 off when booking 2 kids'),
-  ('SIBLING3', 'flat_off', 30000, NULL, 0, NULL, 1, now(), NULL, true, '₹300 off when booking 3 kids'),
-  ('SIBLING4', 'flat_off', 50000, NULL, 0, NULL, 1, now(), NULL, true, '₹500 off when booking 4 kids'),
-  ('SIBLING5', 'flat_off', 70000, NULL, 0, NULL, 1, now(), NULL, true, '₹700 off when booking 5+ kids')
+  ('SIBLING3', 'flat_off', 25000, NULL, 0, NULL, 1, now(), NULL, true, '₹250 off when booking 3 kids'),
+  ('SIBLING4', 'flat_off', 40000, NULL, 0, NULL, 1, now(), NULL, true, '₹400 off when booking 4 kids'),
+  ('SIBLING5', 'flat_off', 50000, NULL, 0, NULL, 1, now(), NULL, true, '₹500 off when booking 5+ kids')
 ON CONFLICT (code) DO UPDATE SET
   type = EXCLUDED.type,
   value = EXCLUDED.value,

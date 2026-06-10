@@ -11,6 +11,7 @@ import '../widgets/home_combos_strip.dart';
 import '../widgets/live_orders_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
 import '../widgets/order_food_card.dart';
+import '../widgets/play_pass_promo_card.dart';
 import '../widgets/recent_activity_list.dart';
 import '../widgets/referral_entry_card.dart';
 
@@ -61,6 +62,8 @@ class IdleHomeBody extends ConsumerWidget {
         Text("Let's get the kids playing! 🎉", style: AppTextStyles.body(context)),
         const SizedBox(height: 20),
         const BigStartSessionCard(),
+        const SizedBox(height: 12),
+        const PlayPassPromoCard(),
         // Order food without starting a session — e.g. parent drops by
         // just for coffee/snacks, or wants to pre-order while planning.
         const SizedBox(height: 12),
