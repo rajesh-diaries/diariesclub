@@ -36,6 +36,7 @@ import 'packages/packages_list_screen.dart';
 import 'providers/admin_auth_provider.dart';
 import 'refunds/refunds_queue_screen.dart';
 import 'reports/hall_of_heroes_screen.dart';
+import 'safari_waitlist/safari_waitlist_screen.dart';
 import 'shell.dart';
 import 'stubs/coming_soon_screen.dart';
 import 'users/users_screen.dart';
@@ -202,6 +203,10 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             path: '/admin/announcements/:id/edit',
             builder: (_, state) =>
                 AnnouncementEditScreen(id: state.pathParameters['id']),
+          ),
+          GoRoute(
+            path: '/admin/safari-waitlist',
+            builder: (_, __) => const SafariWaitlistScreen(),
           ),
           GoRoute(
             path: '/admin/notifications',

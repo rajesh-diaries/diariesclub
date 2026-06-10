@@ -34,7 +34,7 @@ CREATE POLICY "Allow admin select on safari_waitlist"
   FOR SELECT
   TO authenticated
   USING (EXISTS (
-    SELECT 1 FROM public.admins WHERE user_id = auth.uid()
+    SELECT 1 FROM public.admin_users WHERE auth_user_id = auth.uid() AND is_active = true
   ));
 
 -- RLS: only admins can update
@@ -43,8 +43,8 @@ CREATE POLICY "Allow admin update on safari_waitlist"
   FOR UPDATE
   TO authenticated
   USING (EXISTS (
-    SELECT 1 FROM public.admins WHERE user_id = auth.uid()
+    SELECT 1 FROM public.admin_users WHERE auth_user_id = auth.uid() AND is_active = true
   ))
   WITH CHECK (EXISTS (
-    SELECT 1 FROM public.admins WHERE user_id = auth.uid()
+    SELECT 1 FROM public.admin_users WHERE auth_user_id = auth.uid() AND is_active = true
   ));
