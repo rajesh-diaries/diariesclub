@@ -16,7 +16,6 @@ class HeroRecapCardWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionId = recap['session_id'] as String;
-    final totalXp = (recap['total_xp_pool'] as int?) ?? 0;
     final childName =
         ((recap['children'] as Map?)?['name'] as String?) ?? 'Your kid';
     final deadline = recap['reflection_deadline'] as String?;
@@ -54,19 +53,19 @@ class HeroRecapCardWidget extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Adventure Recap',
+                  'All Done!',
                   style: AppTextStyles.caption(context, color: Colors.white70),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              '$childName had an adventure!',
+              '$childName had a blast!',
               style: AppTextStyles.h2(context, color: Colors.white),
             ),
             const SizedBox(height: 6),
             Text(
-              'Tap to see what they earned.',
+              'Tap to see their stars!',
               style: AppTextStyles.body(context, color: Colors.white70),
             ),
             const SizedBox(height: 16),
@@ -78,7 +77,7 @@ class HeroRecapCardWidget extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Text(
-                '+$totalXp XP to share',
+                'Share their win!',
                 style: AppTextStyles.caption(context, color: AppColors.gold),
               ),
             ),
@@ -86,7 +85,7 @@ class HeroRecapCardWidget extends ConsumerWidget {
             Row(
               children: [
                 Text(
-                  'Reflect on the session',
+                  'What did they do?',
                   style: AppTextStyles.button(context, color: AppColors.gold),
                 ),
                 const SizedBox(width: 4),
@@ -101,8 +100,8 @@ class HeroRecapCardWidget extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(
                 hoursLeft <= 0
-                    ? 'Reflection window has just closed'
-                    : 'Reflection closes in ${hoursLeft}h',
+                    ? 'Time to share is up!'
+                    : 'Share their win in ${hoursLeft}h',
                 style: AppTextStyles.caption(
                   context,
                   color: AppColors.warningYellow,

@@ -90,10 +90,28 @@ class _SessionCompleteOverlayState extends State<SessionCompleteOverlay>
         child: Container(
           color: Colors.black.withValues(alpha: 0.88),
           child: SafeArea(
-            child: Column(
+            child: Stack(
               children: [
-                SizedBox(
-                  height: 240,
+                // Content centered with fixed gaps — no Spacers that expand
+                // into huge empty voids on tall screens.
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 40),
+                    _buildContent(context),
+                    const SizedBox(height: 48),
+                    Text(
+                      'Tap to continue',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: Colors.white38,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+                // Confetti overlays the full screen without pushing content.
+                Positioned.fill(
                   child: ConfettiWidget(
                     confettiController: _confetti,
                     blastDirectionality: BlastDirectionality.explosive,
@@ -111,17 +129,6 @@ class _SessionCompleteOverlayState extends State<SessionCompleteOverlay>
                     ],
                   ),
                 ),
-                const Spacer(),
-                _buildContent(context),
-                const Spacer(),
-                Text(
-                  'Tap to continue',
-                  style: AppTextStyles.caption(
-                    context,
-                    color: Colors.white38,
-                  ),
-                ),
-                const SizedBox(height: 24),
               ],
             ),
           ),

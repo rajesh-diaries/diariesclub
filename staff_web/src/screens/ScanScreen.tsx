@@ -60,24 +60,57 @@ export function ScanScreen() {
       restart()
       return
     }
+
     try {
-      await rpc('qr_scan_validate', {
+      // NOTE: We do NOT pass p_batch_mode here. The backend migration 0172
+      // reads batch_mode directly from the decoded QR payload, so the staff
+      // app doesn't need to pass it. This keeps the staff app compatible
+      // with both old and new backend versions.
+      const res = await rpc<{
+        success: boolean
+        batch_mode?: boolean
+        batch_count?: number
+        child_name?: string
+      }>('qr_scan_validate', {
         p_qr_payload: payload,
         p_staff_pin_id: staff.staffId,
       })
       setPhase('done')
-      setResult('Checked in — session is now live.')
+      if (res.batch_mode && (res.batch_count ?? 1) > 1) {
+        setResult(`Checked in ${res.batch_count} kids — sessions are now live.`)
+      } else {
+        setResult('Checked in — session is now live.')
+      }
       toast('Checked in ✓', 'ok')
       setTimeout(() => nav('/live'), 1200)
     } catch (err: any) {
-      const msg = String(err?.message ?? '')
-      setResult(
-        msg.includes('expired')
-          ? 'That QR has expired — ask them to reopen it.'
-          : msg.includes('not_found') || msg.includes('invalid')
-            ? "That QR isn't valid. Try the manual check-in."
-            : "Couldn't check in from that code.",
-      )
+      const msg = String(err?.message ?? '').toLowerCase()
+      console.error('[SCAN ERROR]', err)
+      let friendly: string
+      if (msg.includes('qr_already_scanned')) {
+        friendly = 'QR already scanned earlier.'
+      } else if (msg.includes('session_not_active')) {
+        friendly = 'Session is not active.'
+      } else if (msg.includes('session_not_found')) {
+        friendly = 'Session not found.'
+      } else if (msg.includes('qr_payload_invalid')) {
+        friendly = "That QR isn't valid. Try the manual check-in."
+      } else if (msg.includes('session_wrong_venue')) {
+        friendly = 'QR belongs to a different venue.'
+      } else if (msg.includes('family_deleted')) {
+        friendly = 'Family account is closed.'
+      } else if (msg.includes('tablet_not_authorised') || msg.includes('tablet_not_registered')) {
+        friendly = 'This phone is no longer registered. Sign in again.'
+      } else if (msg.includes('staff_not_authorised') || msg.includes('staff_not_found')) {
+        friendly = 'Staff PIN no longer active.'
+      } else if (msg.includes('venue_config_not_found')) {
+        friendly = 'Venue config missing — contact admin.'
+      } else if (msg.includes('expired')) {
+        friendly = 'That QR has expired — ask them to reopen it.'
+      } else {
+        friendly = msg ? `Scan failed: ${msg.slice(0, 120)}` : 'Scan failed.'
+      }
+      setResult(friendly)
       setPhase('done')
       toast('Scan failed', 'err')
     }
@@ -87,6 +120,7 @@ export function ScanScreen() {
     handledRef.current = false
     setResult(null)
     setPhase('starting')
+    controlsRef.current?.stop()
     const reader = new BrowserQRCodeReader()
     reader
       .decodeFromVideoDevice(undefined, videoRef.current!, (res, _e, controls) => {

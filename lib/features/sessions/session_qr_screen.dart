@@ -40,9 +40,17 @@ import '../../core/utils/currency.dart';
 /// clock is far off, the *visual* countdown drifts but the server-side
 /// cancellation is unaffected — the next status poll catches the
 /// real state. No money math runs on the client.
+///
+/// Batch mode: when [batchSessionIds] is non-empty, the QR payload
+/// includes batch_mode=true so one scan checks in all kids.
 class SessionQrScreen extends ConsumerStatefulWidget {
   final String sessionId;
-  const SessionQrScreen({super.key, required this.sessionId});
+  final List<String> batchSessionIds;
+  const SessionQrScreen({
+    super.key,
+    required this.sessionId,
+    this.batchSessionIds = const [],
+  });
 
   @override
   ConsumerState<SessionQrScreen> createState() => _SessionQrScreenState();
@@ -52,6 +60,9 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
   Map<String, dynamic>? _session;
   String? _qrPayload;
   String? _error;
+  String _childName = '';
+  // Batch mode: names of all children in the batch, in order.
+  final List<String> _batchChildNames = [];
 
   StreamSubscription<List<Map<String, dynamic>>>? _statusSub;
   Timer? _countdownTick;
@@ -100,6 +111,58 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
       final session = Map<String, dynamic>.from(row);
       final status = session['status'] as String?;
 
+      // Fetch child's name so the QR screen can personalise the title.
+      final childId = session['child_id'] as String?;
+      if (childId != null) {
+        try {
+          final childRow = await Supabase.instance.client
+              .from('children')
+              .select('name')
+              .eq('id', childId)
+              .maybeSingle();
+          _childName = (childRow?['name'] as String?) ?? '';
+        } catch (_) {
+          // Best-effort; leave _childName empty if fetch fails.
+        }
+      }
+
+      // Batch mode: fetch names for all children in the batch.
+      if (widget.batchSessionIds.isNotEmpty) {
+        try {
+          final rows = await Supabase.instance.client
+              .from('sessions')
+              .select('id, child_id')
+              .inFilter('id', widget.batchSessionIds);
+          final childIds = rows
+              .map((r) => r['child_id'] as String?)
+              .whereType<String>()
+              .toList();
+          if (childIds.isNotEmpty) {
+            final childrenRows = await Supabase.instance.client
+                .from('children')
+                .select('id, name')
+                .inFilter('id', childIds);
+            final nameMap = {
+              for (final r in childrenRows)
+                r['id'] as String: r['name'] as String? ?? '—',
+            };
+            _batchChildNames.clear();
+            for (final sid in widget.batchSessionIds) {
+              final row = rows.firstWhere(
+                (r) => r['id'] == sid,
+                orElse: () => <String, dynamic>{},
+              );
+              final cid = row['child_id'] as String?;
+              if (cid != null && nameMap.containsKey(cid)) {
+                _batchChildNames.add(nameMap[cid]!);
+              }
+            }
+          }
+        } catch (_) {
+          // Best-effort; batch names stay empty if fetch fails.
+        }
+      }
+
       // Pending sessions need a deadline. Pull venue timeout once, derive
       // deadline from server-stamped created_at, then run a 1Hz tick
       // locally + 2s status poll for state change detection.
@@ -132,6 +195,19 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
       if (!mounted) return;
       setState(() => _error = "Couldn't load session.");
     }
+  }
+
+  String _buildTitleText() {
+    if (_batchChildNames.isNotEmpty) {
+      if (_batchChildNames.length == 2) {
+        return "${_batchChildNames[0].split(' ').first} & ${_batchChildNames[1].split(' ').first}'s Pass";
+      } else if (_batchChildNames.length > 2) {
+        final firsts = _batchChildNames.map((n) => n.split(' ').first).toList();
+        return '${firsts.take(firsts.length - 1).join(", ")} & ${firsts.last}\'s Pass';
+      }
+    }
+    if (_childName.isEmpty) return 'Play Pass';
+    return "${_childName.split(' ').first}'s Pass";
   }
 
   void _startTickers() {
@@ -235,11 +311,14 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
     // Stub payload — signed-JWT replacement is BUG-002 (v1.1). The
     // session_id is unguessable and qr_scan_validate enforces single-use
     // via staff_scanned_at, so v1 trust holds for friends-and-family beta.
+    final isBatch = widget.batchSessionIds.isNotEmpty;
     final payload = {
       'v': 1,
       'session_id': session['id'],
       'family_id': session['family_id'],
       'expires_at': session['expires_at'],
+      if (isBatch) 'batch_mode': true,
+      if (isBatch) 'batch_session_ids': widget.batchSessionIds,
     };
     return base64Url.encode(utf8.encode(jsonEncode(payload)));
   }
@@ -372,7 +451,9 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
           foregroundColor: Colors.white,
           elevation: 0,
           title: Text(
-            status == 'cancelled_pre_scan' ? 'Session cancelled' : 'Adventure Pass',
+            status == 'cancelled_pre_scan'
+                ? 'Session cancelled'
+                : _buildTitleText(),
           ),
           leading: IconButton(
             tooltip: 'Done',
@@ -404,6 +485,8 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
                           remaining: _remaining,
                           cancelling: _cancelling,
                           onCancelNow: _cancelNow,
+                          childName: _childName,
+                          batchChildNames: _batchChildNames,
                         ),
         ),
       ),
@@ -419,6 +502,8 @@ class _Body extends StatefulWidget {
   final Duration remaining;
   final bool cancelling;
   final VoidCallback onCancelNow;
+  final String childName;
+  final List<String> batchChildNames;
 
   const _Body({
     required this.session,
@@ -428,6 +513,8 @@ class _Body extends StatefulWidget {
     required this.remaining,
     required this.cancelling,
     required this.onCancelNow,
+    required this.childName,
+    this.batchChildNames = const [],
   });
 
   @override
@@ -462,120 +549,105 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
     return '$m:$s';
   }
 
+  String _buildGreeting() {
+    final names = widget.batchChildNames.isNotEmpty
+        ? widget.batchChildNames
+        : (widget.childName.isEmpty ? <String>[] : [widget.childName]);
+    if (names.isEmpty) return "You're all set!";
+    if (names.length == 1) return '${names.first} is ready to play!';
+    if (names.length == 2) {
+      return '${names[0]} & ${names[1]} are ready to play!';
+    }
+    final firsts = names.take(names.length - 1).join(', ');
+    return '$firsts & ${names.last} are ready to play!';
+  }
+
   @override
   Widget build(BuildContext context) {
     final duration = widget.session['duration_minutes'] as int? ?? 0;
     final amount = widget.session['amount_paise'] as int? ?? 0;
     final paymentMethod = (widget.session['payment_method'] as String?) ?? '—';
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        children: [
-          const SizedBox(height: 8),
-          // Confetti burst at top
-          SizedBox(
-            height: 120,
-            child: ConfettiWidget(
-              confettiController: _confetti,
-              blastDirectionality: BlastDirectionality.explosive,
-              maxBlastForce: 15,
-              minBlastForce: 3,
-              emissionFrequency: 0.03,
-              numberOfParticles: 20,
-              gravity: 0.4,
-              colors: const [
-                AppColors.gold,
-                AppColors.rafiCoral,
-                AppColors.ellieBlue,
-                AppColors.gerryAmber,
-                AppColors.zenaGreen,
-              ],
-            ),
-          ),
-          // Sparkle icon
-          const Icon(
-            PhosphorIconsFill.sparkle,
-            color: AppColors.gold,
-            size: 48,
-          )
-              .animate()
-              .fadeIn(duration: 400.ms)
-              .scale(
-                begin: const Offset(0.5, 0.5),
-                duration: 500.ms,
-                curve: Curves.easeOutBack,
-              ),
-          const SizedBox(height: 12),
-          // Title
-          Text(
-            'Your Adventure Pass',
-            style: AppTextStyles.h2(context, color: Colors.white),
-            textAlign: TextAlign.center,
-          )
-              .animate(delay: 200.ms)
-              .fadeIn(duration: 400.ms)
-              .slideY(
-                begin: 0.3,
-                duration: 400.ms,
-                curve: Curves.easeOutCubic,
-              ),
-          const SizedBox(height: 4),
-          Text(
-            'is ready!',
-            style: AppTextStyles.body(context, color: Colors.white70),
-            textAlign: TextAlign.center,
-          ).animate(delay: 300.ms).fadeIn(duration: 400.ms),
-          const SizedBox(height: 24),
-          // Pulsing QR card
-          AnimatedBuilder(
-            animation: _pulse,
-            builder: (_, __) {
-              final glow = _pulse.value;
-              return Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AppColors.gold,
-                    width: 2 + glow * 2,
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            children: [
+              const SizedBox(height: 4),
+              // Sparkle icon
+              const Icon(
+                PhosphorIconsFill.sparkle,
+                color: AppColors.gold,
+                size: 32,
+              )
+                  .animate()
+                  .fadeIn(duration: 400.ms)
+                  .scale(
+                    begin: const Offset(0.5, 0.5),
+                    duration: 500.ms,
+                    curve: Curves.easeOutBack,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.gold.withValues(alpha: 0.2 + 0.3 * glow),
-                      blurRadius: 20 + 30 * glow,
-                      spreadRadius: 2 + 6 * glow,
+              const SizedBox(height: 6),
+              // Title — personalised with kid's name(s) when available.
+              Text(
+                _buildGreeting(),
+                style: AppTextStyles.h2(context, color: Colors.white),
+                textAlign: TextAlign.center,
+              )
+                  .animate(delay: 200.ms)
+                  .fadeIn(duration: 400.ms)
+                  .slideY(
+                    begin: 0.3,
+                    duration: 400.ms,
+                    curve: Curves.easeOutCubic,
+                  ),
+              const SizedBox(height: 2),
+              Text(
+                'Show this at the desk to check in.',
+                style: AppTextStyles.body(context, color: Colors.white70),
+                textAlign: TextAlign.center,
+              ).animate(delay: 300.ms).fadeIn(duration: 400.ms),
+              const SizedBox(height: 12),
+              // Pulsing QR card
+              AnimatedBuilder(
+                animation: _pulse,
+                builder: (_, __) {
+                  final glow = _pulse.value;
+                  return Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.gold,
+                        width: 2 + glow * 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.gold.withValues(alpha: 0.2 + 0.3 * glow),
+                          blurRadius: 20 + 30 * glow,
+                          spreadRadius: 2 + 6 * glow,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: QrImageView(
-                  data: widget.qrPayload,
-                  size: 240,
-                  version: QrVersions.auto,
-                  eyeStyle: const QrEyeStyle(
-                    eyeShape: QrEyeShape.square,
-                    color: AppColors.navy,
-                  ),
-                  dataModuleStyle: const QrDataModuleStyle(
-                    dataModuleShape: QrDataModuleShape.square,
-                    color: AppColors.navy,
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-          // Subtitle
-          Text(
-            'Show this at the desk. Staff will scan to start the adventure.',
-            style: AppTextStyles.body(
-              context,
-              color: Colors.white70,
-            ),
-            textAlign: TextAlign.center,
-          ).animate(delay: 500.ms).fadeIn(duration: 400.ms),
-          const SizedBox(height: 24),
+                    child: QrImageView(
+                      data: widget.qrPayload,
+                      size: 220,
+                      version: QrVersions.auto,
+                      eyeStyle: const QrEyeStyle(
+                        eyeShape: QrEyeShape.square,
+                        color: AppColors.navy,
+                      ),
+                      dataModuleStyle: const QrDataModuleStyle(
+                        dataModuleShape: QrDataModuleShape.square,
+                        color: AppColors.navy,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
           if (widget.isPending) ...[
             Container(
               padding: const EdgeInsets.symmetric(
@@ -673,7 +745,32 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
           const SizedBox(height: 24),
         ],
       ),
-    );
+    ),
+    // Confetti floats over everything without pushing content down.
+    Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 180,
+      child: ConfettiWidget(
+        confettiController: _confetti,
+        blastDirectionality: BlastDirectionality.explosive,
+        maxBlastForce: 15,
+        minBlastForce: 3,
+        emissionFrequency: 0.03,
+        numberOfParticles: 20,
+        gravity: 0.4,
+        colors: const [
+          AppColors.gold,
+          AppColors.rafiCoral,
+          AppColors.ellieBlue,
+          AppColors.gerryAmber,
+          AppColors.zenaGreen,
+        ],
+      ),
+    ),
+  ],
+);
   }
 }
 

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
-import '../../core/providers/current_family_provider.dart';
 import '../../core/providers/current_wallet_provider.dart';
 import '../../core/providers/notifications_provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -41,8 +40,6 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final family = ref.watch(currentFamilyProvider).valueOrNull;
-    final initials = _initials(family?['name'] as String?);
     final unread = ref.watch(unreadNotificationCountProvider);
     final balancePaise = ref.watch(walletBalancePaiseProvider);
 
@@ -57,44 +54,30 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
         children: [
           GestureDetector(
             onTap: () => context.go('/profile'),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: AppColors.gold.withValues(alpha: 0.30),
-              child: Text(
-                initials,
-                style: AppTextStyles.bodyLarge(
-                  context,
-                  color: AppColors.navy,
-                ),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.25),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const Icon(
+                PhosphorIconsFill.handWaving,
+                color: AppColors.navy,
+                size: 18,
               ),
             ),
           ),
           const SizedBox(width: 10),
-          // Wordmark: "Diaries ★ Club" — gold star between the two words.
-          // Sits next to the avatar so the brand reads at every Home open.
-          Text.rich(
-            TextSpan(
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: AppColors.navy,
-                letterSpacing: -0.2,
-              ),
-              children: [
-                const TextSpan(text: 'Play '),
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 1),
-                    child: Icon(
-                      PhosphorIconsFill.star,
-                      color: AppColors.gold,
-                      size: 14,
-                    ),
-                  ),
-                ),
-                const TextSpan(text: ' Diaries'),
-              ],
+          // Playful wordmark — no star, just bold fun text.
+          const Text(
+            'Play Diaries',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: AppColors.navy,
+              letterSpacing: -0.5,
             ),
           ),
         ],
@@ -154,13 +137,6 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
     );
   }
 
-  String _initials(String? fullName) {
-    if (fullName == null || fullName.trim().isEmpty) return '?';
-    final parts = fullName.trim().split(RegExp(r'\s+'));
-    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
-    return (parts.first.characters.first + parts.last.characters.first)
-        .toUpperCase();
-  }
 }
 
 /// Always-visible wallet balance pill — gold-tinted, star icon + amount.

@@ -11,6 +11,7 @@ import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/phone.dart';
+import '../../core/widgets/hero_avatar.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../flavors.dart';
 
@@ -134,20 +135,19 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
             children: [
               const SizedBox(height: 40),
 
-              // Four heroes — same circular layout as before, now with
-              // the actual character art. Tinted halo behind each PNG
-              // ties the row to the trait colour even with non-transparent
-              // backgrounds on the source images.
+              // Four heroes in a friendly row — rounded-square avatars
+              // so the full character art is visible (circles clip tall
+              // characters like Gerry's neck or Rafi's propeller).
               const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _HeroAvatar(asset: 'assets/hero/rafi.png', tint: AppColors.rafiCoral),
+                  HeroAvatar(heroId: 'rafi', size: 60),
                   SizedBox(width: 12),
-                  _HeroAvatar(asset: 'assets/hero/ellie.png', tint: AppColors.ellieBlue),
+                  HeroAvatar(heroId: 'ellie', size: 60),
                   SizedBox(width: 12),
-                  _HeroAvatar(asset: 'assets/hero/gerry.png', tint: AppColors.gerryAmber),
+                  HeroAvatar(heroId: 'gerry', size: 60),
                   SizedBox(width: 12),
-                  _HeroAvatar(asset: 'assets/hero/zena.png', tint: AppColors.zenaGreen),
+                  HeroAvatar(heroId: 'zena', size: 60),
                 ],
               ),
 
@@ -227,32 +227,6 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroAvatar extends StatelessWidget {
-  final String asset;
-  final Color tint;
-  const _HeroAvatar({required this.asset, required this.tint});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 56,
-      height: 56,
-      decoration: BoxDecoration(
-        color: tint.withValues(alpha: 0.15),
-        shape: BoxShape.circle,
-      ),
-      child: ClipOval(
-        child: Image.asset(
-          asset,
-          width: 56,
-          height: 56,
-          fit: BoxFit.cover,
         ),
       ),
     );

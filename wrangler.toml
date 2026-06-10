@@ -18,8 +18,4 @@ compatibility_date = "2026-05-04"
 pages_build_output_dir = "build/web"
 
 # Single-page app routing: every unmatched URL serves index.html so go_router
-# can resolve client-side. Cloudflare Pages reads this from web/_redirects;
-# the entry below mirrors it for the wrangler CLI.
-[[routes]]
-pattern = "/*"
-script = "index.html"
+# can resolve client-side. Cloudflare Pages reads this from web/_redirects.

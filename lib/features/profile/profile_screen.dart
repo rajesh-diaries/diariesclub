@@ -13,11 +13,13 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/providers/current_family_provider.dart';
 import '../../core/router/app_router.dart';
 import '../../core/providers/current_wallet_provider.dart';
+import '../../core/providers/family_children_provider.dart';
 import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../../core/widgets/error_screen.dart';
+import '../../core/widgets/hero_avatar.dart';
 import '../home/widgets/top_up_sheet.dart';
 import 'widgets/children_list.dart';
 import 'widgets/profile_header.dart';
@@ -344,23 +346,50 @@ class _HeroPerksSection extends ConsumerWidget {
       ),
       data: (rows) {
         if (rows.isEmpty) {
+          final children =
+              ref.watch(familyChildrenProvider).valueOrNull ?? const [];
+          final hero = (children.isNotEmpty
+                  ? children.first['favourite_hero'] as String?
+                  : null) ??
+              'rafi';
+          final heroPath = 'assets/hero/$hero.png';
+
           return ProfileSectionCard(
             children: [
-              ListTile(
-                leading: const Icon(
-                  PhosphorIconsRegular.gift,
-                  color: AppColors.lightTextSecondary,
-                ),
-                title: Text(
-                  'No perks waiting',
-                  style: AppTextStyles.body(context),
-                ),
-                subtitle: Text(
-                  'Reach a new stage to unlock real-world rewards.',
-                  style: AppTextStyles.caption(
-                    context,
-                    color: AppColors.lightTextSecondary,
-                  ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+                child: Column(
+                  children: [
+                    ColorFiltered(
+                      colorFilter: const ColorFilter.matrix([
+                        0.33, 0.33, 0.33, 0, 0,
+                        0.33, 0.33, 0.33, 0, 0,
+                        0.33, 0.33, 0.33, 0, 0,
+                        0, 0, 0, 0.35, 0,
+                      ]),
+                      child: Image.asset(
+                        heroPath,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Nothing here yet — go play to earn rewards!',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.body(context),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Complete sessions to unlock real-world perks.",
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -409,24 +438,10 @@ class _PickedPerkRow extends StatelessWidget {
     final daysLeft = expiresAt == null
         ? null
         : expiresAt.difference(DateTime.now()).inDays;
-    final traitColor = _traitColor(trait);
     final traitName = _traitName(trait);
 
     return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: traitColor.withValues(alpha: 0.20),
-        ),
-        child: Icon(
-          _traitIcon(trait),
-          color: traitColor,
-          size: 20,
-        ),
-      ),
+      leading: HeroAvatar(heroId: trait, size: 44),
       title: Text(
         label,
         style: AppTextStyles.body(context).copyWith(fontWeight: FontWeight.w800),
@@ -513,22 +528,6 @@ String _traitName(String t) => switch (t) {
       _ => '',
     };
 
-Color _traitColor(String t) => switch (t) {
-      'rafi' => AppColors.rafiCoral,
-      'ellie' => AppColors.ellieBlue,
-      'gerry' => AppColors.gerryAmber,
-      'zena' => AppColors.zenaGreen,
-      _ => AppColors.gold,
-    };
-
-IconData _traitIcon(String t) => switch (t) {
-      'rafi' => PhosphorIconsFill.shieldStar,
-      'ellie' => PhosphorIconsFill.heart,
-      'gerry' => PhosphorIconsFill.magnifyingGlass,
-      'zena' => PhosphorIconsFill.palette,
-      _ => PhosphorIconsFill.gift,
-    };
-
 class _UnchosenPerkRow extends ConsumerStatefulWidget {
   final Map<String, dynamic> row;
   const _UnchosenPerkRow({required this.row});
@@ -576,7 +575,6 @@ class _UnchosenPerkRowState extends ConsumerState<_UnchosenPerkRow> {
     final trait = widget.row['trait'] as String?;
     final childName = (widget.row['child_name'] as String?) ?? '';
     final traitName = _traitName(trait ?? '');
-    final traitColor = _traitColor(trait ?? '');
     final options = ref.watch(
       stagePerkOptionsProvider((stage: stage, trait: trait)),
     );
@@ -588,20 +586,7 @@ class _UnchosenPerkRowState extends ConsumerState<_UnchosenPerkRow> {
         children: [
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: traitColor.withValues(alpha: 0.20),
-                ),
-                child: Icon(
-                  _traitIcon(trait ?? ''),
-                  color: traitColor,
-                  size: 20,
-                ),
-              ),
+              HeroAvatar(heroId: trait ?? '', size: 44),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

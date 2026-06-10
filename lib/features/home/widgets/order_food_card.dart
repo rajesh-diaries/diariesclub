@@ -7,51 +7,53 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../club/providers/pending_club_tab_provider.dart';
 
-/// "Order food" CTA shown on multi-session home (i.e. while at least one
-/// kid is playing). Tap → opens /club on the Cafe tab so the parent can
-/// grab a coffee or snack while the kid plays. We force the Cafe tab via
-/// `pendingClubTabProvider` because ClubScreen's TabController persists
-/// across the bottom-nav shell, so a plain go('/club') could land on
-/// whatever tab the user last visited.
+/// "Order food" CTA on idle & multi-session home. Warm cream card that
+/// mirrors the Let's Play card layout — text left, button + Rafi right.
 class OrderFoodCard extends ConsumerWidget {
   const OrderFoodCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       onTap: () {
         ref.read(pendingClubTabProvider.notifier).state = 0; // Cafe
         context.go('/club');
       },
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         decoration: BoxDecoration(
-          color: AppColors.lightSurface,
-          border: Border.all(color: AppColors.lightBorder),
-          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFF5E6D3),
+              Color(0xFFE8D5C4),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppColors.coffeeBrown.withValues(alpha: 0.15),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.coffeeBrown.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.coffeeBrown.withValues(alpha: 0.20),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                PhosphorIconsFill.coffee,
-                color: AppColors.coffeeBrown,
-                size: 26,
-              ),
-            ),
-            const SizedBox(width: 16),
+            // Left text
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Order food', style: AppTextStyles.h3(context)),
+                  Text(
+                    'Order food',
+                    style: AppTextStyles.h3(context),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     'Coffee, snacks, meals',
@@ -63,7 +65,55 @@ class OrderFoodCard extends ConsumerWidget {
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward, color: AppColors.navy),
+            // Action button
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  ref.read(pendingClubTabProvider.notifier).state = 0;
+                  context.go('/club');
+                },
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: 0.60),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        PhosphorIconsFill.coffee,
+                        color: AppColors.coffeeBrown,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'ORDER',
+                        style: TextStyle(
+                          color: AppColors.coffeeBrown,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
           ],
         ),
       ),

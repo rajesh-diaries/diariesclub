@@ -8,8 +8,10 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/providers/active_sessions_provider.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/current_wallet_provider.dart';
 import '../../../core/providers/family_children_provider.dart';
 import '../../../core/providers/venue_config_provider.dart';
+import '../../sessions/widgets/insufficient_balance_sheet.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
@@ -41,6 +43,7 @@ class ComboPurchaseSheet extends ConsumerStatefulWidget {
 
 class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
   String? _selectedChildId;
+  String _paymentMethod = 'wallet';
   bool _busy = false;
   String? _errorText;
   List<Map<String, dynamic>> _itemRows = const [];
@@ -99,6 +102,30 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
     if (familyId == null) return;
     if (withSession && _selectedChildId == null) return;
 
+    final price = (combo['price_paise'] as int?) ?? 0;
+
+    // Pre-check wallet balance so we surface the sheet before calling
+    // order_place, matching the session-start flow.
+    if (_paymentMethod == 'wallet') {
+      final balance = ref.read(walletBalancePaiseProvider) ?? 0;
+      if (balance < price) {
+        showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          useRootNavigator: true,
+          builder: (_) => InsufficientBalanceSheet(
+            requiredPaise: price,
+            onSwitchToCash: () {
+              if (!mounted) return;
+              setState(() => _paymentMethod = 'cash');
+            },
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() {
       _busy = true;
       _errorText = null;
@@ -124,7 +151,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
           }
         ],
         'p_fulfillment_mode': 'dine_in',
-        'p_payment_method': 'wallet',
+        'p_payment_method': _paymentMethod,
         'p_combo_id': null,
         if (withSession) 'p_child_id': _selectedChildId,
         'p_idempotency_key': const Uuid().v4(),
@@ -157,7 +184,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
       setState(() {
         _busy = false;
         _errorText = e.message.contains('insufficient_balance')
-            ? 'Wallet balance is short. Top up to continue.'
+            ? 'Wallet balance is short. Switch to cash or top up.'
             : "Couldn't purchase combo: ${e.message}";
       });
     } catch (e) {
@@ -392,6 +419,32 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
               ),
             ],
             const SizedBox(height: 20),
+            // Payment method picker — wallet or cash at venue.
+            Text('Pay with', style: AppTextStyles.bodyLarge(context)),
+            const SizedBox(height: 4),
+            RadioListTile<String>(
+              value: 'wallet',
+              groupValue: _paymentMethod,
+              title: Text('Wallet'),
+              subtitle: _paymentMethod == 'wallet'
+                  ? Text(
+                      'Balance: ${Money.fromPaise(ref.watch(walletBalancePaiseProvider) ?? 0)}',
+                      style: AppTextStyles.caption(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    )
+                  : null,
+              onChanged: (v) => setState(() => _paymentMethod = v ?? 'wallet'),
+            ),
+            RadioListTile<String>(
+              value: 'cash',
+              groupValue: _paymentMethod,
+              title: const Text('Cash at venue'),
+              subtitle: const Text('Pay our team when you check in'),
+              onChanged: (v) => setState(() => _paymentMethod = v ?? 'cash'),
+            ),
+            const SizedBox(height: 20),
             // Primary: place order straight from the sheet. Bypasses the
             // /club cart for the high-intent combo path.
             FilledButton(
@@ -417,7 +470,9 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
                       ),
                     )
                   : Text(
-                      'Place order · ${Money.fromPaise(grandTotal)}',
+                      _paymentMethod == 'wallet'
+                          ? 'Pay ${Money.fromPaise(grandTotal)} from wallet'
+                          : 'Continue with cash',
                       style: AppTextStyles.body(context).copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w800,

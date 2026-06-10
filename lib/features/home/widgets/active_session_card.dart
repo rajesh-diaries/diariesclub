@@ -95,8 +95,8 @@ class _ActiveSessionsCardState extends ConsumerState<ActiveSessionsCard> {
               const SizedBox(width: 8),
               Text(
                 entries.length == 1
-                    ? 'PLAYING NOW'
-                    : '${entries.length} PLAYING NOW',
+                    ? 'Playing now!'
+                    : '${entries.length} playing now!',
                 style: const TextStyle(
                   color: AppColors.gold,
                   fontSize: 11,
@@ -224,12 +224,11 @@ class _Entry {
     final diff = end.difference(now);
     if (isGrace) {
       final over = (-diff.inMinutes).clamp(0, 999);
-      return over == 0 ? '0m' : '+${over}m';
+      return over == 0 ? '0' : '+$over';
     }
     final mins = diff.inMinutes;
-    final secs = diff.inSeconds.remainder(60);
     if (mins >= 60) return '${mins ~/ 60}h ${mins % 60}m';
-    return '$mins:${secs.toString().padLeft(2, '0')}';
+    return '$mins';
   }
 
   /// Status word beneath the kid's name.

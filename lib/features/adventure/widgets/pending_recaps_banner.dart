@@ -53,8 +53,8 @@ class PendingRecapsBanner extends ConsumerWidget {
                   children: [
                     Text(
                       extra > 0
-                          ? '${mine.length} reflections waiting'
-                          : 'Reflection waiting',
+                          ? '${mine.length} wins to share! 🌟'
+                          : 'Look Back! 🌟',
                       style:
                           AppTextStyles.bodyLarge(context, color: Colors.white),
                     ),

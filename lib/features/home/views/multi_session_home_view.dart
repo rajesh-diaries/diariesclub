@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/active_sessions_provider.dart';
 import '../../../core/providers/current_family_provider.dart';
 import '../../../core/providers/family_children_provider.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../widgets/active_session_card.dart';
 import '../widgets/announcements_feed.dart';
@@ -13,7 +12,6 @@ import '../widgets/home_combos_strip.dart';
 import '../widgets/my_upcoming_workshops.dart';
 import '../widgets/live_orders_card.dart';
 import '../widgets/order_food_card.dart';
-import '../widgets/pending_reflections_section.dart';
 import '../widgets/recent_activity_list.dart';
 import '../widgets/referral_invite_card.dart';
 import '../widgets/start_session_card.dart';
@@ -51,28 +49,16 @@ class MultiSessionHomeView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  familyName.isEmpty
-                      ? 'Hi there 👋'
-                      : 'Hi, ${familyName.split(' ').first} 👋',
-                  style: AppTextStyles.h2(context),
-                ),
-              ),
-              Text(
-                // Count by unique child — matches ActiveSessionsCard's
-                // dedupe so the badge can never disagree with the rings.
-                childrenInSession.length == 1
-                    ? '1 playing'
-                    : '${childrenInSession.length} playing',
-                style: AppTextStyles.caption(
-                  context,
-                  color: AppColors.lightTextSecondary,
-                ),
-              ),
-            ],
+          Text(
+            familyName.isEmpty ? 'Hey there!' : 'Hey ${familyName.split(' ').first}!',
+            style: AppTextStyles.h2(context),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "Let's get the kids playing! 🎉",
+            style: AppTextStyles.body(context),
           ),
           const SizedBox(height: 16),
           ActiveSessionsCard(sessions: sessions),
@@ -95,11 +81,6 @@ class MultiSessionHomeView extends ConsumerWidget {
             const SizedBox(height: 12),
             const StartSessionCard(),
           ],
-          // Pending reflections for siblings whose sessions ended within
-          // the last 24h. Sits below the live-session block so the active
-          // play stays the visual priority, but parent still sees what
-          // needs reflecting next.
-          const PendingReflectionsSection(),
           // Active-session view always shows the invite card (referral
           // redemption is gated on no completed sessions — by the time
           // the family is here, they can't redeem someone else's code

@@ -25,6 +25,18 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
+class _WelcomeEntry {
+  final String sessionId;
+  final String childName;
+  final String? favouriteHero;
+
+  const _WelcomeEntry({
+    required this.sessionId,
+    required this.childName,
+    this.favouriteHero,
+  });
+}
+
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   ProviderSubscription<AsyncValue<HomeState>>? _sub;
 
@@ -32,7 +44,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // don't greet the same session twice on rebuilds.
   final _greetedSessionIds = <String>{};
 
-  // Session ID currently showing the welcome overlay (null = none).
+  // Queue of fresh sessions waiting for the welcome overlay.
+  final _welcomeQueue = <_WelcomeEntry>[];
+
+  // Currently showing welcome overlay (null = none).
   String? _welcomingSessionId;
   String _welcomeChildName = '';
   String? _welcomeFavouriteHero;
@@ -68,12 +83,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  /// Detects any session that started within the last 30s and hasn't
-  /// been greeted yet. Returns the child name + hero for the overlay.
-  ({String childName, String? favouriteHero})? _freshSessionToGreet(
+  /// Detects all sessions that started within the last 15s and haven't
+  /// been greeted yet. Returns a list of welcome entries.
+  List<_WelcomeEntry> _freshSessionsToGreet(
     List<Map<String, dynamic>> sessions,
   ) {
     final now = DateTime.now();
+    final children =
+        ref.read(familyChildrenProvider).valueOrNull ?? const [];
+    final result = <_WelcomeEntry>[];
+
     for (final s in sessions) {
       final id = s['id'] as String?;
       if (id == null || _greetedSessionIds.contains(id)) continue;
@@ -83,36 +102,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final startedAt = DateTime.tryParse(startedAtStr);
       if (startedAt == null) continue;
 
-      // Only greet sessions that started in the last 5 minutes.
-      if (now.difference(startedAt).inSeconds > 300) continue;
+      // Only greet sessions that started in the last 15 seconds.
+      // 5 minutes was too long — old sessions re-triggered on rebuilds.
+      if (now.difference(startedAt).inSeconds > 15) continue;
 
       final childId = s['child_id'] as String?;
       if (childId == null) continue;
 
-      final children =
-          ref.read(familyChildrenProvider).valueOrNull ?? const [];
       final child = children.cast<Map<String, dynamic>?>().firstWhere(
             (c) => c?['id'] == childId,
             orElse: () => null,
           );
       if (child == null) continue;
 
-      return (
+      result.add(_WelcomeEntry(
+        sessionId: id,
         childName: child['name'] as String? ?? '',
         favouriteHero: child['favourite_hero'] as String?,
-      );
+      ));
     }
-    return null;
+    return result;
   }
 
   void _onWelcomeDismissed() {
     final id = _welcomingSessionId;
+    if (id != null) _greetedSessionIds.add(id);
+
+    // If there are more queued welcomes, pop the next one immediately.
+    if (_welcomeQueue.isNotEmpty) {
+      final next = _welcomeQueue.removeAt(0);
+      setState(() {
+        _welcomingSessionId = next.sessionId;
+        _welcomeChildName = next.childName;
+        _welcomeFavouriteHero = next.favouriteHero;
+      });
+      return;
+    }
+
     setState(() {
       _welcomingSessionId = null;
       _welcomeChildName = '';
       _welcomeFavouriteHero = null;
     });
-    if (id != null) _greetedSessionIds.add(id);
   }
 
   @override
@@ -123,24 +154,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // Trigger welcome overlay for freshly-started sessions.
     if (_welcomingSessionId == null) {
-      final greet = _freshSessionToGreet(activeSessions);
-      if (greet != null) {
-        final freshId = activeSessions
-            .firstWhere((s) {
-              final startedAt = DateTime.tryParse(
-                (s['started_at'] as String?) ?? '',
-              );
-              return startedAt != null &&
-                  DateTime.now().difference(startedAt).inSeconds <= 300;
-            }, orElse: () => const <String, dynamic>{})['id']
-            ?.toString();
-        if (freshId != null) {
-          setState(() {
-            _welcomingSessionId = freshId;
-            _welcomeChildName = greet.childName;
-            _welcomeFavouriteHero = greet.favouriteHero;
-          });
-        }
+      final freshList = _freshSessionsToGreet(activeSessions);
+      if (freshList.isNotEmpty) {
+        // Start with the first, queue the rest.
+        final first = freshList.first;
+        final rest = freshList.skip(1).toList();
+        _welcomeQueue.addAll(rest);
+        setState(() {
+          _welcomingSessionId = first.sessionId;
+          _welcomeChildName = first.childName;
+          _welcomeFavouriteHero = first.favouriteHero;
+        });
       }
     }
 
@@ -177,6 +201,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           body,
           Positioned.fill(
             child: SessionWelcomeOverlay(
+              key: ValueKey(_welcomingSessionId),
               childName: _welcomeChildName,
               favouriteHero: _welcomeFavouriteHero,
               onDismissed: _onWelcomeDismissed,
@@ -188,7 +213,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       appBar: const HomeAppBar(),
-      body: body,
+      body: SafeArea(child: body),
     );
   }
 }

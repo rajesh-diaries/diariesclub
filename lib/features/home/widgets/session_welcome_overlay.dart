@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -7,15 +8,12 @@ import 'package:video_player/video_player.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import 'welcome_video_js.dart'
-    if (dart.library.html) 'welcome_video_js_web.dart';
 
 /// Full-screen welcome overlay shown once when a session freshly starts.
 ///
-/// Web: uses HtmlElementView with a native <video> element injected via JS.
-/// Mobile: uses video_player package.
-///
-/// Place clips at: assets/welcome_clips/{hero}_1.mp4, {hero}_2.mp4, etc.
+/// Tries to play a hero video clip. If the video fails or doesn't render
+/// within 1.5s, falls back to an animated hero image (pulsing glow +
+/// floating sparkles) which looks intentional and delightful.
 class SessionWelcomeOverlay extends StatefulWidget {
   final String childName;
   final String? favouriteHero;
@@ -33,8 +31,10 @@ class SessionWelcomeOverlay extends StatefulWidget {
 }
 
 class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay> {
-  VideoPlayerController? _videoController;
+  VideoPlayerController? _controller;
   bool _videoReady = false;
+  Timer? _endPoller;
+  Timer? _safetyDismiss;
 
   static const _heroAssets = <String, String>{
     'rafi': 'assets/hero/rafi.png',
@@ -70,185 +70,201 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay> {
     return _greetings[idx];
   }
 
-  String get _videoUrl {
-    final hero = widget.favouriteHero ?? 'rafi';
-    return 'assets/assets/welcome_clips/${hero}_1.mp4';
-  }
+  static final _random = Random();
+  static const _videoExtensions = ['.mp4'];
+
+  /// Actual clip counts per hero — keep this in sync with files in
+  /// assets/welcome_clips/. Missing heroes default to 0 (always fallback).
+  static const _clipCounts = <String, int>{
+    'gerry': 1,
+    'rafi': 5,
+    'zena': 4,
+    'ellie': 0,
+  };
 
   @override
   void initState() {
     super.initState();
+    _initVideo();
 
-    if (!kIsWeb) {
-      _initMobileVideo();
-    }
+    // If video hasn't rendered within 4s, trigger rebuild so the
+    // animated hero fallback appears while video keeps trying.
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted && !_videoReady) setState(() {});
+    });
 
-    // Auto-dismiss after 5 seconds max.
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) widget.onDismissed();
+    // Safety dismiss after 10 seconds.
+    _safetyDismiss = Timer(const Duration(seconds: 10), () {
+      if (mounted) _dismiss();
     });
   }
 
-  Future<void> _initMobileVideo() async {
-    try {
-      final clipPath = HeroClipPicker.randomClip(
-        widget.favouriteHero ?? 'rafi',
-        maxClips: 1,
-      );
-      final controller = VideoPlayerController.asset(clipPath);
-      await controller.initialize();
-      if (!mounted) return;
-      controller.setLooping(false);
-      controller.setVolume(0);
-      controller.play();
-      setState(() => _videoReady = true);
-    } catch (e) {
-      debugPrint('[SessionWelcomeOverlay] mobile video failed: $e');
+  void _dismiss() {
+    _safetyDismiss?.cancel();
+    _endPoller?.cancel();
+    widget.onDismissed();
+  }
+
+  Future<void> _initVideo() async {
+    final hero = widget.favouriteHero ?? 'rafi';
+    final count = _clipCounts[hero] ?? 0;
+    if (count == 0) {
+      if (mounted) setState(() {});
+      return;
     }
+    final idx = _random.nextInt(count) + 1;
+
+    for (final ext in _videoExtensions) {
+      final path = kIsWeb
+          ? 'welcome_clips/${hero}_$idx$ext'
+          : 'assets/welcome_clips/${hero}_$idx$ext';
+
+      try {
+        final controller = VideoPlayerController.asset(path);
+        await controller.initialize();
+        if (!mounted) {
+          controller.dispose();
+          return;
+        }
+        final size = controller.value.size;
+        if (size.width <= 0 || size.height <= 0) {
+          controller.dispose();
+          continue;
+        }
+        _controller = controller;
+        controller.setLooping(false);
+        controller.setVolume(0);
+        await controller.play();
+        setState(() => _videoReady = true);
+
+        // Poll every 300ms to detect video end — more reliable than
+        // a listener that can miss the exact frame.
+        _endPoller = Timer.periodic(const Duration(milliseconds: 300), (_) {
+          final c = _controller;
+          if (c == null || !c.value.isInitialized) return;
+          final pos = c.value.position;
+          final dur = c.value.duration;
+          final nearEnd = dur.inMilliseconds > 0 &&
+              pos.inMilliseconds >= dur.inMilliseconds - 500;
+          final stoppedPlaying = !c.value.isPlaying &&
+              pos > const Duration(milliseconds: 500);
+          if (nearEnd || stoppedPlaying) {
+            _endPoller?.cancel();
+            if (mounted) _dismiss();
+          }
+        });
+        return;
+      } catch (e) {
+        debugPrint('Welcome clip failed: $path — $e');
+      }
+    }
+
+    // all extensions failed
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    _videoController?.dispose();
+    _endPoller?.cancel();
+    _safetyDismiss?.cancel();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: widget.onDismissed,
-      child: Container(
-        color: AppColors.navy.withValues(alpha: 0.92),
-        child: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Hero avatar — flat square, no rotation
-              if (kIsWeb)
-                _WebVideoBox(
-                  videoUrl: _videoUrl,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Background + content
+        Container(
+          color: AppColors.navy.withValues(alpha: 0.92),
+          child: SafeArea(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _SparkleFrame(
                   heroColor: _heroColor,
-                  onEnded: widget.onDismissed,
+                  child: _videoReady && _controller != null
+                      ? _VideoBox(
+                          controller: _controller!,
+                          heroColor: _heroColor,
+                        )
+                      : _AnimatedHeroBox(
+                          heroAsset: _heroAsset,
+                          heroColor: _heroColor,
+                        ),
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'Welcome, ${widget.childName}!',
+                  style: AppTextStyles.h1(context).copyWith(
+                    color: Colors.white,
+                    fontSize: 32,
+                  ),
+                  textAlign: TextAlign.center,
                 )
-              else if (_videoReady && _videoController != null)
-                _MobileVideoBox(
-                  controller: _videoController!,
-                  heroColor: _heroColor,
+                    .animate()
+                    .fadeIn(delay: 200.ms, duration: 500.ms)
+                    .slideY(begin: 0.3, end: 0, duration: 500.ms),
+                const SizedBox(height: 8),
+                Text(
+                  _greeting,
+                  style: AppTextStyles.bodyLarge(context).copyWith(
+                    color: _heroColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  textAlign: TextAlign.center,
                 )
-              else
-                _StaticBox(
-                  heroAsset: _heroAsset,
-                  heroColor: _heroColor,
-                ),
-              const SizedBox(height: 32),
-              Text(
-                'Welcome, ${widget.childName}!',
-                style: AppTextStyles.h1(context).copyWith(
-                  color: Colors.white,
-                  fontSize: 32,
-                ),
-                textAlign: TextAlign.center,
-              )
-                  .animate()
-                  .fadeIn(delay: 200.ms, duration: 500.ms)
-                  .slideY(begin: 0.3, end: 0, duration: 500.ms),
-              const SizedBox(height: 8),
-              Text(
-                _greeting,
-                style: AppTextStyles.bodyLarge(context).copyWith(
-                  color: _heroColor,
-                  fontWeight: FontWeight.w800,
-                ),
-                textAlign: TextAlign.center,
-              )
-                  .animate()
-                  .fadeIn(delay: 400.ms, duration: 500.ms)
-                  .slideY(begin: 0.2, end: 0, duration: 500.ms),
-              const SizedBox(height: 48),
-              Text(
-                'Tap anywhere to skip',
-                style: AppTextStyles.caption(
-                  context,
-                  color: Colors.white.withValues(alpha: 0.50),
-                ),
-              ).animate().fadeIn(delay: 1200.ms, duration: 600.ms),
-            ],
+                    .animate()
+                    .fadeIn(delay: 400.ms, duration: 500.ms)
+                    .slideY(begin: 0.2, end: 0, duration: 500.ms),
+                const SizedBox(height: 48),
+                // Explicit skip button — more reliable than "tap anywhere".
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _dismiss,
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.30),
+                        ),
+                      ),
+                      child: Text(
+                        'Skip welcome',
+                        style: AppTextStyles.caption(
+                          context,
+                          color: Colors.white.withValues(alpha: 0.90),
+                        ).copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ).animate().fadeIn(delay: 800.ms, duration: 500.ms),
+              ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-//  Web native video — flat square, uses JS-injected <video> element.
+//  Video box — shown when video loads successfully.
 // ---------------------------------------------------------------------------
-class _WebVideoBox extends StatefulWidget {
-  final String videoUrl;
-  final Color heroColor;
-  final VoidCallback onEnded;
-
-  const _WebVideoBox({
-    required this.videoUrl,
-    required this.heroColor,
-    required this.onEnded,
-  });
-
-  @override
-  State<_WebVideoBox> createState() => _WebVideoBoxState();
-}
-
-class _WebVideoBoxState extends State<_WebVideoBox> {
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(milliseconds: 100), () {
-      jsInjectVideo(widget.videoUrl, widget.onEnded);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 200,
-      height: 200,
-      decoration: BoxDecoration(
-        color: widget.heroColor.withValues(alpha: 0.20),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: widget.heroColor.withValues(alpha: 0.50),
-          width: 3,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: widget.heroColor.withValues(alpha: 0.30),
-            blurRadius: 40,
-            spreadRadius: 8,
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: const HtmlElementView(viewType: 'welcome-video-view'),
-    )
-        .animate()
-        .scale(
-          begin: const Offset(0.6, 0.6),
-          end: const Offset(1.0, 1.0),
-          duration: 600.ms,
-          curve: Curves.elasticOut,
-        )
-        .fadeIn(duration: 400.ms);
-  }
-}
-
-// ---------------------------------------------------------------------------
-//  Mobile video — flat square, no rotation.
-// ---------------------------------------------------------------------------
-class _MobileVideoBox extends StatelessWidget {
+class _VideoBox extends StatelessWidget {
   final VideoPlayerController controller;
   final Color heroColor;
 
-  const _MobileVideoBox({required this.controller, required this.heroColor});
+  const _VideoBox({required this.controller, required this.heroColor});
 
   @override
   Widget build(BuildContext context) {
@@ -271,13 +287,8 @@ class _MobileVideoBox extends StatelessWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: FittedBox(
-        fit: BoxFit.cover,
-        child: SizedBox(
-          width: controller.value.size.width,
-          height: controller.value.size.height,
-          child: VideoPlayer(controller),
-        ),
+      child: IgnorePointer(
+        child: VideoPlayer(controller),
       ),
     )
         .animate()
@@ -292,13 +303,81 @@ class _MobileVideoBox extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-//  Static fallback — flat square, NO rotation/tilt.
+//  Animated hero image — pulsing glow + floating sparkles.
+//  This is the fallback when video fails, and it looks intentional.
 // ---------------------------------------------------------------------------
-class _StaticBox extends StatelessWidget {
+class _AnimatedHeroBox extends StatelessWidget {
   final String heroAsset;
   final Color heroColor;
 
-  const _StaticBox({required this.heroAsset, required this.heroColor});
+  const _AnimatedHeroBox({
+    required this.heroAsset,
+    required this.heroColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 200,
+      height: 200,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Pulsing glow behind the image.
+          _PulsingGlow(color: heroColor),
+          // Hero image with elastic entrance.
+          Container(
+            width: 160,
+            height: 160,
+            decoration: BoxDecoration(
+              color: heroColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: heroColor.withValues(alpha: 0.40),
+                width: 2,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            padding: const EdgeInsets.all(10),
+            child: Image.asset(
+              heroAsset,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.face,
+                size: 72,
+                color: Colors.white,
+              ),
+            ),
+          )
+              .animate()
+              .scale(
+                begin: const Offset(0.5, 0.5),
+                end: const Offset(1.0, 1.0),
+                duration: 700.ms,
+                curve: Curves.elasticOut,
+              )
+              .fadeIn(duration: 400.ms),
+          // Floating sparkles.
+          const _FloatingSparkle(delay: Duration.zero, top: 12, right: 20),
+          const _FloatingSparkle(
+            delay: Duration(milliseconds: 400),
+            bottom: 20,
+            left: 16,
+          ),
+          const _FloatingSparkle(
+            delay: Duration(milliseconds: 800),
+            top: 40,
+            left: 24,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PulsingGlow extends StatelessWidget {
+  final Color color;
+  const _PulsingGlow({required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -306,53 +385,105 @@ class _StaticBox extends StatelessWidget {
       width: 180,
       height: 180,
       decoration: BoxDecoration(
-        color: heroColor.withValues(alpha: 0.20),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: heroColor.withValues(alpha: 0.50),
-          width: 3,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: heroColor.withValues(alpha: 0.30),
-            blurRadius: 40,
-            spreadRadius: 8,
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Image.asset(
-          heroAsset,
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => const Icon(
-            Icons.face,
-            size: 80,
-            color: Colors.white,
-          ),
-        ),
       ),
     )
-        .animate()
+        .animate(onPlay: (c) => c.repeat(reverse: true))
         .scale(
-          begin: const Offset(0.6, 0.6),
-          end: const Offset(1.0, 1.0),
-          duration: 600.ms,
-          curve: Curves.elasticOut,
+          begin: const Offset(0.85, 0.85),
+          end: const Offset(1.15, 1.15),
+          duration: 1400.ms,
+          curve: Curves.easeInOut,
         )
-        .fadeIn(duration: 400.ms);
+        .fadeIn(duration: 300.ms);
   }
 }
 
 // ---------------------------------------------------------------------------
-//  Random clip selector.
+//  Sparkle frame — wraps any child with pulsing glow + floating stars.
+//  Used around both the video and the animated hero fallback.
 // ---------------------------------------------------------------------------
-class HeroClipPicker {
-  static final _random = Random();
+class _SparkleFrame extends StatelessWidget {
+  final Widget child;
+  final Color heroColor;
 
-  static String randomClip(String hero, {int maxClips = 1}) {
-    final idx = _random.nextInt(maxClips) + 1;
-    return 'assets/welcome_clips/${hero}_$idx.mp4';
+  const _SparkleFrame({
+    required this.child,
+    required this.heroColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 200,
+      height: 200,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          _PulsingGlow(color: heroColor),
+          child,
+          const _FloatingSparkle(delay: Duration.zero, top: 12, right: 20),
+          const _FloatingSparkle(
+            delay: Duration(milliseconds: 400),
+            bottom: 20,
+            left: 16,
+          ),
+          const _FloatingSparkle(
+            delay: Duration(milliseconds: 800),
+            top: 40,
+            left: 24,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FloatingSparkle extends StatelessWidget {
+  final Duration delay;
+  final double? top;
+  final double? bottom;
+  final double? left;
+  final double? right;
+
+  const _FloatingSparkle({
+    required this.delay,
+    this.top,
+    this.bottom,
+    this.left,
+    this.right,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: top,
+      bottom: bottom,
+      left: left,
+      right: right,
+      child: Icon(
+        Icons.star,
+        color: AppColors.gold.withValues(alpha: 0.80),
+        size: 18,
+      )
+          .animate(delay: delay)
+          .fadeIn(duration: 400.ms)
+          .then()
+          .scale(
+            begin: const Offset(0.6, 0.6),
+            end: const Offset(1.2, 1.2),
+            duration: 800.ms,
+            curve: Curves.easeInOut,
+          )
+          .then()
+          .scale(
+            begin: const Offset(1.2, 1.2),
+            end: const Offset(0.6, 0.6),
+            duration: 800.ms,
+            curve: Curves.easeInOut,
+          )
+          .slideY(begin: 0, end: -12, duration: 1600.ms),
+    );
   }
 }

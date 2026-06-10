@@ -32,7 +32,7 @@ class HomeCombosStrip extends ConsumerWidget {
         Row(
           children: [
             Expanded(
-              child: Text('Quick combos', style: AppTextStyles.h3(context)),
+              child: Text('Explore Combos', style: AppTextStyles.h3(context)),
             ),
             TextButton(
               onPressed: () => context.go('/club'),

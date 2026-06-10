@@ -16,9 +16,9 @@ class SafariHeroBanner extends StatelessWidget {
           bottomRight: Radius.circular(32),
         ),
       ),
-      child: Column(
+      child: const Column(
         children: [
-          const Text(
+          Text(
             'Safari Club',
             style: TextStyle(
               color: Colors.white,
@@ -26,8 +26,8 @@ class SafariHeroBanner extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: 8),
+          Text(
             'A club for little explorers.',
             style: TextStyle(
               color: Colors.white70,
@@ -35,16 +35,16 @@ class SafariHeroBanner extends StatelessWidget {
               fontWeight: FontWeight.w400,
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _HeroAvatar(imagePath: 'assets/hero/rafi.png'),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               _HeroAvatar(imagePath: 'assets/hero/gerry.png'),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               _HeroAvatar(imagePath: 'assets/hero/ellie.png'),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               _HeroAvatar(imagePath: 'assets/hero/zena.png'),
             ],
           ),

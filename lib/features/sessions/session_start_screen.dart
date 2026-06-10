@@ -16,6 +16,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../../core/utils/venues.dart';
 import '../../core/widgets/error_screen.dart';
+import '../../core/widgets/hero_avatar.dart';
 import '../../core/widgets/primary_button.dart';
 import 'widgets/insufficient_balance_sheet.dart';
 
@@ -76,10 +77,42 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   }
 
   int _priceFor(int? duration, Map<String, dynamic>? cfg) {
-    if (duration == null || cfg == null) return 0;
-    return duration == 60
-        ? (cfg['session_1hr_price_paise'] as int?) ?? 80000
-        : (cfg['session_2hr_price_paise'] as int?) ?? 110000;
+    if (duration == null) return 0;
+    // Hardcoded prices — 1hr ₹800, 2hr ₹1100
+    return duration <= 60 ? 80000 : 110000;
+  }
+
+  /// Auto sibling coupon based on number of selected kids.
+  /// Returns {code, discountPaise} or null for single kid.
+  Map<String, dynamic>? _siblingCouponFor(int kidCount) {
+    return switch (kidCount) {
+      2 => {'code': 'SIBLING2', 'discount_paise': 15000},
+      3 => {'code': 'SIBLING3', 'discount_paise': 30000},
+      4 => {'code': 'SIBLING4', 'discount_paise': 50000},
+      >= 5 => {'code': 'SIBLING5', 'discount_paise': 70000},
+      _ => null,
+    };
+  }
+
+  void _applyAutoCoupon() {
+    // Only auto-apply if no manual coupon is active.
+    if (_appliedCouponCode != null &&
+        !_appliedCouponCode!.startsWith('SIBLING')) {
+      return;
+    }
+    final auto = _siblingCouponFor(_selectedChildIds.length);
+    if (auto != null) {
+      setState(() {
+        _couponDiscountPaise = auto['discount_paise'] as int;
+        _appliedCouponCode = auto['code'] as String;
+        _couponError = null;
+      });
+    } else {
+      setState(() {
+        _couponDiscountPaise = null;
+        _appliedCouponCode = null;
+      });
+    }
   }
 
   Future<void> _applyCoupon() async {
@@ -184,7 +217,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     }
 
     final children = _selectedChildIds.toList();
-    String? firstSessionId;
+    final sessionIds = <String>[];
     // Track successes so a mid-batch failure can surface a "N of M
     // started" message instead of silently leaving the user wondering
     // which kids made it through.
@@ -205,7 +238,8 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
           'p_idempotency_key': idem,
           if (couponForCall != null) 'p_coupon_code': couponForCall,
         });
-        firstSessionId ??= result['session_id'] as String?;
+        final sid = result['session_id'] as String?;
+        if (sid != null) sessionIds.add(sid);
         createdCount[0]++;
       }
 
@@ -214,10 +248,13 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       // next frame — without this the multi-session stack appears empty
       // until the stream's next 15s tick.
       ref.invalidate(activeSessionsProvider);
-      // Multi-session → land on home with the new session stack.
-      // Single-kid → straight to QR like before.
-      if (children.length == 1 && firstSessionId != null) {
-        context.go('/session/qr/$firstSessionId');
+      // Always route to QR scanner after session creation — parents need
+      // to scan at the venue for every session, including additional kids.
+      if (sessionIds.isNotEmpty) {
+        context.go(
+          '/session/qr/${sessionIds.first}',
+          extra: {'batchSessionIds': sessionIds},
+        );
       } else {
         context.go('/home');
       }
@@ -326,8 +363,9 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     final cfg = ref.watch(venueConfigProvider).valueOrNull;
     final balance = ref.watch(walletBalancePaiseProvider) ?? 0;
 
-    final price1hr = (cfg?['session_1hr_price_paise'] as int?) ?? 80000;
-    final price2hr = (cfg?['session_2hr_price_paise'] as int?) ?? 110000;
+    // Hardcoded prices — 1hr ₹800, 2hr ₹1100
+    const price1hr = 80000;
+    const price2hr = 110000;
     final perKidPrice = _priceFor(_selectedDurationMinutes, cfg);
     final discount = _couponDiscountPaise ?? 0;
     // Sum across selected kids, then subtract the (single-redemption) coupon.
@@ -385,6 +423,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
           // CTA gets stuck on "Pick at least one kid" with nothing to tap.
           if (children.length == 1) {
             _selectedChildIds.add(children.first['id'] as String);
+            _applyAutoCoupon();
           }
 
           if (children.isEmpty) {
@@ -448,6 +487,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                     } else {
                                       _selectedChildIds.add(id);
                                     }
+                                    _applyAutoCoupon();
                                   }),
                                 );
                               },
@@ -620,68 +660,18 @@ class _ChildAvatar extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _heroAssets = <String, String>{
-    'rafi': 'assets/hero/rafi.png',
-    'ellie': 'assets/hero/ellie.png',
-    'gerry': 'assets/hero/gerry.png',
-    'zena': 'assets/hero/zena.png',
-  };
-
-  static const _heroColors = <String, Color>{
-    'rafi': AppColors.rafiCoral,
-    'ellie': AppColors.ellieBlue,
-    'gerry': AppColors.gerryAmber,
-    'zena': AppColors.zenaGreen,
-  };
-
   @override
   Widget build(BuildContext context) {
-    final initial =
-        name.trim().isEmpty ? '?' : name.trim().characters.first.toUpperCase();
-    final heroAsset = _heroAssets[favouriteHero];
-    final heroColor = _heroColors[favouriteHero] ?? AppColors.gold;
     return GestureDetector(
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 72,
-            height: 72,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: selected ? AppColors.gold : AppColors.lightBorder,
-                width: selected ? 3 : 1,
-              ),
-              color: heroColor.withValues(alpha: 0.18),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: heroAsset != null
-                ? Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: Image.asset(
-                      heroAsset,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Text(
-                        initial,
-                        style: const TextStyle(
-                          color: AppColors.navy,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 28,
-                        ),
-                      ),
-                    ),
-                  )
-                : Text(
-                    initial,
-                    style: const TextStyle(
-                      color: AppColors.navy,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 28,
-                    ),
-                  ),
+          HeroAvatar(
+            heroId: favouriteHero,
+            fallbackName: name,
+            size: 72,
+            selected: selected,
           ),
           const SizedBox(height: 6),
           SizedBox(

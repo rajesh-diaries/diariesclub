@@ -468,9 +468,14 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
   // ---------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    final cfg = ref.watch(venueConfigProvider).valueOrNull;
-    final offers = (cfg?['topup_offers'] as List?) ?? const [];
     final balance = ref.watch(walletBalancePaiseProvider);
+    // Fixed amounts — no bonuses, no tags
+    const offers = <Map<String, int>>[
+      {'amount_paise': 100000},
+      {'amount_paise': 250000},
+      {'amount_paise': 400000},
+      {'amount_paise': 600000},
+    ];
 
     final canPay = _selectedAmountPaise != null;
     final payLabel = canPay
@@ -520,7 +525,6 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
                   : _stage == _SheetStage.processing
                       ? const _ProcessingView()
                       : _PickingBody(
-                          offers: offers,
                           balancePaise: balance,
                           selectedAmountPaise: _selectedAmountPaise,
                           selectedBonusPaise: _selectedBonusPaise,
@@ -566,7 +570,6 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
 //  amount.
 // ---------------------------------------------------------------------------
 class _PickingBody extends StatelessWidget {
-  final List<dynamic> offers;
   final int? balancePaise;
   final int? selectedAmountPaise;
   final int? selectedBonusPaise;
@@ -576,7 +579,6 @@ class _PickingBody extends StatelessWidget {
   final ValueChanged<String> onCustomChanged;
 
   const _PickingBody({
-    required this.offers,
     required this.balancePaise,
     required this.selectedAmountPaise,
     required this.selectedBonusPaise,
@@ -613,31 +615,23 @@ class _PickingBody extends StatelessWidget {
         const SizedBox(height: 16),
         Text('Quick top-up', style: AppTextStyles.bodyLarge(context)),
         const SizedBox(height: 12),
-        if (offers.isNotEmpty)
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.7,
-            children: [
-              for (final o in offers)
-                _OfferTile(
-                  amountPaise: (o['amount_paise'] as int?) ?? 0,
-                  bonusPaise: (o['bonus_paise'] as int?) ?? 0,
-                  badge: (o['badge'] as String?) ?? '',
-                  label: (o['label'] as String?) ?? '',
-                  selected: selectedAmountPaise ==
-                          ((o['amount_paise'] as int?) ?? 0) &&
-                      customController.text.isEmpty,
-                  onTap: () => onSelectQuick(
-                    (o['amount_paise'] as int?) ?? 0,
-                    (o['bonus_paise'] as int?) ?? 0,
-                  ),
-                ),
-            ],
-          ),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.7,
+          children: [
+            for (final o in offers)
+              _OfferTile(
+                amountPaise: o['amount_paise'] ?? 0,
+                selected: selectedAmountPaise == (o['amount_paise'] ?? 0) &&
+                    customController.text.isEmpty,
+                onTap: () => onSelectQuick(o['amount_paise'] ?? 0, 0),
+              ),
+          ],
+        ),
         const SizedBox(height: 20),
         Text('Custom amount', style: AppTextStyles.bodyLarge(context)),
         const SizedBox(height: 8),
@@ -668,16 +662,10 @@ class _PickingBody extends StatelessWidget {
 
 class _OfferTile extends StatelessWidget {
   final int amountPaise;
-  final int bonusPaise;
-  final String badge;
-  final String label;
   final bool selected;
   final VoidCallback onTap;
   const _OfferTile({
     required this.amountPaise,
-    required this.bonusPaise,
-    required this.badge,
-    required this.label,
     required this.selected,
     required this.onTap,
   });
@@ -707,19 +695,6 @@ class _OfferTile extends StatelessWidget {
               Money.fromPaise(amountPaise),
               style: AppTextStyles.h3(context),
             ),
-            if (bonusPaise > 0)
-              Text(
-                '+${Money.fromPaise(bonusPaise)} bonus',
-                style: AppTextStyles.caption(context, color: AppColors.gold),
-              ),
-            if (label.isNotEmpty)
-              Text(
-                badge.isEmpty ? label : '$badge $label',
-                style: AppTextStyles.caption(
-                  context,
-                  color: AppColors.lightTextSecondary,
-                ),
-              ),
           ],
         ),
       ),

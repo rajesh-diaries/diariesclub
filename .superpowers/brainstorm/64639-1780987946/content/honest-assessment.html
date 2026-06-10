@@ -1,0 +1,82 @@
+<h2>Honest Technical Assessment</h2>
+<p class="subtitle">Will the smart fallback actually work in production?</p>
+
+<div class="section">
+  <h3>Android — ✅ Yes, rock solid</h3>
+  <div class="mockup">
+    <div class="mockup-body" style="padding: 16px;">
+      <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+        <li><code>upi://pay?pa=...</code> is an official Android intent scheme</li>
+        <li>System chooser shows real app icons — guaranteed</li>
+        <li>Works on every Android device with a UPI app</li>
+        <li>Used by millions of apps (Swiggy, Zomato, etc.)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>iOS Deep Links — ⚠️ Risky / Brittle</h3>
+  <div class="mockup">
+    <div class="mockup-body" style="padding: 16px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <tr style="border-bottom: 1px solid #eee;">
+          <td style="padding: 10px 0; font-weight: 600;">Google Pay</td>
+          <td style="padding: 10px 0;">Was <code>tez://</code>, now <code>gpay://</code>, may change again</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #eee;">
+          <td style="padding: 10px 0; font-weight: 600;">PhonePe</td>
+          <td style="padding: 10px 0;">Scheme changed 2x in past 2 years</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #eee;">
+          <td style="padding: 10px 0; font-weight: 600;">Paytm</td>
+          <td style="padding: 10px 0;"><code>paytmmp://</code> — most stable, still undocumented</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #eee;">
+          <td style="padding: 10px 0; font-weight: 600;">App Store Review</td>
+          <td style="padding: 10px 0;">Apple has rejected apps for linking to rival payment apps</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; font-weight: 600;">Return to app</td>
+          <td style="padding: 10px 0;">After payment, user must manually switch back. No callback.</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+  <p style="margin-top: 12px; color: #E8524A;"><strong>Reality check:</strong> These schemes are undocumented, change without notice, and Apple discourages them. A scheme that works today may break with next week's app update.</p>
+</div>
+
+<div class="section">
+  <h3>iOS QR Code — ✅ Yes, 100% reliable</h3>
+  <div class="mockup">
+    <div class="mockup-body" style="padding: 16px;">
+      <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+        <li>UPI QR is an NPCI standard — every app can scan it</li>
+        <li>No deep links, no URL schemes, no Apple review risk</li>
+        <li>Works today, works next year</li>
+        <li>Same pattern used by petrol pumps, kirana stores, street vendors</li>
+        <li>Users in India are extremely familiar with "scan and pay"</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>My recommendation</h3>
+  <div class="options">
+    <div class="option" data-choice="safe">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>Safe: Android intent + iOS QR</h3>
+        <p>Android gets the perfect native chooser. iOS gets a clean QR + copy sheet. Zero fees everywhere. App Store safe. Slightly more friction on iOS but bulletproof.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="risky">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Risky: Try deep links on iOS</h3>
+        <p>Attempt tez:///phonepe:// first, fall back to QR. Better UX when it works, but schemes break and Apple may flag it. You'll need to monitor and update schemes regularly.</p>
+      </div>
+    </div>
+  </div>
+</div>

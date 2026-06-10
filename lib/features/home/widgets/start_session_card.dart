@@ -5,35 +5,49 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
-/// CTA card on Home (idle). Tap → /session/start.
+/// CTA card on Home (idle or multi-session). Tap → /session/start.
+/// Navy gradient with gold accents — action-oriented and premium.
 class StartSessionCard extends StatelessWidget {
   const StartSessionCard({super.key});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       onTap: () => context.push('/session/start'),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppColors.lightSurface,
-          border: Border.all(color: AppColors.lightBorder),
-          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF2A4A8B),
+              AppColors.navy,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.navy.withValues(alpha: 0.20),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Row(
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
-                color: AppColors.gold.withValues(alpha: 0.18),
-                shape: BoxShape.circle,
+                color: AppColors.gold.withValues(alpha: 0.20),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: const Icon(
-                PhosphorIconsFill.playCircle,
-                color: AppColors.navy,
-                size: 26,
+                PhosphorIconsFill.usersThree,
+                color: AppColors.gold,
+                size: 28,
               ),
             ),
             const SizedBox(width: 16),
@@ -41,19 +55,33 @@ class StartSessionCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Start playing', style: AppTextStyles.h3(context)),
-                  const SizedBox(height: 2),
                   Text(
-                    'Pick your time and go',
+                    'Add a friend to play!',
+                    style: AppTextStyles.h3(context, color: Colors.white),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Bring a sibling or friend along',
                     style: AppTextStyles.caption(
                       context,
-                      color: AppColors.lightTextSecondary,
+                      color: Colors.white70,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward, color: AppColors.navy),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.arrow_forward,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
           ],
         ),
       ),

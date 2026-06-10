@@ -28,7 +28,7 @@ class RecentActivityList extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Recent activity', style: AppTextStyles.bodyLarge(context)),
+          Text("What You've Been Up To", style: AppTextStyles.bodyLarge(context)),
           const SizedBox(height: 12),
           for (final r in rows) _ActivityRow(row: r),
           // "See all" navigates into Profile's full activity log — wired in

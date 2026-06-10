@@ -63,7 +63,7 @@ class _SafariWaitlistScreenState extends State<SafariWaitlistScreen> {
                         ),
                         isThreeLine: true,
                         trailing: PopupMenuButton<String>(
-                          onSelected: (status) => _updateStatus(e['id'], status),
+                          onSelected: (status) => _updateStatus(e['id'] as String, status),
                           itemBuilder: (_) => [
                             const PopupMenuItem(value: 'pending', child: Text('Pending')),
                             const PopupMenuItem(value: 'contacted', child: Text('Contacted')),

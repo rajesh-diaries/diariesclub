@@ -1,0 +1,105 @@
+<h2>iOS UPI: Smart Sequential Fallback</h2>
+<p class="subtitle">One button. Zero fees. Maximum chance of direct app open.</p>
+
+<div class="section">
+  <h3>What happens when the user taps "UPI" on iOS:</h3>
+  
+  <div class="mockup">
+    <div class="mockup-header">Step-by-step flow</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 13px; line-height: 1.8;">
+      <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
+        <div style="background: #1E3A7B; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">1</div>
+        <div>
+          <strong>Try <code>upi://pay?pa=YOUR_UPI_ID&am=500...</code></strong><br>
+          <span style="color: #5BAD4E;">✓ Works if any UPI app registered for upi:// (rare on iOS)</span><br>
+          <span style="color: #E8524A;">✗ Most likely fails silently</span>
+        </div>
+      </div>
+      
+      <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
+        <div style="background: #1E3A7B; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">2</div>
+        <div>
+          <strong>Try <code>tez://upi/pay?pa=YOUR_UPI_ID...</code></strong> (Google Pay)</span><br>
+          <span style="color: #5BAD4E;">✓ Opens Google Pay directly with amount pre-filled</span><br>
+          <span style="color: #E8524A;">✗ Fails if GPay not installed or scheme changed</span>
+        </div>
+      </div>
+      
+      <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
+        <div style="background: #1E3A7B; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">3</div>
+        <div>
+          <strong>Try <code>phonepe://pay?pa=YOUR_UPI_ID...</code></strong> (PhonePe)</span><br>
+          <span style="color: #5BAD4E;">✓ Opens PhonePe directly with amount pre-filled</span><br>
+          <span style="color: #E8524A;">✗ Fails if PhonePe not installed or scheme changed</span>
+        </div>
+      </div>
+      
+      <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
+        <div style="background: #1E3A7B; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">4</div>
+        <div>
+          <strong>Try <code>paytmmp://pay?pa=YOUR_UPI_ID...</code></strong> (Paytm)</span><br>
+          <span style="color: #5BAD4E;">✓ Opens Paytm directly with amount pre-filled</span><br>
+          <span style="color: #E8524A;">✗ Fails if Paytm not installed or scheme changed</span>
+        </div>
+      </div>
+      
+      <div style="display: flex; align-items: flex-start; gap: 12px;">
+        <div style="background: #F5C442; color: #1E3A7B; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">5</div>
+        <div>
+          <strong>Fallback: Show QR Code + Copy UPI ID</strong><br>
+          <span style="color: #5BAD4E;">✓ Works with EVERY UPI app, guaranteed</span><br>
+          <span>User scans QR or copies ID → manually pays → comes back → taps "Done"</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>What the user sees:</h3>
+  <div class="mockup">
+    <div class="mockup-header">Single UPI button (same on Android & iOS)</div>
+    <div class="mockup-body" style="padding: 20px; background: #f8f9fa;">
+      <div style="background: white; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 48px; height: 48px; background: #e8f5e9; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 24px;">⚡</span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 16px;">UPI — Google Pay, PhonePe, Paytm</div>
+            <div style="color: #5BAD4E; font-size: 13px;">Zero fees • Money credited instantly</div>
+          </div>
+          <div style="color: #999;">›</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <p style="margin-top: 16px;"><strong>On Android:</strong> Tapping this opens the native system chooser with real app icons. One tap, done.</p>
+  <p><strong>On iOS:</strong> The app tries each deep link behind the scenes. If one works, the UPI app opens instantly. If none work, a clean sheet slides up with QR + copy.</p>
+</div>
+
+<div class="section">
+  <h3>Trade-offs to know:</h3>
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>Pros</h4>
+      <ul>
+        <li>One button everywhere — no platform-specific UI</li>
+        <li>Zero Razorpay fees on UPI</li>
+        <li>Maximum chance of one-tap payment on iOS</li>
+        <li>QR fallback is guaranteed to work</li>
+        <li>No fake app icons — real apps open or QR appears</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>Cons</h4>
+      <ul>
+        <li>URL schemes can change without warning</li>
+        <li>Apple may question app-specific deep links during review</li>
+        <li>QR on iOS = more friction than Android</li>
+        <li>Need to declare schemes in Info.plist</li>
+      </ul>
+    </div>
+  </div>
+</div>

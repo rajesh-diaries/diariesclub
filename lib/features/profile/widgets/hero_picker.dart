@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/hero_avatar.dart';
 
 /// Inline 2×2 hero picker reused by Add child + Edit child screens.
 /// Shows the actual hero character images (from onboarding assets) so the
@@ -85,26 +86,10 @@ class _HeroTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: hero.color.withValues(alpha: 0.18),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Image.asset(
-                  hero.imagePath,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Icon(
-                    Icons.face,
-                    color: hero.color,
-                    size: 22,
-                  ),
-                ),
-              ),
+            HeroAvatar(
+              heroId: hero.id,
+              size: 48,
+              selected: selected,
             ),
             const SizedBox(width: 10),
             Expanded(

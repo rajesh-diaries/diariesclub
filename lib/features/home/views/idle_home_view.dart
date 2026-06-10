@@ -10,7 +10,7 @@ import '../widgets/birthday_card.dart';
 import '../widgets/home_combos_strip.dart';
 import '../widgets/live_orders_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
-import '../widgets/pending_reflections_section.dart';
+import '../widgets/order_food_card.dart';
 import '../widgets/recent_activity_list.dart';
 import '../widgets/referral_entry_card.dart';
 
@@ -54,15 +54,17 @@ class IdleHomeBody extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          familyName.isEmpty
-              ? 'Hi there 👋'
-              : 'Hi, ${familyName.split(' ').first} 👋',
+          familyName.isEmpty ? 'Hey there!' : 'Hey ${familyName.split(' ').first}!',
           style: AppTextStyles.h1(context),
         ),
         const SizedBox(height: 4),
-        Text('Ready for adventure?', style: AppTextStyles.body(context)),
+        Text("Let's get the kids playing! 🎉", style: AppTextStyles.body(context)),
         const SizedBox(height: 20),
         const BigStartSessionCard(),
+        // Order food without starting a session — e.g. parent drops by
+        // just for coffee/snacks, or wants to pre-order while planning.
+        const SizedBox(height: 12),
+        const OrderFoodCard(),
         // Live orders the parent placed during a session that just
         // ended — show them above reflections so they can track the
         // kitchen without losing the cards behind a finished session.
@@ -71,11 +73,6 @@ class IdleHomeBody extends ConsumerWidget {
           padding: EdgeInsets.only(top: 16),
           child: LiveOrdersCard(),
         ),
-        // Pending reflections (one card per kid whose session ended in
-        // the last 24h without reflection). Self-margined: hides cleanly
-        // when nothing's pending. Sits between the Start CTA and combos
-        // because reflecting is more time-sensitive than browsing food.
-        const PendingReflectionsSection(),
         if (referralEligible) ...[
           const SizedBox(height: 16),
           const ReferralEntryCard(),

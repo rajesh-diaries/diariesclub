@@ -6,12 +6,12 @@ class SafariWhatItIs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'What it is',
             style: TextStyle(
               color: SafariColors.jungleGreen,
@@ -19,25 +19,25 @@ class SafariWhatItIs extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
           _InfoCard(
             icon: Icons.calendar_today_outlined,
             title: 'Age 2–4 years',
             subtitle: 'Monday – Friday',
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _InfoCard(
             icon: Icons.schedule_outlined,
             title: '9:30 AM – 12:30 PM',
             subtitle: 'Morning sessions',
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _InfoCard(
             icon: Icons.location_on_outlined,
             title: 'Play Diaries Centre',
             subtitle: 'Indoor & outdoor spaces',
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _InfoCard(
             icon: Icons.restaurant_outlined,
             title: 'Healthy snacks included',

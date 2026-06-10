@@ -8,6 +8,7 @@ import '../../core/providers/current_family_provider.dart';
 import '../../core/providers/onboarding_state_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/hero_avatar.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../core/widgets/progress_dots.dart';
 
@@ -199,21 +200,10 @@ class _HeroCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: hero.color.withValues(alpha: 0.20),
-                    shape: BoxShape.circle,
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Image.asset(
-                      hero.imagePath,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
+                HeroAvatar(
+                  heroId: hero.id,
+                  size: 88,
+                  selected: selected,
                 ),
                 const SizedBox(height: 12),
                 Text(hero.name, style: AppTextStyles.h3(context)),

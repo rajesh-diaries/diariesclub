@@ -87,9 +87,7 @@ class MyUpcomingWorkshopsSection extends ConsumerWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                workshops.length == 1
-                    ? 'Your upcoming workshop'
-                    : 'Your upcoming workshops',
+                'Fun Workshops Coming Up!',
                 style: AppTextStyles.body(context).copyWith(
                   fontWeight: FontWeight.w800,
                 ),

@@ -99,13 +99,18 @@ class _SessionTimerState extends ConsumerState<SessionTimerWidget> {
     }
   }
 
-  /// MM:SS for active, +MM:SS for grace. Hours show only past 1h.
+  /// "42 left" for active, "+5" for grace. Hours shown when > 60 min.
   static String _format(Duration d, bool isGrace) {
+    final totalMinutes = d.inMinutes;
     final hh = d.inHours;
-    final mm = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final ss = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    final body = hh > 0 ? '$hh:$mm:$ss' : '$mm:$ss';
-    return isGrace ? '+$body' : body;
+    final mm = d.inMinutes.remainder(60);
+    String body;
+    if (hh > 0) {
+      body = '${hh}h ${mm}m';
+    } else {
+      body = '$totalMinutes';
+    }
+    return isGrace ? '+$body' : '$body left';
   }
 
   String _semanticsLabel() {

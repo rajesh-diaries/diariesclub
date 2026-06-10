@@ -4,15 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
-import '../../../core/theme/app_colors.dart';
-
-/// Premium "Start playing" banner pinned at the top of idle home.
-/// Stacked layout: gold "READY WHEN YOU ARE" eyebrow on top, full-width
-/// gold "Start playing" pill below. The full width gives the eyebrow
-/// room to render without ellipsizing on narrow phones, and makes the
-/// CTA — the most important tap target in the app — visually dominant.
-/// Background is a navy gradient that slowly rotates (12s cycle) so the
-/// surface feels alive without being noisy.
+/// Compact "Let's Play!" card on idle home. Warm coral-amber gradient
+/// with a hero character jumping above the GO button and sparkle stars.
 class BigStartSessionCard extends StatefulWidget {
   const BigStartSessionCard({super.key});
 
@@ -23,14 +16,18 @@ class BigStartSessionCard extends StatefulWidget {
 class _BigStartSessionCardState extends State<BigStartSessionCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _gradientController;
+  late final String _hero;
 
   @override
   void initState() {
     super.initState();
     _gradientController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 12),
+      duration: const Duration(seconds: 10),
     )..repeat();
+    // Random hero each time home loads — persisted for this session
+    final heroes = const ['rafi', 'ellie', 'gerry', 'zena'];
+    _hero = heroes[DateTime.now().millisecond % heroes.length];
   }
 
   @override
@@ -45,117 +42,152 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
       animation: _gradientController,
       builder: (context, _) {
         final angle = _gradientController.value * 2 * math.pi;
-        return Container(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              transform: GradientRotation(angle),
-              colors: const [
-                Color(0xFF2A4A92),
-                AppColors.navy,
-                Color(0xFF152C5C),
-                AppColors.navy,
-              ],
-              stops: const [0.0, 0.4, 0.7, 1.0],
-            ),
-            border: Border.all(
-              color: AppColors.gold.withValues(alpha: 0.30),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.navy.withValues(alpha: 0.25),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Main card
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  transform: GradientRotation(angle),
+                  colors: const [
+                    Color(0xFFFF8A65), // warm coral
+                    Color(0xFFFFB74D), // amber
+                    Color(0xFFFFD54F), // soft gold
+                    Color(0xFFFFB74D),
+                  ],
+                  stops: const [0.0, 0.35, 0.7, 1.0],
+                ),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.40),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF8A65).withValues(alpha: 0.30),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _Eyebrow(),
-              const SizedBox(height: 14),
-              _StartButton(onTap: () => context.push('/session/start')),
-            ],
-          ),
+              child: Row(
+                children: [
+                  // Left side text
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Let's Play!",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Tap to start a session',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Action button
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => context.push('/session/start'),
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withValues(alpha: 0.40),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'PLAY!',
+                              style: TextStyle(
+                                color: Color(0xFFE85D3F),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            Icon(
+                              PhosphorIconsFill.rocketLaunch,
+                              color: Color(0xFFE85D3F),
+                              size: 18,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Hero standing on the top-right corner of the card
+            Positioned(
+              top: -34,
+              right: 8,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Sparkle stars going up above the hero
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _sparkle(10, -8),
+                      const SizedBox(width: 20),
+                      _sparkle(8, 4),
+                    ],
+                  ),
+                  // Hero standing upright on the corner
+                  Image.asset(
+                    'assets/hero/$_hero.png',
+                    height: 48,
+                    fit: BoxFit.contain,
+                  ),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
   }
-}
 
-class _Eyebrow extends StatelessWidget {
-  const _Eyebrow();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(PhosphorIconsFill.sparkle, color: AppColors.gold, size: 18),
-        SizedBox(width: 10),
-        Text(
-          'READY WHEN YOU ARE',
-          style: TextStyle(
-            color: AppColors.gold,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.6,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StartButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _StartButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          decoration: BoxDecoration(
-            color: AppColors.gold,
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.gold.withValues(alpha: 0.50),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Start playing',
-                style: TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              SizedBox(width: 10),
-              Icon(
-                PhosphorIconsFill.playCircle,
-                color: AppColors.navy,
-                size: 22,
-              ),
-            ],
-          ),
-        ),
+  Widget _sparkle(double size, double offsetX) {
+    return Transform.translate(
+      offset: Offset(offsetX, 0),
+      child: Icon(
+        PhosphorIconsFill.sparkle,
+        color: Colors.white.withValues(alpha: 0.90),
+        size: size,
       ),
     );
   }

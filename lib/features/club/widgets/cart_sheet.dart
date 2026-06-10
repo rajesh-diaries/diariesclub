@@ -17,6 +17,7 @@ import '../../../core/utils/currency.dart';
 import '../../../core/utils/venues.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../sessions/widgets/insufficient_balance_sheet.dart';
+import '../providers/active_orders_provider.dart';
 import '../providers/cart_provider.dart';
 
 const _venueId = Venues.kondapurId;
@@ -105,9 +106,12 @@ class _CartSheetState extends ConsumerState<CartSheet> {
       // Wallet just got debited by order_place — invalidate so the next
       // purchase sees the fresh balance instead of the pre-order one.
       ref.invalidate(currentWalletProvider);
+      // Force home to re-subscribe to active orders so the LiveOrdersCard
+      // shows the new order immediately.
+      ref.invalidate(activeOrdersProvider);
       if (!mounted) return;
       Navigator.of(context).pop();
-      context.push('/club/order/$orderId');
+      context.go('/home');
     } on PostgrestException catch (e) {
       debugPrint('[ORDER_PLACE] PostgrestException: code=${e.code} '
           'message=${e.message} details=${e.details} hint=${e.hint}');

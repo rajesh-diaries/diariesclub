@@ -128,15 +128,15 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
           color: SafariColors.lightSage,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Column(
+        child: const Column(
           children: [
             Icon(
               Icons.check_circle_outline,
               size: 48,
               color: SafariColors.jungleGreen,
             ),
-            const SizedBox(height: 16),
-            const Text(
+            SizedBox(height: 16),
+            Text(
               'You\'re on the list!',
               style: TextStyle(
                 color: SafariColors.jungleGreen,
@@ -144,8 +144,8 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
+            SizedBox(height: 8),
+            Text(
               'We\'ll reach out as soon as Safari Club is ready. Thank you for your interest!',
               textAlign: TextAlign.center,
               style: TextStyle(
