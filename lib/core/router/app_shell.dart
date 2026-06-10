@@ -33,7 +33,11 @@ class AppShell extends StatelessWidget {
             label: 'Adventure',
           ),
           BottomNavigationBarItem(
-            icon: Icon(i == 3 ? PhosphorIconsFill.user : PhosphorIconsRegular.user),
+            icon: Icon(i == 3 ? PhosphorIconsFill.globeHemisphereWest : PhosphorIconsRegular.globeHemisphereWest),
+            label: 'Safari',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(i == 4 ? PhosphorIconsFill.user : PhosphorIconsRegular.user),
             label: 'Profile',
           ),
         ],

@@ -41,6 +41,7 @@ import '../../features/profile/wallet_history_screen.dart';
 import '../../features/gamification/card_unboxing_screen.dart';
 import '../../features/gamification/reflection_screen.dart';
 import '../../features/reactivation/reactivation_screen.dart';
+import '../../features/safari/safari_screen.dart';
 import '../../features/sessions/session_detail_screen.dart';
 import '../../features/sessions/session_qr_screen.dart';
 import '../../features/sessions/session_start_screen.dart';
@@ -363,9 +364,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/session/qr/:sessionId',
         name: 'session_qr',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => SessionQrScreen(
-          sessionId: state.pathParameters['sessionId']!,
-        ),
+        builder: (context, state) {
+          final extra = state.extra;
+          final batchIds = extra is Map && extra['batchSessionIds'] is List
+              ? List<String>.from(extra['batchSessionIds'] as List)
+              : const <String>[];
+          return SessionQrScreen(
+            sessionId: state.pathParameters['sessionId']!,
+            batchSessionIds: batchIds,
+          );
+        },
       ),
       GoRoute(
         path: '/session/:sessionId',
@@ -440,7 +448,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // ── Bottom-nav shell with 4 main tabs ─────────────────────────────
+      // ── Bottom-nav shell with 5 main tabs ─────────────────────────────
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
@@ -470,6 +478,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: '/adventure',
                 name: 'adventure',
                 builder: (context, state) => const AdventureScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/safari',
+                name: 'safari',
+                builder: (context, state) => const SafariScreen(),
               ),
             ],
           ),
