@@ -319,6 +319,14 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         });
         return;
       }
+      if (e.message.contains('play_pass_1hr_only')) {
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _errorText = 'Play Passes are for 1-hour visits only. Pick 1 hour or switch payment.';
+        });
+        return;
+      }
       if (e.message.contains('no_active_play_pass')) {
         if (!mounted) return;
         if (createdCount[0] > 0) {
@@ -590,8 +598,9 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                 tagline: 'Quick play',
                                 pricePaise: price1hr,
                                 selected: _selectedDurationMinutes == 60,
-                                onTap: () => setState(
-                                    () => _selectedDurationMinutes = 60),
+                                onTap: () => setState(() {
+                                  _selectedDurationMinutes = 60;
+                                }),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -601,8 +610,13 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                 tagline: 'Best value',
                                 pricePaise: price2hr,
                                 selected: _selectedDurationMinutes == 120,
-                                onTap: () => setState(
-                                    () => _selectedDurationMinutes = 120),
+                                onTap: () => setState(() {
+                                  _selectedDurationMinutes = 120;
+                                  // Play Passes are 1-hour only.
+                                  if (_paymentMethod == 'play_pass') {
+                                    _paymentMethod = 'wallet';
+                                  }
+                                }),
                               ),
                             ),
                           ],
@@ -648,22 +662,30 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                             groupValue: _paymentMethod,
                             title: Text(
                                 'Play Pass ($remainingPasses left)'),
-                            subtitle: !passesEnough &&
-                                    _selectedDurationMinutes != null
-                                ? Text(
-                                    'Need ${_selectedChildIds.length} pass${_selectedChildIds.length == 1 ? '' : 'es'}',
-                                    style: const TextStyle(
-                                        color: AppColors.adminRed),
+                            subtitle: _selectedDurationMinutes == 120
+                                ? const Text(
+                                    'For 1-hour visits only',
+                                    style: TextStyle(
+                                        color: AppColors.lightTextSecondary),
                                   )
-                                : const Text(
-                                    '1 pass = 1 session for any kid'),
-                            onChanged: (v) => setState(() {
-                              _paymentMethod = v ?? 'wallet';
-                              // Coupons can't be combined with passes.
-                              if (_paymentMethod == 'play_pass') {
-                                _clearCoupon();
-                              }
-                            }),
+                                : !passesEnough &&
+                                        _selectedDurationMinutes != null
+                                    ? Text(
+                                        'Need ${_selectedChildIds.length} pass${_selectedChildIds.length == 1 ? '' : 'es'}',
+                                        style: const TextStyle(
+                                            color: AppColors.adminRed),
+                                      )
+                                    : const Text(
+                                        '1 pass = 1 hour for any kid'),
+                            onChanged: _selectedDurationMinutes == 120
+                                ? null
+                                : (v) => setState(() {
+                                      _paymentMethod = v ?? 'wallet';
+                                      // Coupons can't be combined with passes.
+                                      if (_paymentMethod == 'play_pass') {
+                                        _clearCoupon();
+                                      }
+                                    }),
                           ),
                         RadioListTile<String>(
                           value: 'wallet',

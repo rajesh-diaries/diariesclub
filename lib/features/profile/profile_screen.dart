@@ -265,7 +265,7 @@ class _PlayPassesSection extends ConsumerWidget {
                   style: AppTextStyles.body(context),
                 ),
                 subtitle: Text(
-                  'Save on every session with membership',
+                  'Save on every visit with bulk passes',
                   style: AppTextStyles.caption(
                     context,
                     color: AppColors.lightTextSecondary,
@@ -364,7 +364,7 @@ class _PassRow extends StatelessWidget {
         color: AppColors.gold,
       ),
       title: Text(
-        '$total-session pack',
+        '$total-visit pack',
         style: AppTextStyles.body(context).copyWith(fontWeight: FontWeight.w600),
       ),
       subtitle: Text(

@@ -83,7 +83,7 @@ class _PromoCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Save up to ₹200 per session. Buy 5, 10 or 15 passes.',
+                    'Save up to ₹200 per visit. Buy 5, 10 or 15 passes.',
                     style: AppTextStyles.caption(context).copyWith(
                       color: Colors.white.withValues(alpha: 0.85),
                     ),
@@ -135,7 +135,7 @@ class _ActivePassCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Use them at session start — 1 pass = 1 session for any kid.',
+                  'Use them at session start — 1 pass = 1 hour for any kid.',
                   style: AppTextStyles.caption(
                     context,
                     color: AppColors.lightTextSecondary,

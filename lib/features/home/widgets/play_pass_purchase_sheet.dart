@@ -29,7 +29,7 @@ const _passOptions = <Map<String, dynamic>>[
     'total': 10,
     'price_paise': 650000,
     'days': 45,
-    'label': 'Regular Pack',
+    'label': 'Value Pack',
     'tag': 'Best value',
   },
   {
@@ -121,7 +121,7 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
         SnackBar(
           content: Text(
             '${option['label']} purchased! '
-            '${option['total']} passes ready to use.',
+            '${option['total']} visits ready to use.',
           ),
         ),
       );
@@ -209,7 +209,8 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
             ],
             const SizedBox(height: 8),
             Text(
-              'Passes work for both 1-hour (₹800) and 2-hour (₹1,100) sessions. '
+              'Each pass is for a 1-hour play visit. Need more time? Extend '
+              'for ₹300 directly from the app after your session starts. '
               '1 kid = 1 pass. No coupons can be used with passes.',
               style: AppTextStyles.caption(
                 context,
@@ -265,7 +266,7 @@ class _PassOptionCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        '$total sessions',
+                        '$total Visits',
                         style: AppTextStyles.bodyLarge(context)
                             .copyWith(fontWeight: FontWeight.w800),
                       ),
@@ -302,7 +303,7 @@ class _PassOptionCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '${Money.fromPaise(perSession)}/session',
+                        '${Money.fromPaise(perSession)}/visit',
                         style: AppTextStyles.caption(
                           context,
                           color: AppColors.lightTextSecondary,
