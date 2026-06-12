@@ -12,7 +12,7 @@
 # pre-launch session; this file lands now so Cloudflare config is checked
 # in alongside the rest of Session 11's surface area.)
 
-name = "diariesclub-admin"
+name = "playdiaries-admin"
 compatibility_date = "2026-05-04"
 
 pages_build_output_dir = "build/web"
