@@ -46,7 +46,7 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
       builder: (context, _) {
         final angle = _gradientController.value * 2 * math.pi;
         return SizedBox(
-          height: 132,
+          height: 142,
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             decoration: BoxDecoration(
@@ -76,15 +76,16 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                 ),
               ],
             ),
-            child: Row(
+            child: Stack(
               children: [
-                // Left side text
-                Expanded(
+                // Left side text, kept high so it doesn't overlap the hero
+                const Align(
+                  alignment: Alignment(-1.0, -0.35),
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
+                      Text(
                         "Let's Play!",
                         style: TextStyle(
                           color: Colors.white,
@@ -100,11 +101,11 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                           ],
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: 2),
                       Text(
                         'Tap to start a session',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.92),
+                          color: Colors.white,
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
@@ -112,60 +113,62 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                     ],
                   ),
                 ),
-                // Hero + PLAY button stacked on the right
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Image.asset(
-                      'assets/hero/$_hero.png',
-                      height: 64,
-                      fit: BoxFit.contain,
-                    ),
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => context.push('/session/start'),
-                        borderRadius: BorderRadius.circular(999),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(999),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.white.withValues(alpha: 0.40),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'PLAY!',
-                                style: TextStyle(
-                                  color: Color(0xFF1A1A2E),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              SizedBox(width: 6),
-                              Icon(
-                                PhosphorIconsFill.rocketLaunch,
+                // Hero sitting at the bottom centre of the card
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Image.asset(
+                    'assets/hero/$_hero.png',
+                    height: 72,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                // PLAY button bottom-right, slightly larger
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => context.push('/session/start'),
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withValues(alpha: 0.40),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'PLAY!',
+                              style: TextStyle(
                                 color: Color(0xFF1A1A2E),
-                                size: 16,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
                               ),
-                            ],
-                          ),
+                            ),
+                            SizedBox(width: 6),
+                            Icon(
+                              PhosphorIconsFill.rocketLaunch,
+                              color: Color(0xFF1A1A2E),
+                              size: 18,
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
