@@ -46,9 +46,9 @@ class MultiSessionHomeView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const HomeBannerCarousel(),
-          const SizedBox(height: kHomeSectionGap),
           ActiveSessionsCard(sessions: sessions),
+          const SizedBox(height: kHomeSectionGap),
+          const HomeBannerCarousel(),
           // In-flight kitchen status — mirrors what the staff app sees,
           // so the parent watches their cappuccino move placed →
           // preparing → ready in real time. Hidden when nothing is in
