@@ -66,7 +66,7 @@ class IdleHomeBody extends ConsumerWidget {
         // kitchen without losing the cards behind a finished session.
         // Self-hides when there are no in-flight orders.
         const Padding(
-          padding: EdgeInsets.only(top: 12),
+          padding: EdgeInsets.only(top: kHomeSectionGap),
           child: LiveOrdersCard(),
         ),
         if (referralEligible) ...[
@@ -84,7 +84,7 @@ class IdleHomeBody extends ConsumerWidget {
         const AnnouncementsFeed(),
         const SizedBox(height: kHomeSectionGap),
         const RecentActivityList(),
-        const SizedBox(height: 20),
+        const SizedBox(height: kHomeSectionGap),
       ],
     );
   }

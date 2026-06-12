@@ -76,3 +76,4 @@ flutter_*.log
 
 # Supabase CLI scratch dir
 supabase/.temp/
+.superpowers/

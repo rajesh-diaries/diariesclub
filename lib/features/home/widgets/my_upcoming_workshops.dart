@@ -223,7 +223,7 @@ class _UpcomingWorkshopCard extends StatelessWidget {
                   ),
                 ),
                 const Icon(
-                  Icons.chevron_right,
+                  PhosphorIconsRegular.caretRight,
                   color: AppColors.lightTextSecondary,
                 ),
               ],

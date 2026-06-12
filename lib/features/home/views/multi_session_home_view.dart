@@ -42,11 +42,10 @@ class MultiSessionHomeView extends ConsumerWidget {
     // Greeting now lives in [HomeAppBar]. Start with the immersive
     // ActiveSessionsCard so the parent sees the timer first.
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: kHomeSectionGap),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 12),
           const HomeBannerCarousel(),
           const SizedBox(height: kHomeSectionGap),
           ActiveSessionsCard(sessions: sessions),
@@ -66,7 +65,7 @@ class MultiSessionHomeView extends ConsumerWidget {
           // the parent start a session for the other kid without leaving
           // home.
           if (showStartCta) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: kHomeSectionGap),
             const StartSessionCard(),
           ],
           // Active-session view always shows the invite card (referral
@@ -78,7 +77,7 @@ class MultiSessionHomeView extends ConsumerWidget {
           // Announcements moved BELOW the live session(s) — the primary
           // attention moment is what's playing right now.
           const AnnouncementsFeed(),
-          const SizedBox(height: 20),
+          const SizedBox(height: kHomeSectionGap),
           const HomeCombosStrip(),
           const SizedBox(height: kHomeSectionGap),
           const BirthdayCardList(),
@@ -86,7 +85,7 @@ class MultiSessionHomeView extends ConsumerWidget {
           const MyUpcomingWorkshopsSection(),
           const SizedBox(height: kHomeSectionGap),
           const RecentActivityList(),
-          const SizedBox(height: 32),
+          const SizedBox(height: kHomeSectionGap),
         ],
       ),
     );
