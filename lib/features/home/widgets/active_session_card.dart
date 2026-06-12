@@ -8,6 +8,8 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/family_children_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// Immersive "Playing now" card pinned at the top of multi-session home.
 /// One card surface holds 1+ live sessions: each kid gets a ring timer
@@ -59,7 +61,7 @@ class _ActiveSessionsCardState extends ConsumerState<ActiveSessionsCard> {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -74,13 +76,7 @@ class _ActiveSessionsCardState extends ConsumerState<ActiveSessionsCard> {
           color: AppColors.gold.withValues(alpha: 0.28),
           width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.navy.withValues(alpha: 0.28),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        boxShadow: [kHomeCardShadow(context)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -97,12 +93,10 @@ class _ActiveSessionsCardState extends ConsumerState<ActiveSessionsCard> {
                 entries.length == 1
                     ? 'Playing now!'
                     : '${entries.length} playing now!',
-                style: const TextStyle(
+                style: AppTextStyles.pillLabel(
+                  context,
                   color: AppColors.gold,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.6,
-                ),
+                ).copyWith(letterSpacing: 1.6),
               ),
             ],
           ),
@@ -304,12 +298,10 @@ class _SingleKidBody extends StatelessWidget {
                     children: [
                       Text(
                         entry.ringLabel(),
-                        style: const TextStyle(
+                        style: AppTextStyles.cardTitle(
+                          context,
                           color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                        ),
+                        ).copyWith(fontSize: 24, letterSpacing: -0.5),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -318,12 +310,10 @@ class _SingleKidBody extends StatelessWidget {
                             : entry.isGrace
                                 ? 'over'
                                 : 'left',
-                        style: TextStyle(
+                        style: AppTextStyles.caption(
+                          context,
                           color: Colors.white.withValues(alpha: 0.7),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.8,
-                        ),
+                        ).copyWith(letterSpacing: 0.8),
                       ),
                     ],
                   ),
@@ -334,22 +324,18 @@ class _SingleKidBody extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             entry.childName,
-            style: const TextStyle(
+            style: AppTextStyles.cardTitle(
+              context,
               color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.3,
-            ),
+            ).copyWith(fontSize: 22, letterSpacing: -0.3),
           ),
           const SizedBox(height: 4),
           Text(
             entry.statusWord(),
-            style: TextStyle(
+            style: AppTextStyles.cardSubtitle(
+              context,
               color: entry.heroColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
-            ),
+            ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.2),
           ),
         ],
       ),
@@ -403,12 +389,10 @@ class _MultiKidTile extends StatelessWidget {
                   ),
                   Text(
                     entry.ringLabel(),
-                    style: const TextStyle(
+                    style: AppTextStyles.caption(
+                      context,
                       color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
-                    ),
+                    ).copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.3),
                   ),
                 ],
               ),
@@ -418,22 +402,20 @@ class _MultiKidTile extends StatelessWidget {
               entry.childName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: AppTextStyles.body(
+                context,
                 color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
+              ).copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 2),
             Text(
               entry.statusWord(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              style: AppTextStyles.caption(
+                context,
                 color: entry.heroColor,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
+              ).copyWith(fontWeight: FontWeight.w700),
             ),
           ],
         ),
