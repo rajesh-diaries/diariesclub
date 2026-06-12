@@ -112,61 +112,57 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                     ],
                   ),
                 ),
-                // Right column: PLAY button top, hero on the base
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => context.push('/session/start'),
+                // Hero centred vertically
+                Image.asset(
+                  'assets/hero/$_hero.png',
+                  height: 64,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: 8),
+                // PLAY button on the right, vertically centred
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => context.push('/session/start'),
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(999),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.40),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(999),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.white.withValues(alpha: 0.40),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'PLAY!',
+                            style: TextStyle(
+                              color: Color(0xFF1A1A2E),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
                           ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'PLAY!',
-                                style: TextStyle(
-                                  color: Color(0xFF1A1A2E),
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              SizedBox(width: 6),
-                              Icon(
-                                PhosphorIconsFill.rocketLaunch,
-                                color: Color(0xFF1A1A2E),
-                                size: 18,
-                              ),
-                            ],
+                          SizedBox(width: 6),
+                          Icon(
+                            PhosphorIconsFill.rocketLaunch,
+                            color: Color(0xFF1A1A2E),
+                            size: 18,
                           ),
-                        ),
+                        ],
                       ),
                     ),
-                    Image.asset(
-                      'assets/hero/$_hero.png',
-                      height: 68,
-                      fit: BoxFit.contain,
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
