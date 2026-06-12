@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// Prominent "Let's Play!" card on idle home. Uses a four-hero-color
 /// moving gradient, places the hero character inside the card, and keeps
@@ -50,7 +52,7 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(kHomeCardRadius),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -68,13 +70,7 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                 color: Colors.white.withValues(alpha: 0.40),
                 width: 2,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.rafiCoral.withValues(alpha: 0.25),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              boxShadow: [kHomeCardShadow(context)],
             ),
             child: Row(
               children: [
@@ -84,29 +80,17 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
+                      Text(
                         "Let's Play!",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.3,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black26,
-                              blurRadius: 4,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
+                        style: AppTextStyles.cardTitle(context, color: Colors.white)
+                            .copyWith(fontSize: 26),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Tap to start a session',
-                        style: TextStyle(
+                        style: AppTextStyles.cardSubtitle(
+                          context,
                           color: Colors.white.withValues(alpha: 0.92),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
@@ -141,20 +125,18 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                           ),
                         ],
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             'PLAY!',
-                            style: TextStyle(
-                              color: Color(0xFF1A1A2E),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.5,
+                            style: AppTextStyles.pillLabel(
+                              context,
+                              color: const Color(0xFF1A1A2E),
                             ),
                           ),
-                          SizedBox(width: 6),
-                          Icon(
+                          const SizedBox(width: 6),
+                          const Icon(
                             PhosphorIconsFill.rocketLaunch,
                             color: Color(0xFF1A1A2E),
                             size: 18,
