@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/providers/current_family_provider.dart';
 import '../../../core/providers/referral_eligibility_provider.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../widgets/announcements_feed.dart';
 import '../widgets/big_start_session_card.dart';
 import '../widgets/birthday_card.dart';
+import '../widgets/home_banner_carousel.dart';
 import '../widgets/home_combos_strip.dart';
 import '../widgets/live_orders_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
@@ -36,8 +35,6 @@ class IdleHomeBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final family = ref.watch(currentFamilyProvider).valueOrNull;
-    final familyName = (family?['name'] as String?) ?? '';
     // Only include the referral entry card when the provider has
     // explicit data (eligible == true). Skipping inclusion entirely is
     // safer than rendering a 0-sized widget — Flutter web's hit-test
@@ -46,22 +43,17 @@ class IdleHomeBody extends ConsumerWidget {
         .watch(referralRedeemEligibleProvider)
         .maybeWhen(data: (v) => v, orElse: () => false);
 
-    // Order: greeting → big "Shall we start a session?" card (always
-    // pinned at top so the primary CTA is the first thing below the
-    // greeting) → combos → birthday → workshops → announcements →
-    // activity. Sections that have nothing to show return
-    // SizedBox.shrink so they don't leave phantom gaps.
+    // Order: big "Shall we start a session?" card (always pinned at top
+    // so the primary CTA is the first thing below the app-bar greeting)
+    // → combos → birthday → workshops → announcements → activity.
+    // Sections that have nothing to show return SizedBox.shrink so they
+    // don't leave phantom gaps.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          familyName.isEmpty ? 'Hey there!' : 'Hey ${familyName.split(' ').first}!',
-          style: AppTextStyles.h1(context),
-        ),
-        const SizedBox(height: 2),
-        Text("Let's get the kids playing!", style: AppTextStyles.body(context)),
-        const SizedBox(height: 10),
         const BigStartSessionCard(),
+        const SizedBox(height: 12),
+        const HomeBannerCarousel(),
         const SizedBox(height: 10),
         const PlayPassPromoCard(),
         // Order food without starting a session — e.g. parent drops by
