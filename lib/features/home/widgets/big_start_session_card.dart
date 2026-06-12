@@ -46,9 +46,9 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
       builder: (context, _) {
         final angle = _gradientController.value * 2 * math.pi;
         return SizedBox(
-          height: 142,
+          height: 132,
           child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(22),
               gradient: LinearGradient(
@@ -76,16 +76,15 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                 ),
               ],
             ),
-            child: Stack(
+            child: Row(
               children: [
                 // Left side text
-                const Align(
-                  alignment: Alignment.topLeft,
+                Expanded(
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
+                      const Text(
                         "Let's Play!",
                         style: TextStyle(
                           color: Colors.white,
@@ -101,11 +100,11 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                           ],
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
                         'Tap to start a session',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Colors.white.withValues(alpha: 0.92),
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
@@ -113,62 +112,61 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                     ],
                   ),
                 ),
-                // Hero sitting on the bottom-right base of the card
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: Image.asset(
-                    'assets/hero/$_hero.png',
-                    height: 72,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                // PLAY button at the right end, vertically centred
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => context.push('/session/start'),
-                      borderRadius: BorderRadius.circular(999),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(999),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.white.withValues(alpha: 0.40),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'PLAY!',
-                              style: TextStyle(
-                                color: Color(0xFF1A1A2E),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
+                // Right column: PLAY button top, hero on the base
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => context.push('/session/start'),
+                        borderRadius: BorderRadius.circular(999),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(999),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.white.withValues(alpha: 0.40),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
                               ),
-                            ),
-                            SizedBox(width: 6),
-                            Icon(
-                              PhosphorIconsFill.rocketLaunch,
-                              color: Color(0xFF1A1A2E),
-                              size: 18,
-                            ),
-                          ],
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'PLAY!',
+                                style: TextStyle(
+                                  color: Color(0xFF1A1A2E),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              SizedBox(width: 6),
+                              Icon(
+                                PhosphorIconsFill.rocketLaunch,
+                                color: Color(0xFF1A1A2E),
+                                size: 18,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                    Image.asset(
+                      'assets/hero/$_hero.png',
+                      height: 68,
+                      fit: BoxFit.contain,
+                    ),
+                  ],
                 ),
               ],
             ),
