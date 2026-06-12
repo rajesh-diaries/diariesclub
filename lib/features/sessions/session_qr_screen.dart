@@ -461,33 +461,45 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
             onPressed: _confirmExit,
           ),
         ),
-        body: SafeArea(
-          child: _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      _error!,
-                      style: AppTextStyles.body(context),
-                      textAlign: TextAlign.center,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                AppColors.navy,
+                Color(0xFF152C5C),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: _error != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        _error!,
+                        style: AppTextStyles.body(context),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ),
-                )
-              : session == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : status == 'cancelled_pre_scan'
-                      ? _CancelledBody(onHome: () => context.go('/home'))
-                      : _Body(
-                          session: session,
-                          qrPayload: _qrPayload!,
-                          iAmOwner: iAmOwner,
-                          isPending: status == 'pending',
-                          remaining: _remaining,
-                          cancelling: _cancelling,
-                          onCancelNow: _cancelNow,
-                          childName: _childName,
-                          batchChildNames: _batchChildNames,
-                        ),
+                  )
+                : session == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : status == 'cancelled_pre_scan'
+                        ? _CancelledBody(onHome: () => context.go('/home'))
+                        : _Body(
+                            session: session,
+                            qrPayload: _qrPayload!,
+                            iAmOwner: iAmOwner,
+                            isPending: status == 'pending',
+                            remaining: _remaining,
+                            cancelling: _cancelling,
+                            onCancelNow: _cancelNow,
+                            childName: _childName,
+                            batchChildNames: _batchChildNames,
+                          ),
+          ),
         ),
       ),
     );
@@ -528,7 +540,7 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _confetti = ConfettiController(duration: const Duration(seconds: 2));
+    _confetti = ConfettiController(duration: const Duration(milliseconds: 900));
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
@@ -548,6 +560,8 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
     final s = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$m:$s';
   }
+
+  bool _isUrgent(Duration d) => d.inMinutes < 1;
 
   String _buildGreeting() {
     final names = widget.batchChildNames.isNotEmpty
@@ -657,15 +671,19 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
               decoration: BoxDecoration(
                 color: AppColors.navy.withValues(alpha: 0.35),
                 border: Border.all(
-                  color: AppColors.gold.withValues(alpha: 0.50),
+                  color: _isUrgent(widget.remaining)
+                      ? AppColors.adminRed.withValues(alpha: 0.60)
+                      : AppColors.gold.withValues(alpha: 0.50),
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     PhosphorIconsFill.timer,
-                    color: AppColors.gold,
+                    color: _isUrgent(widget.remaining)
+                        ? AppColors.adminRed
+                        : AppColors.gold,
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -682,7 +700,9 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
                     _formatRemaining(widget.remaining),
                     style: AppTextStyles.bodyLarge(
                       context,
-                      color: AppColors.gold,
+                      color: _isUrgent(widget.remaining)
+                          ? AppColors.adminRed
+                          : AppColors.gold,
                     ).copyWith(fontWeight: FontWeight.w800),
                   ),
                 ],
@@ -699,6 +719,13 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
               color: AppColors.lightSurface,
               border: Border.all(color: AppColors.lightBorder),
               borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -725,17 +752,24 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
           ),
           if (widget.isPending) ...[
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(PhosphorIconsRegular.xCircle),
-                label: Text(widget.cancelling ? 'Cancelling…' : 'Cancel session'),
-                onPressed: widget.cancelling ? null : widget.onCancelNow,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.adminRed,
-                  side: const BorderSide(color: AppColors.adminRed),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+            TextButton.icon(
+              onPressed: widget.cancelling ? null : widget.onCancelNow,
+              icon: Icon(
+                PhosphorIconsRegular.x,
+                size: 16,
+                color: AppColors.adminRed.withValues(alpha: 0.9),
+              ),
+              label: Text(
+                widget.cancelling ? 'Cancelling…' : 'Cancel session',
+                style: AppTextStyles.body(
+                  context,
+                  color: AppColors.adminRed.withValues(alpha: 0.9),
                 ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
           ],
@@ -765,8 +799,8 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
         blastDirectionality: BlastDirectionality.explosive,
         maxBlastForce: 15,
         minBlastForce: 3,
-        emissionFrequency: 0.03,
-        numberOfParticles: 20,
+        emissionFrequency: 0.04,
+        numberOfParticles: 14,
         gravity: 0.4,
         colors: const [
           AppColors.gold,
