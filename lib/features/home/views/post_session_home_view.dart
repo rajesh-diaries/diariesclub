@@ -13,7 +13,7 @@ class PostSessionHomeView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return const SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: EdgeInsets.only(left: 20, right: 20, bottom: 12),
       child: IdleHomeBody(),
     );
   }

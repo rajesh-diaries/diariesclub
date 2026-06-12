@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/active_sessions_provider.dart';
-import '../../../core/providers/current_family_provider.dart';
 import '../../../core/providers/family_children_provider.dart';
-import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../widgets/active_session_card.dart';
 import '../widgets/announcements_feed.dart';
+import '../widgets/home_banner_carousel.dart';
 import '../widgets/birthday_card.dart';
 import '../widgets/home_combos_strip.dart';
 import '../widgets/my_upcoming_workshops.dart';
@@ -28,8 +28,6 @@ class MultiSessionHomeView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessions = ref.watch(activeSessionsProvider).valueOrNull ?? const [];
     final children = ref.watch(familyChildrenProvider).valueOrNull ?? const [];
-    final family = ref.watch(currentFamilyProvider).valueOrNull;
-    final familyName = (family?['name'] as String?) ?? '';
 
     final childrenInSession = sessions
         .map((s) => s['child_id'] as String?)
@@ -41,38 +39,28 @@ class MultiSessionHomeView extends ConsumerWidget {
     // (the start screen handles guests / new-child flow).
     final showStartCta = children.isEmpty || hasIdleChildren;
 
-    // Greeting first, then the immersive ActiveSessionsCard with a ring
-    // timer per kid (character-tinted). Wallet pill lives in the top app
-    // bar so we don't render WalletCard here.
+    // Greeting now lives in [HomeAppBar]. Start with the immersive
+    // ActiveSessionsCard so the parent sees the timer first.
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            familyName.isEmpty ? 'Hey there!' : 'Hey ${familyName.split(' ').first}!',
-            style: AppTextStyles.h2(context),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "Let's get the kids playing! 🎉",
-            style: AppTextStyles.body(context),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          const HomeBannerCarousel(),
+          const SizedBox(height: kHomeSectionGap),
           ActiveSessionsCard(sessions: sessions),
           // In-flight kitchen status — mirrors what the staff app sees,
           // so the parent watches their cappuccino move placed →
           // preparing → ready in real time. Hidden when nothing is in
           // flight, so it doesn't compete with the Order food CTA when
           // there's nothing to track yet.
-          const SizedBox(height: 16),
+          const SizedBox(height: kHomeSectionGap),
           const LiveOrdersCard(),
           // Primary CTA while a session is running: order food. Cafe tab
           // gets pre-selected on /club so the parent lands on coffee +
           // snacks directly.
-          const SizedBox(height: 16),
+          const SizedBox(height: kHomeSectionGap),
           const OrderFoodCard(),
           // Secondary CTA: only when at least one sibling is idle. Lets
           // the parent start a session for the other kid without leaving
@@ -85,18 +73,18 @@ class MultiSessionHomeView extends ConsumerWidget {
           // redemption is gated on no completed sessions — by the time
           // the family is here, they can't redeem someone else's code
           // anymore, so promote sharing their own instead).
-          const SizedBox(height: 16),
+          const SizedBox(height: kHomeSectionGap),
           const ReferralInviteCard(),
           // Announcements moved BELOW the live session(s) — the primary
           // attention moment is what's playing right now.
           const AnnouncementsFeed(),
           const SizedBox(height: 20),
           const HomeCombosStrip(),
-          const SizedBox(height: 16),
+          const SizedBox(height: kHomeSectionGap),
           const BirthdayCardList(),
-          const SizedBox(height: 16),
+          const SizedBox(height: kHomeSectionGap),
           const MyUpcomingWorkshopsSection(),
-          const SizedBox(height: 16),
+          const SizedBox(height: kHomeSectionGap),
           const RecentActivityList(),
           const SizedBox(height: 32),
         ],

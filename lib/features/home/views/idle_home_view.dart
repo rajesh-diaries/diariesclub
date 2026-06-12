@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/referral_eligibility_provider.dart';
+import '../../../core/theme/app_theme.dart';
 import '../widgets/announcements_feed.dart';
 import '../widgets/big_start_session_card.dart';
 import '../widgets/birthday_card.dart';
@@ -22,7 +23,7 @@ class IdleHomeView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return const SingleChildScrollView(
-      padding: EdgeInsets.only(left: 20, right: 20, bottom: 8),
+      padding: EdgeInsets.only(left: 20, right: 20, bottom: 12),
       child: IdleHomeBody(),
     );
   }
@@ -52,13 +53,13 @@ class IdleHomeBody extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const BigStartSessionCard(),
-        const SizedBox(height: 12),
+        const SizedBox(height: kHomeSectionGap),
         const HomeBannerCarousel(),
-        const SizedBox(height: 10),
+        const SizedBox(height: kHomeSectionGap),
         const PlayPassPromoCard(),
         // Order food without starting a session — e.g. parent drops by
         // just for coffee/snacks, or wants to pre-order while planning.
-        const SizedBox(height: 10),
+        const SizedBox(height: kHomeSectionGap),
         const OrderFoodCard(),
         // Live orders the parent placed during a session that just
         // ended — show them above reflections so they can track the
@@ -69,19 +70,19 @@ class IdleHomeBody extends ConsumerWidget {
           child: LiveOrdersCard(),
         ),
         if (referralEligible) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: kHomeSectionGap),
           const ReferralEntryCard(),
         ],
-        const SizedBox(height: 16),
+        const SizedBox(height: kHomeSectionGap),
         const HomeCombosStrip(),
-        const SizedBox(height: 12),
+        const SizedBox(height: kHomeSectionGap),
         const BirthdayCardList(),
-        const SizedBox(height: 12),
+        const SizedBox(height: kHomeSectionGap),
         const MyUpcomingWorkshopsSection(),
         // Announcements moved BELOW the start CTA so the primary
         // action lands first. Self-margined: collapses if no rows.
         const AnnouncementsFeed(),
-        const SizedBox(height: 12),
+        const SizedBox(height: kHomeSectionGap),
         const RecentActivityList(),
         const SizedBox(height: 20),
       ],
