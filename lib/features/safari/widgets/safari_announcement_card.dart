@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+
 import '../../../core/providers/venue_config_provider.dart';
+import '../../../core/theme/app_text_styles.dart';
 import 'safari_colors.dart';
 
 class SafariAnnouncementCard extends ConsumerWidget {
@@ -28,7 +31,11 @@ class SafariAnnouncementCard extends ConsumerWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, color: SafariColors.warmAmber, size: 20),
+          const Icon(
+            PhosphorIconsRegular.info,
+            color: SafariColors.warmAmber,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -37,20 +44,18 @@ class SafariAnnouncementCard extends ConsumerWidget {
                 if (title.isNotEmpty)
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: AppTextStyles.body(
+                      context,
                       color: SafariColors.slate,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    ).copyWith(fontWeight: FontWeight.w800),
                   ),
                 if (body.isNotEmpty) ...[
                   if (title.isNotEmpty) const SizedBox(height: 2),
                   Text(
                     body,
-                    style: const TextStyle(
+                    style: AppTextStyles.caption(
+                      context,
                       color: SafariColors.slate,
-                      fontSize: 13,
-                      height: 1.4,
                     ),
                   ),
                 ],

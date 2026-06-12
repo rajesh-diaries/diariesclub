@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../core/theme/app_text_styles.dart';
 import 'widgets/safari_announcement_card.dart';
 import 'widgets/safari_colors.dart';
 import 'widgets/safari_faq_section.dart';
@@ -71,12 +73,11 @@ class _FourTraitsSection extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
-          const Text(
+          Text(
             'The Four Traits',
-            style: TextStyle(
+            style: AppTextStyles.h3(
+              context,
               color: SafariColors.jungleGreen,
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 24),
@@ -99,10 +100,13 @@ class _Footer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Text(
         'Safari Club · Play Diaries',
-        style: TextStyle(color: Color(0xFFAAAAAA), fontSize: 12),
+        style: AppTextStyles.caption(
+          context,
+          color: const Color(0xFFAAAAAA),
+        ),
       ),
     );
   }

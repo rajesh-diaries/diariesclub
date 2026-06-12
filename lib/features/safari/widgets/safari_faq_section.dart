@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_text_styles.dart';
 import 'safari_colors.dart';
 
 class SafariFaqSection extends StatefulWidget {
@@ -37,12 +41,11 @@ class _SafariFaqSectionState extends State<SafariFaqSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Questions?',
-            style: TextStyle(
+            style: AppTextStyles.h3(
+              context,
               color: SafariColors.jungleGreen,
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 20),
@@ -57,16 +60,15 @@ class _SafariFaqSectionState extends State<SafariFaqSection> {
               child: ExpansionTile(
                 title: Text(
                   _faqs[index]['q']!,
-                  style: const TextStyle(
+                  style: AppTextStyles.body(
+                    context,
                     color: SafariColors.slate,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  ).copyWith(fontWeight: FontWeight.w700),
                 ),
                 trailing: Icon(
                   _expanded[index]
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
+                      ? PhosphorIconsRegular.caretUp
+                      : PhosphorIconsRegular.caretDown,
                   color: SafariColors.jungleGreen,
                 ),
                 onExpansionChanged: (expanded) {
@@ -77,10 +79,9 @@ class _SafariFaqSectionState extends State<SafariFaqSection> {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     child: Text(
                       _faqs[index]['a']!,
-                      style: const TextStyle(
-                        color: Color(0xFF666666),
-                        fontSize: 14,
-                        height: 1.5,
+                      style: AppTextStyles.body(
+                        context,
+                        color: AppColors.lightTextSecondary,
                       ),
                     ),
                   ),

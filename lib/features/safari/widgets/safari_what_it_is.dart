@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_text_styles.dart';
 import 'safari_colors.dart';
 
 class SafariWhatItIs extends StatelessWidget {
@@ -6,40 +10,39 @@ class SafariWhatItIs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'What it is',
-            style: TextStyle(
+            style: AppTextStyles.h3(
+              context,
               color: SafariColors.jungleGreen,
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
             ),
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           const _InfoCard(
-            icon: Icons.calendar_today_outlined,
+            icon: PhosphorIconsRegular.calendar,
             title: 'Age 2–5 years',
             subtitle: 'Monday – Friday',
           ),
           const SizedBox(height: 12),
           const _InfoCard(
-            icon: Icons.schedule_outlined,
+            icon: PhosphorIconsRegular.clock,
             title: '9:30 AM – 12:30 PM',
             subtitle: 'Morning sessions',
           ),
           const SizedBox(height: 12),
           const _InfoCard(
-            icon: Icons.location_on_outlined,
+            icon: PhosphorIconsRegular.mapPin,
             title: 'Play Diaries Centre',
             subtitle: 'A safe, inspiring space to explore',
           ),
           const SizedBox(height: 12),
           const _InfoCard(
-            icon: Icons.restaurant_outlined,
+            icon: PhosphorIconsRegular.bowlFood,
             title: 'Healthy snacks & meals',
             subtitle: 'Optional, wholesome add-ons available',
           ),
@@ -86,18 +89,17 @@ class _InfoCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: AppTextStyles.body(
+                  context,
                   color: SafariColors.slate,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
+                ).copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  color: Color(0xFF888888),
-                  fontSize: 13,
+                style: AppTextStyles.caption(
+                  context,
+                  color: AppColors.lightTextSecondary,
                 ),
               ),
             ],

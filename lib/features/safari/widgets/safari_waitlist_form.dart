@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/current_family_provider.dart';
 import '../../../core/providers/family_children_provider.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/primary_button.dart';
 import 'safari_colors.dart';
 
@@ -11,7 +14,8 @@ class SafariWaitlistForm extends ConsumerStatefulWidget {
   const SafariWaitlistForm({super.key});
 
   @override
-  ConsumerState<SafariWaitlistForm> createState() => _SafariWaitlistFormState();
+  ConsumerState<SafariWaitlistForm> createState() =>
+      _SafariWaitlistFormState();
 }
 
 class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
@@ -57,7 +61,8 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
       final dob = DateTime.parse(dobStr);
       final now = DateTime.now();
       var age = now.year - dob.year;
-      if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) {
+      if (now.month < dob.month ||
+          (now.month == dob.month && now.day < dob.day)) {
         age--;
       }
       return age < 0 ? 0 : age;
@@ -76,7 +81,7 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
 
   bool get _canSubmit {
     return _parentNameController.text.trim().isNotEmpty &&
-        _phoneController.text.trim().isNotEmpty &&
+        _phoneController.text.trim().length >= 10 &&
         _childNameController.text.trim().isNotEmpty &&
         _selectedAge != null &&
         !_submitting;
@@ -85,12 +90,11 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
   Future<void> _submit() async {
     if (!_canSubmit) return;
 
-    setState(() {
-      _submitting = true;
-    });
+    setState(() => _submitting = true);
 
     try {
-      final familyId = ref.read(currentFamilyProvider).valueOrNull?['id'] as String?;
+      final familyId =
+          ref.read(currentFamilyProvider).valueOrNull?['id'] as String?;
 
       await Supabase.instance.client.from('safari_waitlist').insert({
         'family_id': familyId,
@@ -109,9 +113,12 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
       setState(() => _submitting = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Something went wrong. Please try again.'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: Text(
+              'Something went wrong. Please try again.',
+              style: AppTextStyles.body(context, color: Colors.white),
+            ),
+            backgroundColor: AppColors.adminRed,
           ),
         );
       }
@@ -128,30 +135,28 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
           color: SafariColors.lightSage,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: const Column(
+        child: Column(
           children: [
-            Icon(
-              Icons.check_circle_outline,
+            const Icon(
+              PhosphorIconsRegular.checkCircle,
               size: 48,
               color: SafariColors.jungleGreen,
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               'You\'re on the list!',
-              style: TextStyle(
+              style: AppTextStyles.h3(
+                context,
                 color: SafariColors.jungleGreen,
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'We\'ll reach out as soon as Safari Club is ready. Thank you for your interest!',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: AppTextStyles.body(
+                context,
                 color: SafariColors.slate,
-                fontSize: 14,
-                height: 1.5,
               ),
             ),
           ],
@@ -164,21 +169,19 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Join the waitlist',
-            style: TextStyle(
+            style: AppTextStyles.h3(
+              context,
               color: SafariColors.jungleGreen,
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Be the first to know when Safari Club opens. No commitment required.',
-            style: TextStyle(
-              color: Color(0xFF888888),
-              fontSize: 14,
-              height: 1.5,
+            style: AppTextStyles.body(
+              context,
+              color: AppColors.lightTextSecondary,
             ),
           ),
           const SizedBox(height: 24),
@@ -197,9 +200,11 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
           TextField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
+            maxLength: 10,
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               labelText: 'Phone number',
+              counterText: '',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -218,26 +223,40 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
             ),
           ),
           const SizedBox(height: 16),
-          InputDecorator(
-            decoration: InputDecoration(
-              labelText: 'Child age',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+          Text(
+            'Child age',
+            style: AppTextStyles.caption(
+              context,
+              color: AppColors.lightTextSecondary,
             ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<int>(
-                value: _selectedAge,
-                isDense: true,
-                hint: const Text('Select age'),
-                items: const [
-                  DropdownMenuItem(value: 2, child: Text('2 years')),
-                  DropdownMenuItem(value: 3, child: Text('3 years')),
-                  DropdownMenuItem(value: 4, child: Text('4 years')),
-                ],
-                onChanged: (value) => setState(() => _selectedAge = value),
-              ),
-            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [2, 3, 4].map((age) {
+              final selected = _selectedAge == age;
+              return Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: ChoiceChip(
+                  label: Text('$age years'),
+                  selected: selected,
+                  onSelected: (_) => setState(() => _selectedAge = age),
+                  selectedColor: SafariColors.jungleGreen,
+                  backgroundColor: Colors.white,
+                  side: BorderSide(
+                    color: selected
+                        ? SafariColors.jungleGreen
+                        : AppColors.lightBorder,
+                  ),
+                  labelStyle: AppTextStyles.body(
+                    context,
+                    color: selected ? Colors.white : SafariColors.slate,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
           const SizedBox(height: 24),
           SizedBox(

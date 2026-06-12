@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+
+import '../../../core/theme/app_text_styles.dart';
 import 'safari_colors.dart';
 
 class SafariPhilosophyCard extends StatelessWidget {
@@ -13,31 +16,33 @@ class SafariPhilosophyCard extends StatelessWidget {
         color: SafariColors.lightSage,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'What makes Safari Club different?',
-            style: TextStyle(
+            style: AppTextStyles.bodyLarge(
+              context,
               color: SafariColors.jungleGreen,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 16),
           const _PhilosophyItem(
-            icon: Icons.favorite_border,
-            text: 'Whole-child growth. Social, emotional and creative skills built through play.',
+            icon: PhosphorIconsRegular.heart,
+            text:
+                'Whole-child growth. Social, emotional and creative skills built through play.',
           ),
           const SizedBox(height: 12),
           const _PhilosophyItem(
-            icon: Icons.psychology_outlined,
-            text: 'Guided exploration. Curiosity-led activities that build confidence and independence.',
+            icon: PhosphorIconsRegular.brain,
+            text:
+                'Guided exploration. Curiosity-led activities that build confidence and independence.',
           ),
           const SizedBox(height: 12),
           const _PhilosophyItem(
-            icon: Icons.school_outlined,
-            text: 'Hands-on learning. No screens, no worksheets — just meaningful experiences.',
+            icon: PhosphorIconsRegular.handHeart,
+            text:
+                'Hands-on learning. No screens, no worksheets — just meaningful experiences.',
           ),
         ],
       ),
@@ -61,10 +66,9 @@ class _PhilosophyItem extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
+            style: AppTextStyles.body(
+              context,
               color: SafariColors.slate,
-              fontSize: 14,
-              height: 1.5,
             ),
           ),
         ),
