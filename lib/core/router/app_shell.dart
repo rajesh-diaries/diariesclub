@@ -25,7 +25,7 @@ class AppShell extends StatelessWidget {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(i == 1 ? PhosphorIconsFill.martini : PhosphorIconsRegular.martini),
+            icon: Icon(i == 1 ? PhosphorIconsFill.storefront : PhosphorIconsRegular.storefront),
             label: 'Club',
           ),
           BottomNavigationBarItem(
@@ -33,11 +33,11 @@ class AppShell extends StatelessWidget {
             label: 'Adventure',
           ),
           BottomNavigationBarItem(
-            icon: Icon(i == 3 ? PhosphorIconsFill.globeHemisphereWest : PhosphorIconsRegular.globeHemisphereWest),
+            icon: Icon(i == 3 ? PhosphorIconsFill.binoculars : PhosphorIconsRegular.binoculars),
             label: 'Safari',
           ),
           BottomNavigationBarItem(
-            icon: Icon(i == 4 ? PhosphorIconsFill.user : PhosphorIconsRegular.user),
+            icon: Icon(i == 4 ? PhosphorIconsFill.userCircle : PhosphorIconsRegular.userCircle),
             label: 'Profile',
           ),
         ],
