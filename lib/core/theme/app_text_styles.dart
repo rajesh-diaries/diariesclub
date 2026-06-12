@@ -62,4 +62,23 @@ class AppTextStyles {
         fontWeight: FontWeight.w700,
         color: color ?? Colors.white,
       );
+
+  static TextStyle cardTitle(BuildContext c, {Color? color}) => GoogleFonts.nunito(
+        fontSize: 18,
+        fontWeight: FontWeight.w800,
+        color: color ?? Theme.of(c).colorScheme.onSurface,
+      );
+
+  static TextStyle cardSubtitle(BuildContext c, {Color? color}) => GoogleFonts.nunito(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: color ?? Theme.of(c).colorScheme.onSurfaceVariant,
+      );
+
+  static TextStyle pillLabel(BuildContext c, {Color? color}) => GoogleFonts.nunito(
+        fontSize: 13,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.5,
+        color: color ?? Colors.white,
+      );
 }

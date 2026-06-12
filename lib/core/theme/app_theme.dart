@@ -3,6 +3,16 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 
+const double kHomeCardRadius = 16.0;
+const double kHomeSectionGap = 12.0;
+const double kHomeCardPadding = 16.0;
+
+BoxShadow kHomeCardShadow(BuildContext context) => BoxShadow(
+      color: AppColors.navy.withValues(alpha: 0.08),
+      blurRadius: 12,
+      offset: const Offset(0, 4),
+    );
+
 /// Material 3 themes for light + dark, anchored on AppColors.
 class AppTheme {
   AppTheme._();
