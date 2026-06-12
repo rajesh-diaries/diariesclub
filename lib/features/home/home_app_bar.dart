@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../core/providers/active_sessions_provider.dart';
+import '../../core/providers/current_family_provider.dart';
 import '../../core/providers/current_wallet_provider.dart';
 import '../../core/providers/notifications_provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -42,6 +43,13 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final unread = ref.watch(unreadNotificationCountProvider);
     final balancePaise = ref.watch(walletBalancePaiseProvider);
+    final family = ref.watch(currentFamilyProvider).valueOrNull;
+    final sessions = ref.watch(activeSessionsProvider).valueOrNull ?? const [];
+
+    final familyName = (family?['name'] as String?) ?? '';
+    final firstName = familyName.isEmpty ? 'there' : familyName.split(' ').first;
+    final hasActive = sessions.any((s) => s['status'] == 'active');
+    final tagline = hasActive ? 'Play time is here!' : "Let's get the kids playing!";
 
     return AppBar(
       automaticallyImplyLeading: false,
@@ -49,36 +57,22 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
       elevation: 0,
       centerTitle: false,
       titleSpacing: 16,
-      title: Row(
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          GestureDetector(
-            onTap: () => context.go('/profile'),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.gold.withValues(alpha: 0.25),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Icon(
-                PhosphorIconsFill.handWaving,
-                color: AppColors.navy,
-                size: 18,
-              ),
-            ),
+          Text(
+            'Hey $firstName!',
+            style: AppTextStyles.bodyLarge(context)
+                .copyWith(fontWeight: FontWeight.w800),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(width: 10),
-          // Playful wordmark — no star, just bold fun text.
-          const Text(
-            'Play Diaries',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: AppColors.navy,
-              letterSpacing: -0.5,
-            ),
+          Text(
+            tagline,
+            style: AppTextStyles.caption(context),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -111,7 +105,7 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.adminRed,
+                        color: AppColors.gold,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       constraints: const BoxConstraints(
@@ -122,7 +116,7 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
                         unread > 9 ? '9+' : '$unread',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: AppColors.navy,
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
                         ),
@@ -175,7 +169,7 @@ class _WalletPill extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 label,
-                style: AppTextStyles.body(context, color: AppColors.navy)
+                style: AppTextStyles.caption(context, color: AppColors.navy)
                     .copyWith(fontWeight: FontWeight.w800),
               ),
             ],
