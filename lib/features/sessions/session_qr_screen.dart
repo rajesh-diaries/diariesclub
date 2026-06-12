@@ -457,7 +457,7 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
           ),
           leading: IconButton(
             tooltip: 'Done',
-            icon: const Icon(Icons.close),
+            icon: const Icon(PhosphorIconsRegular.x),
             onPressed: _confirmExit,
           ),
         ),
@@ -655,9 +655,9 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
                 vertical: 14,
               ),
               decoration: BoxDecoration(
-                color: AppColors.gold.withValues(alpha: 0.10),
+                color: AppColors.navy.withValues(alpha: 0.35),
                 border: Border.all(
-                  color: AppColors.gold.withValues(alpha: 0.40),
+                  color: AppColors.gold.withValues(alpha: 0.50),
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -671,11 +671,19 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Auto-cancels in ${_formatRemaining(widget.remaining)}',
-                      style: AppTextStyles.body(context).copyWith(
-                        fontWeight: FontWeight.w700,
+                      'Auto-cancels in ',
+                      style: AppTextStyles.body(
+                        context,
+                        color: Colors.white.withValues(alpha: 0.92),
                       ),
                     ),
+                  ),
+                  Text(
+                    _formatRemaining(widget.remaining),
+                    style: AppTextStyles.bodyLarge(
+                      context,
+                      color: AppColors.gold,
+                    ).copyWith(fontWeight: FontWeight.w800),
                   ),
                 ],
               ),
@@ -695,7 +703,7 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
             child: Row(
               children: [
                 const Icon(
-                  PhosphorIconsFill.timer,
+                  PhosphorIconsFill.clock,
                   color: AppColors.navy,
                   size: 18,
                 ),
