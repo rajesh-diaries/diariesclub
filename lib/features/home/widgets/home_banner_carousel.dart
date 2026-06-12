@@ -1,13 +1,16 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/current_family_provider.dart';
 import '../../../core/providers/server_clock_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../features/club/providers/pending_club_tab_provider.dart';
 
 /// Provider for active home banners ordered by display_order.
@@ -253,17 +256,21 @@ class _BannerPage extends StatelessWidget {
     };
 
     Widget image = ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(kHomeCardRadius),
       child: imageUrl.isNotEmpty
-          ? Image.network(
-              imageUrl,
+          ? CachedNetworkImage(
+              imageUrl: imageUrl,
               fit: BoxFit.cover,
-              semanticLabel: altText.isNotEmpty ? altText : null,
-              errorBuilder: (_, __, ___) => Container(color: AppColors.navy),
-              loadingBuilder: (_, child, progress) {
-                if (progress == null) return child;
-                return Container(color: AppColors.lightBorder);
-              },
+              placeholder: (context, url) => Container(
+                color: AppColors.lightBorder,
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: AppColors.lightBorder,
+                child: const Icon(
+                  PhosphorIconsRegular.image,
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
             )
           : Container(color: AppColors.navy),
     );
@@ -282,8 +289,25 @@ class _BannerPage extends StatelessWidget {
     if (borderColor != Colors.transparent) {
       image = Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
           border: Border.all(color: borderColor, width: 2),
+        ),
+        child: image,
+      );
+    }
+
+    if (altText.isNotEmpty) {
+      image = Semantics(
+        label: altText,
+        child: image,
+      );
+    }
+
+    if (isCurrent) {
+      image = Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
+          boxShadow: [kHomeCardShadow(context)],
         ),
         child: image,
       );
