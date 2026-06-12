@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/play_passes_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import 'play_pass_purchase_sheet.dart';
 
 /// Promotional card shown on the home screen when the family has no active
@@ -43,16 +44,17 @@ class _PromoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(kHomeCardRadius),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(kHomeCardPadding),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF1E3A7B), Color(0xFF2A4A9B)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
+          boxShadow: [kHomeCardShadow(context)],
         ),
         child: Row(
           children: [
@@ -76,15 +78,13 @@ class _PromoCard extends StatelessWidget {
                 children: [
                   Text(
                     'Play Passes',
-                    style: AppTextStyles.bodyLarge(context).copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: AppTextStyles.cardTitle(context, color: Colors.white),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     'Save up to ₹200 per visit. Buy 5, 10 or 15 passes.',
-                    style: AppTextStyles.caption(context).copyWith(
+                    style: AppTextStyles.cardSubtitle(
+                      context,
                       color: Colors.white.withValues(alpha: 0.85),
                     ),
                   ),
@@ -110,11 +110,12 @@ class _ActivePassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(kHomeCardPadding),
       decoration: BoxDecoration(
-        color: AppColors.gold.withValues(alpha: 0.12),
+        color: const Color(0xFFFDF8EE),
         border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
+        boxShadow: [kHomeCardShadow(context)],
       ),
       child: Row(
         children: [
@@ -130,16 +131,12 @@ class _ActivePassCard extends StatelessWidget {
               children: [
                 Text(
                   '$remaining Play Pass${remaining == 1 ? '' : 'es'} ready',
-                  style: AppTextStyles.bodyLarge(context)
-                      .copyWith(fontWeight: FontWeight.w800),
+                  style: AppTextStyles.cardTitle(context),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Use them at session start — 1 pass = 1 hour for any kid.',
-                  style: AppTextStyles.caption(
-                    context,
-                    color: AppColors.lightTextSecondary,
-                  ),
+                  style: AppTextStyles.cardSubtitle(context),
                 ),
               ],
             ),
