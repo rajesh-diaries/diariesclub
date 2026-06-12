@@ -8,6 +8,7 @@ import '../../../core/providers/referral_eligibility_provider.dart';
 import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
 
 /// Home-tab card that lets a new family enter a friend's referral code
@@ -33,10 +34,11 @@ class ReferralEntryCard extends ConsumerWidget {
       behavior: HitTestBehavior.opaque,
       onTap: () => _showEntryDialog(context, ref),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(kHomeCardPadding),
         decoration: BoxDecoration(
           color: AppColors.navy,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
+          boxShadow: [kHomeCardShadow(context)],
         ),
         child: Row(
           children: [
@@ -52,12 +54,12 @@ class ReferralEntryCard extends ConsumerWidget {
                 children: [
                   Text(
                     'Have a referral code?',
-                    style: AppTextStyles.h3(context, color: Colors.white),
+                    style: AppTextStyles.cardTitle(context, color: Colors.white),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '$creditLabel wallet credit on your first visit.',
-                    style: AppTextStyles.body(
+                    style: AppTextStyles.cardSubtitle(
                       context,
                       color: Colors.white70,
                     ),
@@ -66,7 +68,7 @@ class ReferralEntryCard extends ConsumerWidget {
               ),
             ),
             const Icon(
-              Icons.arrow_forward_ios,
+              PhosphorIconsRegular.arrowRight,
               color: Colors.white54,
               size: 16,
             ),

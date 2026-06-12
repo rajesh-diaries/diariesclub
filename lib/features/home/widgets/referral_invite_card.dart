@@ -7,6 +7,7 @@ import '../../../core/providers/current_family_provider.dart';
 import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
 
 /// Compact "Refer friends" card for the active-session home view.
@@ -36,13 +37,14 @@ class ReferralInviteCard extends ConsumerWidget {
         ? gifterPaise
         : newFamilyPaise;
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(kHomeCardRadius),
       onTap: () => context.push('/profile/referral-details'),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(kHomeCardPadding),
         decoration: BoxDecoration(
           color: AppColors.navy,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
+          boxShadow: [kHomeCardShadow(context)],
         ),
         child: Row(
           children: [
@@ -67,14 +69,13 @@ class ReferralInviteCard extends ConsumerWidget {
                 children: [
                   Text(
                     'Refer friends',
-                    style: AppTextStyles.bodyLarge(context)
-                        .copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                    style: AppTextStyles.cardTitle(context, color: Colors.white),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${Money.fromPaise(headlineAmount)} wallet credit each '
                     'after their first visit.',
-                    style: AppTextStyles.caption(
+                    style: AppTextStyles.cardSubtitle(
                       context,
                       color: Colors.white70,
                     ),
@@ -83,7 +84,7 @@ class ReferralInviteCard extends ConsumerWidget {
               ),
             ),
             const Icon(
-              Icons.arrow_forward_ios,
+              PhosphorIconsRegular.arrowRight,
               color: Colors.white54,
               size: 14,
             ),
