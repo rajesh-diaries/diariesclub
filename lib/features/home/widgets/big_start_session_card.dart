@@ -78,9 +78,9 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
             ),
             child: Stack(
               children: [
-                // Left side text, kept high so it doesn't overlap the hero
+                // Left side text
                 const Align(
-                  alignment: Alignment(-1.0, -0.35),
+                  alignment: Alignment.topLeft,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,18 +113,18 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                     ],
                   ),
                 ),
-                // Hero sitting at the bottom centre of the card
+                // Hero sitting on the bottom-right base of the card
                 Align(
-                  alignment: Alignment.bottomCenter,
+                  alignment: Alignment.bottomRight,
                   child: Image.asset(
                     'assets/hero/$_hero.png',
                     height: 72,
                     fit: BoxFit.contain,
                   ),
                 ),
-                // PLAY button bottom-right, slightly larger
+                // PLAY button centred
                 Align(
-                  alignment: Alignment.bottomRight,
+                  alignment: Alignment.center,
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
