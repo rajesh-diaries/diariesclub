@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../club/providers/active_orders_provider.dart';
 
 /// Customer-facing kitchen-status card on home. Renders one row per
@@ -33,8 +34,9 @@ class LiveOrdersCard extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
         border: Border.all(color: AppColors.lightBorder),
+        boxShadow: [kHomeCardShadow(context)],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -54,9 +56,7 @@ class LiveOrdersCard extends ConsumerWidget {
                   orders.length == 1
                       ? 'Your order'
                       : 'Your orders (${orders.length})',
-                  style: AppTextStyles.bodyLarge(context).copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: AppTextStyles.cardTitle(context),
                 ),
               ],
             ),
@@ -143,7 +143,7 @@ class _OrderRow extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             const Icon(
-              Icons.chevron_right,
+              PhosphorIconsRegular.caretRight,
               color: AppColors.lightTextSecondary,
             ),
           ],
@@ -160,7 +160,7 @@ class _OrderRow extends StatelessWidget {
     for (final it in items.take(3)) {
       final name = (it['name_snapshot'] as String?) ?? 'Item';
       final qty = (it['quantity'] as int?) ?? 1;
-      parts.add(qty > 1 ? '${qty}× $name' : name);
+      parts.add(qty > 1 ? '$qty× $name' : name);
     }
     final remaining = items.length - parts.length;
     if (remaining > 0) {
@@ -263,7 +263,11 @@ class _StatusPill extends StatelessWidget {
           if (state == _PillState.past)
             const Padding(
               padding: EdgeInsets.only(right: 4),
-              child: Icon(Icons.check, size: 12, color: AppColors.activeGreen),
+              child: Icon(
+                PhosphorIconsRegular.check,
+                size: 12,
+                color: AppColors.activeGreen,
+              ),
             ),
           if (showDot)
             Container(
@@ -277,9 +281,7 @@ class _StatusPill extends StatelessWidget {
             ),
           Text(
             label,
-            style: AppTextStyles.caption(context, color: textColor).copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: AppTextStyles.pillLabel(context, color: textColor),
           ),
         ],
       ),
