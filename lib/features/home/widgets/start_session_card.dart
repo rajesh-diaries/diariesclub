@@ -9,40 +9,51 @@ import '../../../core/theme/app_theme.dart';
 /// CTA card on Home (idle or multi-session). Tap → /session/start.
 /// Navy gradient with gold accents — action-oriented and premium.
 class StartSessionCard extends StatelessWidget {
-  const StartSessionCard({super.key});
+  final bool compact;
+  const StartSessionCard({super.key, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(kHomeCardRadius),
       onTap: () => context.push('/session/start'),
       child: Container(
-        padding: const EdgeInsets.all(kHomeCardPadding),
+        padding: compact
+            ? const EdgeInsets.all(12)
+            : const EdgeInsets.all(kHomeCardPadding),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF2A4A8B),
-              AppColors.navy,
-            ],
-          ),
+          color: compact ? const Color(0xFFFDF8EE) : null,
+          gradient: compact
+              ? null
+              : const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF2A4A8B),
+                    AppColors.navy,
+                  ],
+                ),
           borderRadius: BorderRadius.circular(kHomeCardRadius),
+          border: compact
+              ? Border.all(color: AppColors.navy.withValues(alpha: 0.12))
+              : null,
           boxShadow: [kHomeCardShadow(context)],
         ),
         child: Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: compact ? 36 : 44,
+              height: compact ? 36 : 44,
               decoration: BoxDecoration(
-                color: AppColors.gold.withValues(alpha: 0.20),
-                borderRadius: BorderRadius.circular(12),
+                color: compact
+                    ? AppColors.gold.withValues(alpha: 0.15)
+                    : AppColors.gold.withValues(alpha: 0.20),
+                borderRadius: BorderRadius.circular(compact ? 10 : 12),
               ),
-              child: const Icon(
+              child: Icon(
                 PhosphorIconsFill.usersThree,
                 color: AppColors.gold,
-                size: 22,
+                size: compact ? 18 : 22,
               ),
             ),
             const SizedBox(width: 12),
@@ -52,23 +63,32 @@ class StartSessionCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Add a friend to play!',
-                    style: AppTextStyles.cardTitle(context, color: Colors.white),
+                    compact ? 'Add a friend' : 'Add a friend to play!',
+                    style: AppTextStyles.cardTitle(
+                      context,
+                      color: compact ? AppColors.navy : Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Bring a sibling or friend along',
+                    compact
+                        ? 'Start for a sibling'
+                        : 'Bring a sibling or friend along',
                     style: AppTextStyles.cardSubtitle(
                       context,
-                      color: Colors.white70,
+                      color: compact
+                          ? AppColors.lightTextSecondary
+                          : Colors.white70,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               PhosphorIconsRegular.caretRight,
-              color: Colors.white54,
+              color: compact
+                  ? AppColors.lightTextSecondary
+                  : Colors.white54,
               size: 14,
             ),
           ],

@@ -193,6 +193,13 @@ class _Entry {
   bool get isPending => status == 'pending';
   bool get isGrace =>
       expiresAt != null && expiresAt!.isBefore(DateTime.now());
+  bool get isUrgent {
+    if (isPending || isGrace) return false;
+    final end = expiresAt;
+    if (end == null) return false;
+    final minutesLeft = end.difference(DateTime.now()).inMinutes;
+    return minutesLeft >= 0 && minutesLeft < 5;
+  }
 
   /// 0.0 = empty, 1.0 = full. Drains from 1 → 0 as time runs out.
   /// Pending: full (no scan yet so nothing's "spent"). Grace: 0.
@@ -232,6 +239,7 @@ class _Entry {
   String statusWord() {
     if (isPending) return 'Awaiting check-in';
     if (isGrace) return 'Wrapping up';
+    if (isUrgent) return 'Finishing soon';
     return 'Playing';
   }
 
@@ -255,6 +263,8 @@ class _SingleKidBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ringColor = entry.isUrgent ? AppColors.adminRed : entry.heroColor;
+    final glowColor = entry.isUrgent ? AppColors.adminRed : this.glowColor;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => context.push(entry.route()),
@@ -289,7 +299,7 @@ class _SingleKidBody extends StatelessWidget {
                     size: const Size(120, 120),
                     painter: _RingPainter(
                       progress: entry.progress(),
-                      color: entry.heroColor,
+                      color: ringColor,
                       strokeWidth: 8,
                     ),
                   ),
@@ -334,7 +344,7 @@ class _SingleKidBody extends StatelessWidget {
             entry.statusWord(),
             style: AppTextStyles.cardSubtitle(
               context,
-              color: entry.heroColor,
+              color: ringColor,
             ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.2),
           ),
         ],
@@ -365,6 +375,7 @@ class _MultiKidTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ringColor = entry.isUrgent ? AppColors.adminRed : entry.heroColor;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => context.push(entry.route()),
@@ -383,7 +394,7 @@ class _MultiKidTile extends StatelessWidget {
                     size: const Size(68, 68),
                     painter: _RingPainter(
                       progress: entry.progress(),
-                      color: entry.heroColor,
+                      color: ringColor,
                       strokeWidth: 5,
                     ),
                   ),
@@ -414,7 +425,7 @@ class _MultiKidTile extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: AppTextStyles.caption(
                 context,
-                color: entry.heroColor,
+                color: ringColor,
               ).copyWith(fontWeight: FontWeight.w700),
             ),
           ],

@@ -33,8 +33,10 @@ class MultiSessionHomeView extends ConsumerWidget {
         .map((s) => s['child_id'] as String?)
         .whereType<String>()
         .toSet();
-    final hasIdleChildren = children
-        .any((c) => !childrenInSession.contains(c['id'] as String?));
+    final idleChildren = children
+        .where((c) => !childrenInSession.contains(c['id'] as String?))
+        .toList();
+    final hasIdleChildren = idleChildren.isNotEmpty;
     // If there are no children registered yet, still show Start playing
     // (the start screen handles guests / new-child flow).
     final showStartCta = children.isEmpty || hasIdleChildren;
@@ -47,8 +49,6 @@ class MultiSessionHomeView extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ActiveSessionsCard(sessions: sessions),
-          const SizedBox(height: kHomeSectionGap),
-          const HomeBannerCarousel(),
           // In-flight kitchen status — mirrors what the staff app sees,
           // so the parent watches their cappuccino move placed →
           // preparing → ready in real time. Hidden when nothing is in
@@ -56,6 +56,10 @@ class MultiSessionHomeView extends ConsumerWidget {
           // there's nothing to track yet.
           const SizedBox(height: kHomeSectionGap),
           const LiveOrdersCard(),
+          // Promotional banner comes after personalized info (timer + live
+          // orders) so it never pushes actionable content below the fold.
+          const SizedBox(height: kHomeSectionGap),
+          const HomeBannerCarousel(),
           // Primary CTA while a session is running: order food. Cafe tab
           // gets pre-selected on /club so the parent lands on coffee +
           // snacks directly.
@@ -66,7 +70,7 @@ class MultiSessionHomeView extends ConsumerWidget {
           // home.
           if (showStartCta) ...[
             const SizedBox(height: kHomeSectionGap),
-            const StartSessionCard(),
+            StartSessionCard(compact: idleChildren.length == 1),
           ],
           // Active-session view always shows the invite card (referral
           // redemption is gated on no completed sessions — by the time

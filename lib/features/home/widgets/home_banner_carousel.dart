@@ -150,7 +150,7 @@ class _HomeBannerCarouselState extends ConsumerState<HomeBannerCarousel> {
         if (banners.isEmpty) return const SizedBox.shrink();
 
         return SizedBox(
-          height: 160,
+          height: 140,
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -331,10 +331,10 @@ class _SkeletonBanner extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
-        height: 160,
+        height: 140,
         decoration: BoxDecoration(
           color: AppColors.lightBorder,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
         ),
         child: const Center(
           child: SizedBox(
