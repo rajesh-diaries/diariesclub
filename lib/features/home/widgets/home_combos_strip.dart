@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
 import '../../club/fit_builder_screen.dart'
     show FitBuilderComboContext, FitBuilderResult;
@@ -164,7 +165,7 @@ class _ComboMiniCardState extends ConsumerState<_ComboMiniCard> {
     final legacyIds = ((inclusions['menu_item_ids'] as List?) ?? const [])
         .cast<String>();
     final newItems = ((inclusions['menu_items'] as List?) ?? const [])
-        .whereType<Map>()
+        .whereType<Map<String, dynamic>>()
         .toList();
     final sessionMinutes = inclusions['session_minutes'] as int?;
     final fitTemplateId = widget.combo['fit_template_id'] as String?;
@@ -255,7 +256,8 @@ class _ComboMiniCardState extends ConsumerState<_ComboMiniCard> {
           decoration: BoxDecoration(
             color: AppColors.lightSurface,
             border: Border.all(color: AppColors.lightBorder),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(kHomeCardRadius),
+            boxShadow: [kHomeCardShadow(context)],
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -313,9 +315,7 @@ class _ComboMiniCardState extends ConsumerState<_ComboMiniCard> {
                   children: [
                     Text(
                       name,
-                      style: AppTextStyles.body(context).copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: AppTextStyles.cardTitle(context),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -325,7 +325,7 @@ class _ComboMiniCardState extends ConsumerState<_ComboMiniCard> {
                       children: [
                         Text(
                           Money.fromPaise(price),
-                          style: AppTextStyles.h3(
+                          style: AppTextStyles.bodyLarge(
                             context,
                             color: AppColors.navy,
                           ),
