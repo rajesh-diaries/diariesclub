@@ -74,7 +74,7 @@ class OrderFoodCard extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.coffeeBrown,
+                color: AppColors.navy,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Row(

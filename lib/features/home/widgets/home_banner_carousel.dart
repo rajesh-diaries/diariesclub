@@ -251,7 +251,6 @@ class _BannerPage extends StatelessWidget {
 
     final borderColor = switch (type) {
       'urgent' => AppColors.adminRed,
-      'info' => AppColors.ellieBlue,
       _ => Colors.transparent,
     };
 

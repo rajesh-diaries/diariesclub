@@ -97,27 +97,27 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
                 ),
                 if (unread > 0)
                   Positioned(
-                    right: -4,
-                    top: -4,
+                    right: -2,
+                    top: -2,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
+                        horizontal: 4,
+                        vertical: 1,
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.gold,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       constraints: const BoxConstraints(
-                        minWidth: 18,
-                        minHeight: 18,
+                        minWidth: 15,
+                        minHeight: 15,
                       ),
                       child: Text(
                         unread > 9 ? '9+' : '$unread',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: AppColors.navy,
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
