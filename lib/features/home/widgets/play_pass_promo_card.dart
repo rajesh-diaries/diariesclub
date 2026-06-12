@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/play_passes_provider.dart';
@@ -19,7 +20,8 @@ class PlayPassPromoCard extends ConsumerWidget {
 
     if (remaining > 0) {
       // Show compact "you have passes" card instead of promo.
-      return _ActivePassCard(remaining: remaining);
+      final passes = ref.watch(playPassesProvider).valueOrNull ?? const [];
+      return _ActivePassCard(remaining: remaining, passes: passes);
     }
 
     return _PromoCard(onTap: () => _openSheet(context));
@@ -105,7 +107,8 @@ class _PromoCard extends StatelessWidget {
 
 class _ActivePassCard extends StatelessWidget {
   final int remaining;
-  const _ActivePassCard({required this.remaining});
+  final List<Map<String, dynamic>> passes;
+  const _ActivePassCard({required this.remaining, required this.passes});
 
   @override
   Widget build(BuildContext context) {
@@ -119,10 +122,18 @@ class _ActivePassCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
-            PhosphorIconsFill.ticket,
-            color: AppColors.gold,
-            size: 28,
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.gold.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              PhosphorIconsFill.ticket,
+              color: AppColors.gold,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -130,12 +141,12 @@ class _ActivePassCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$remaining Play Pass${remaining == 1 ? '' : 'es'} ready',
+                  '$remaining Play Pass${remaining == 1 ? '' : 'es'}',
                   style: AppTextStyles.cardTitle(context),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Use them at session start — 1 pass = 1 hour for any kid.',
+                  _validityLabel(passes),
                   style: AppTextStyles.cardSubtitle(context),
                 ),
               ],
@@ -144,5 +155,20 @@ class _ActivePassCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _validityLabel(List<Map<String, dynamic>> passes) {
+    DateTime? earliest;
+    for (final p in passes) {
+      final expiry = DateTime.tryParse((p['expires_at'] as String?) ?? '');
+      if (expiry == null) continue;
+      if (earliest == null || expiry.isBefore(earliest)) earliest = expiry;
+    }
+    if (earliest == null) return 'Active';
+    final now = DateTime.now();
+    final days = earliest.difference(now).inDays;
+    if (days < 0) return 'Expiring soon';
+    if (days <= 7) return 'Expires in $days ${days == 1 ? 'day' : 'days'}';
+    return 'Valid until ${DateFormat('d MMM').format(earliest)}';
   }
 }

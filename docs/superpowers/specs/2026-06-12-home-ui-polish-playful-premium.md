@@ -121,6 +121,19 @@ Add to `AppTextStyles`:
   - `Icons.close` → `PhosphorIconsRegular.x`
   - `Icons.remove_circle_outline` / `Icons.add_circle_outline` → `PhosphorIconsRegular.minusCircle` / `PhosphorIconsRegular.plusCircle`
 
+## Active Play Pass Card Redesign
+
+The active-pass state of `PlayPassPromoCard` should feel clean and avoid a wall of text.
+
+- **Title:** `{remaining} Play Pass{es}` (e.g. “3 Play Passes”).
+- **Subtitle:** Validity of the soonest-expiring active pass.
+  - If expiry is within 7 days: “Expires in {n} days”.
+  - Otherwise: “Valid until {d MMM}”.
+- **Surface:** Keep the existing cream/gold-bordered card.
+- **Leading:** Keep the gold ticket icon in a soft gold-tinted rounded square.
+- **No usage hint:** Do not show “1 pass = 1 hour”.
+- **No CTA:** The card is informational; no action button needed.
+
 ## Acceptance Criteria
 - [ ] All home cards use radius 16 and the same shadow token.
 - [ ] No hardcoded `TextStyle` in `BigStartSessionCard`, `OrderFoodCard`, `PlayPassPromoCard`, `ActiveSessionsCard`.
@@ -128,3 +141,4 @@ Add to `AppTextStyles`:
 - [ ] `flutter analyze` passes.
 - [ ] Home screens (idle / active / post-session) have consistent 12 dp vertical gaps.
 - [ ] Visual appearance matches the “Playful Premium” direction (Option A).
+- [ ] Active Play Pass card shows only pass count + validity.
