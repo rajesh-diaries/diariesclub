@@ -122,9 +122,9 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                     fit: BoxFit.contain,
                   ),
                 ),
-                // PLAY button centred
+                // PLAY button at the right end, vertically centred
                 Align(
-                  alignment: Alignment.center,
+                  alignment: Alignment.centerRight,
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
