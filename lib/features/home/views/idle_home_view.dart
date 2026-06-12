@@ -23,7 +23,7 @@ class IdleHomeView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return const SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: EdgeInsets.only(left: 20, right: 20, bottom: 8),
       child: IdleHomeBody(),
     );
   }
@@ -58,40 +58,40 @@ class IdleHomeBody extends ConsumerWidget {
           familyName.isEmpty ? 'Hey there!' : 'Hey ${familyName.split(' ').first}!',
           style: AppTextStyles.h1(context),
         ),
-        const SizedBox(height: 4),
-        Text("Let's get the kids playing! 🎉", style: AppTextStyles.body(context)),
-        const SizedBox(height: 20),
+        const SizedBox(height: 2),
+        Text("Let's get the kids playing!", style: AppTextStyles.body(context)),
+        const SizedBox(height: 10),
         const BigStartSessionCard(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         const PlayPassPromoCard(),
         // Order food without starting a session — e.g. parent drops by
         // just for coffee/snacks, or wants to pre-order while planning.
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         const OrderFoodCard(),
         // Live orders the parent placed during a session that just
         // ended — show them above reflections so they can track the
         // kitchen without losing the cards behind a finished session.
         // Self-hides when there are no in-flight orders.
         const Padding(
-          padding: EdgeInsets.only(top: 16),
+          padding: EdgeInsets.only(top: 12),
           child: LiveOrdersCard(),
         ),
         if (referralEligible) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           const ReferralEntryCard(),
         ],
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         const HomeCombosStrip(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         const BirthdayCardList(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         const MyUpcomingWorkshopsSection(),
         // Announcements moved BELOW the start CTA so the primary
         // action lands first. Self-margined: collapses if no rows.
         const AnnouncementsFeed(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         const RecentActivityList(),
-        const SizedBox(height: 32),
+        const SizedBox(height: 20),
       ],
     );
   }

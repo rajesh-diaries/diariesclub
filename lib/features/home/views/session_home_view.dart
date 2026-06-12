@@ -15,6 +15,7 @@ import '../../club/widgets/while_you_wait_card.dart';
 import '../../sessions/widgets/extend_session_sheet.dart';
 import '../widgets/birthday_card.dart';
 import '../widgets/healthy_bite_reminder_banner.dart';
+import '../widgets/home_banner_carousel.dart';
 import '../widgets/hydration_reminder_banner.dart';
 import '../widgets/wallet_card.dart';
 
@@ -156,7 +157,9 @@ class _DominantLayout extends StatelessWidget {
           expiresAt: expiresAt,
           size: TimerSize.dominant,
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 20),
+        const HomeBannerCarousel(),
+        const SizedBox(height: 20),
         if (isGrace)
           _GraceCtaPair(onExtend: onExtend, sessionId: session['id'] as String)
         else
@@ -309,8 +312,7 @@ class _GraceCtaPair extends ConsumerWidget {
       return;
     }
     try {
-      final result = await Supabase.instance.client
-          .rpc<dynamic>('session_complete', params: {
+      await Supabase.instance.client.rpc<dynamic>('session_complete', params: {
         'p_session_id': sessionId,
       });
       if (!context.mounted) {
@@ -337,13 +339,12 @@ class _GraceCtaPair extends ConsumerWidget {
         );
       });
       context.go('/home');
-    } on PostgrestException catch (e, st) {
+    } on PostgrestException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Couldn't wrap up: ${e.message}")),
       );
-    } catch (e, st) {
-
+    } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Couldn't wrap up: $e")),

@@ -133,7 +133,7 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
 
               // Four heroes in a friendly row — rounded-square avatars
               // so the full character art is visible (circles clip tall
@@ -141,30 +141,34 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
               const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  HeroAvatar(heroId: 'rafi', size: 60),
+                  HeroAvatar(heroId: 'rafi', size: 56),
                   SizedBox(width: 12),
-                  HeroAvatar(heroId: 'ellie', size: 60),
+                  HeroAvatar(heroId: 'ellie', size: 56),
                   SizedBox(width: 12),
-                  HeroAvatar(heroId: 'gerry', size: 60),
+                  HeroAvatar(heroId: 'gerry', size: 56),
                   SizedBox(width: 12),
-                  HeroAvatar(heroId: 'zena', size: 60),
+                  HeroAvatar(heroId: 'zena', size: 56),
                 ],
               ),
 
-              const SizedBox(height: 32),
-              // Two-line layout so "Play Diaries" stays together as a
-               // brand unit instead of orphaning "Diaries" on its own line
-               // at H1 font size on phone widths.
-               Text(
-                 'Welcome to\nPlay Diaries',
-                 style: AppTextStyles.h1(context),
-               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 20),
+              // Single-line, scale-to-fit headline so the brand name
+              // never orphans and the page feels compact.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Welcome to Play Diaries',
+                  style: AppTextStyles.h1(context),
+                  maxLines: 1,
+                ),
+              ),
+              const SizedBox(height: 6),
               Text(
                 'Enter your phone number to get started.',
                 style: AppTextStyles.body(context, color: AppColors.lightTextSecondary),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
 
               _PhoneField(
                 controller: _phoneController,
@@ -182,7 +186,7 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
                 ),
               ],
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
 
               _ConsentCheckbox(
                 checked: _consentChecked,
@@ -192,7 +196,7 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
                 onOpenUrl: _openUrl,
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
               SizedBox(
                 width: double.infinity,
@@ -203,7 +207,7 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               if (F.isMockOtp)
                 Center(
