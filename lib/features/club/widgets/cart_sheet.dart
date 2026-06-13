@@ -1,6 +1,3 @@
-// ignore_for_file: deprecated_member_use
-// ^ RadioListTile.groupValue/onChanged — see extend_session_sheet.dart.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +13,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/utils/venues.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/selection_card.dart';
 import '../../sessions/widgets/insufficient_balance_sheet.dart';
 import '../providers/active_orders_provider.dart';
 import '../providers/cart_provider.dart';
@@ -575,10 +573,17 @@ class _FulfillmentSelector extends ConsumerWidget {
         // value still exists for staff/admin flows and legacy orders, but
         // we don't surface it as a customer-facing pick.
         for (final m in const [FulfillmentMode.dineIn, FulfillmentMode.takeaway])
-          RadioListTile<FulfillmentMode>(
+          SelectableCard<FulfillmentMode>(
             value: m,
             groupValue: selected,
-            title: Text(m.label),
+            title: m.label,
+            leading: Icon(
+              m == FulfillmentMode.dineIn
+                  ? PhosphorIconsRegular.bowlFood
+                  : PhosphorIconsRegular.bag,
+              color: AppColors.navy,
+              size: 24,
+            ),
             onChanged: (v) =>
                 ref.read(cartFulfillmentProvider.notifier).state = v ?? m,
           ),
@@ -615,26 +620,29 @@ class _PaymentSelector extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 4),
-        RadioListTile<CartPaymentMethod>(
+        SelectableCard<CartPaymentMethod>(
           value: CartPaymentMethod.wallet,
           groupValue: selected,
-          title: Text('Wallet (${Money.fromPaise(walletBalance)})'),
-          subtitle: walletShort
-              ? Text(
-                  'Not enough balance',
-                  style: AppTextStyles.caption(
-                    context,
-                    color: AppColors.adminRed,
-                  ),
-                )
-              : null,
+          title: 'Wallet (${Money.fromPaise(walletBalance)})',
+          subtitle: walletShort ? 'Not enough balance' : 'Pay instantly from wallet',
+          leading: const Icon(
+            PhosphorIconsFill.wallet,
+            color: AppColors.navy,
+            size: 24,
+          ),
           onChanged: (v) => ref.read(cartPaymentMethodProvider.notifier).state =
               v ?? CartPaymentMethod.wallet,
         ),
-        RadioListTile<CartPaymentMethod>(
+        SelectableCard<CartPaymentMethod>(
           value: CartPaymentMethod.cash,
           groupValue: selected,
-          title: const Text('Pay at counter'),
+          title: 'Pay at counter',
+          subtitle: 'Pay when you pick up',
+          leading: const Icon(
+            PhosphorIconsRegular.money,
+            color: AppColors.navy,
+            size: 24,
+          ),
           onChanged: (v) => ref.read(cartPaymentMethodProvider.notifier).state =
               v ?? CartPaymentMethod.cash,
         ),

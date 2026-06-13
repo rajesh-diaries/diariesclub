@@ -1,6 +1,3 @@
-// ignore_for_file: deprecated_member_use
-// ^ RadioListTile.groupValue/onChanged — see extend_session_sheet.dart.
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +15,7 @@ import '../../sessions/widgets/insufficient_balance_sheet.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/widgets/selection_card.dart';
 import '../../../core/utils/venues.dart';
 import '../../club/providers/cart_provider.dart';
 
@@ -425,27 +423,30 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
             // Payment method picker — wallet or cash at venue.
             Text('Pay with', style: AppTextStyles.bodyLarge(context)),
             const SizedBox(height: 4),
-            RadioListTile<String>(
+            SelectableCard<String>(
               value: 'wallet',
               groupValue: _paymentMethod,
-              title: const Text('Wallet'),
-              subtitle: _paymentMethod == 'wallet'
-                  ? Text(
-                      'Balance: ${Money.fromPaise(ref.watch(walletBalancePaiseProvider) ?? 0)}',
-                      style: AppTextStyles.caption(
-                        context,
-                        color: AppColors.lightTextSecondary,
-                      ),
-                    )
-                  : null,
-              onChanged: (v) => setState(() => _paymentMethod = v ?? 'wallet'),
+              title: 'Wallet',
+              subtitle:
+                  'Balance: ${Money.fromPaise(ref.watch(walletBalancePaiseProvider) ?? 0)}',
+              leading: const Icon(
+                PhosphorIconsFill.wallet,
+                color: AppColors.navy,
+                size: 24,
+              ),
+              onChanged: (_) => setState(() => _paymentMethod = 'wallet'),
             ),
-            RadioListTile<String>(
+            SelectableCard<String>(
               value: 'cash',
               groupValue: _paymentMethod,
-              title: const Text('Cash at venue'),
-              subtitle: const Text('Pay our team when you check in'),
-              onChanged: (v) => setState(() => _paymentMethod = v ?? 'cash'),
+              title: 'Cash at venue',
+              subtitle: 'Pay our team when you check in',
+              leading: const Icon(
+                PhosphorIconsRegular.money,
+                color: AppColors.navy,
+                size: 24,
+              ),
+              onChanged: (_) => setState(() => _paymentMethod = 'cash'),
             ),
             const SizedBox(height: 20),
             // Primary: place order straight from the sheet. Bypasses the

@@ -1,6 +1,3 @@
-// ignore_for_file: deprecated_member_use
-// ^ RadioListTile.groupValue/onChanged — see extend_session_sheet.dart.
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +16,7 @@ import '../../core/utils/currency.dart';
 import '../../core/widgets/child_avatar.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/primary_button.dart';
+import '../../core/widgets/selection_card.dart';
 import '../sessions/widgets/insufficient_balance_sheet.dart';
 import 'providers/workshops_provider.dart';
 import 'widgets/trait_pill.dart';
@@ -476,34 +474,37 @@ class _WorkshopDetailScreenState
                                     color: AppColors.lightTextSecondary,
                                   ).copyWith(letterSpacing: 1.0),
                                 ),
-                                RadioListTile<String>(
+                                SelectableCard<String>(
                                   value: 'wallet',
                                   groupValue: _payment,
-                                  title: Text(
-                                    'Wallet (${Money.fromPaise(balance)})',
-                                  ),
+                                  title: 'Wallet (${Money.fromPaise(balance)})',
                                   subtitle: balance <
                                           (price *
                                               (_selectedChildIds.isEmpty
                                                   ? 1
                                                   : _selectedChildIds.length))
-                                      ? Text(
-                                          'Not enough balance',
-                                          style: AppTextStyles.caption(
-                                            context,
-                                            color: AppColors.adminRed,
-                                          ),
-                                        )
-                                      : null,
-                                  onChanged: (v) =>
-                                      setState(() => _payment = v ?? 'wallet'),
+                                      ? 'Not enough balance'
+                                      : 'Pay instantly from wallet',
+                                  leading: const Icon(
+                                    PhosphorIconsFill.wallet,
+                                    color: AppColors.navy,
+                                    size: 24,
+                                  ),
+                                  onChanged: (_) =>
+                                      setState(() => _payment = 'wallet'),
                                 ),
-                                RadioListTile<String>(
+                                SelectableCard<String>(
                                   value: 'cash',
                                   groupValue: _payment,
-                                  title: const Text('Pay at venue'),
-                                  onChanged: (v) =>
-                                      setState(() => _payment = v ?? 'cash'),
+                                  title: 'Pay at venue',
+                                  subtitle: 'Pay our team when you check in',
+                                  leading: const Icon(
+                                    PhosphorIconsRegular.money,
+                                    color: AppColors.navy,
+                                    size: 24,
+                                  ),
+                                  onChanged: (_) =>
+                                      setState(() => _payment = 'cash'),
                                 ),
                               ],
                               if (_errorText != null) ...[

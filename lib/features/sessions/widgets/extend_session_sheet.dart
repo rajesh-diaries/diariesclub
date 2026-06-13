@@ -1,8 +1,3 @@
-// ignore_for_file: deprecated_member_use
-// ^ RadioListTile.groupValue/onChanged are slated for deprecation once
-// RadioGroup ships in stable. We're on 3.41 where RadioGroup doesn't exist
-// yet — revisit when it does.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -15,6 +10,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/selection_card.dart';
 
 /// Bottom sheet to extend an active or grace session. Reads the option
 /// list from `venue_config.session_extension_options` (added in 0027 as
@@ -195,28 +191,32 @@ class _ExtendSessionSheetState extends ConsumerState<ExtendSessionSheet> {
           const SizedBox(height: 20),
           Text('Pay with', style: AppTextStyles.bodyLarge(context)),
           const SizedBox(height: 4),
-          RadioListTile<String>(
+          SelectableCard<String>(
             value: 'wallet',
             groupValue: _paymentMethod,
-            title: Text(
-              'Wallet${balance != null ? ' (${Money.fromPaise(balance)})' : ''}',
-            ),
+            title:
+                'Wallet${balance != null ? ' (${Money.fromPaise(balance)})' : ''}',
             subtitle: balance != null && balance < amountPaise
-                ? Text(
-                    'Not enough balance',
-                    style: AppTextStyles.caption(
-                      context,
-                      color: AppColors.adminRed,
-                    ),
-                  )
-                : null,
-            onChanged: (v) => setState(() => _paymentMethod = v ?? 'wallet'),
+                ? 'Not enough balance'
+                : 'Pay instantly from wallet',
+            leading: const Icon(
+              PhosphorIconsFill.wallet,
+              color: AppColors.navy,
+              size: 24,
+            ),
+            onChanged: (_) => setState(() => _paymentMethod = 'wallet'),
           ),
-          RadioListTile<String>(
+          SelectableCard<String>(
             value: 'cash',
             groupValue: _paymentMethod,
-            title: const Text('Cash at desk'),
-            onChanged: (v) => setState(() => _paymentMethod = v ?? 'cash'),
+            title: 'Cash at desk',
+            subtitle: 'Pay when you check out',
+            leading: const Icon(
+              PhosphorIconsRegular.money,
+              color: AppColors.navy,
+              size: 24,
+            ),
+            onChanged: (_) => setState(() => _paymentMethod = 'cash'),
           ),
           if (_errorText != null) ...[
             const SizedBox(height: 8),

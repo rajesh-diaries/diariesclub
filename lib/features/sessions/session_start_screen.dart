@@ -1,6 +1,3 @@
-// ignore_for_file: deprecated_member_use
-// ^ RadioListTile.groupValue/onChanged — see extend_session_sheet.dart.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,6 +18,7 @@ import '../../core/utils/venues.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/hero_avatar.dart';
 import '../../core/widgets/primary_button.dart';
+import '../../core/widgets/selection_card.dart';
 import 'widgets/insufficient_balance_sheet.dart';
 
 const _venueId = Venues.kondapurId;
@@ -675,51 +673,52 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                             style: AppTextStyles.bodyLarge(context)),
                         const SizedBox(height: 4),
                         if (passesEnough && _selectedDurationMinutes != 120)
-                          RadioListTile<String>(
+                          SelectableCard<String>(
                             value: 'play_pass',
                             groupValue: _paymentMethod,
-                            title: Text(
-                                'Play Pass ($remainingPasses left)'),
-                            subtitle:
-                                const Text('1 pass = 1 hour for any kid'),
-                            onChanged: (v) => setState(() {
-                              _paymentMethod = v ?? 'wallet';
+                            title: 'Play Pass ($remainingPasses left)',
+                            subtitle: '1 pass = 1 hour for any kid',
+                            leading: const Icon(
+                              PhosphorIconsFill.ticket,
+                              color: AppColors.gold,
+                              size: 24,
+                            ),
+                            onChanged: (_) => setState(() {
+                              _paymentMethod = 'play_pass';
                               _errorText = null;
-                              // Coupons can't be combined with passes.
-                              if (_paymentMethod == 'play_pass') {
-                                _clearCoupon();
-                              }
+                              _clearCoupon();
                             }),
                           ),
-                        RadioListTile<String>(
+                        SelectableCard<String>(
                           value: 'wallet',
                           groupValue: _paymentMethod,
-                          title: Text(
-                              'Wallet (${Money.fromPaise(balance)})'),
+                          title: 'Wallet (${Money.fromPaise(balance)})',
                           subtitle: !walletEnough &&
                                   _selectedDurationMinutes != null
-                              ? Text(
-                                  'Not enough balance',
-                                  style: AppTextStyles.caption(
-                                    context,
-                                    color: AppColors.adminRed,
-                                  ),
-                                )
-                              : null,
-                          onChanged: (v) => setState(() {
-                            _paymentMethod = v ?? 'wallet';
+                              ? 'Not enough balance'
+                              : 'Pay instantly from wallet',
+                          leading: const Icon(
+                            PhosphorIconsFill.wallet,
+                            color: AppColors.navy,
+                            size: 24,
+                          ),
+                          onChanged: (_) => setState(() {
+                            _paymentMethod = 'wallet';
                             _errorText = null;
                           }),
                         ),
-                        RadioListTile<String>(
+                        SelectableCard<String>(
                           value: 'cash',
                           groupValue: _paymentMethod,
-                          title: const Text('Cash at venue'),
-                          subtitle: const Text(
-                            'Pay our team when you check in',
+                          title: 'Cash at venue',
+                          subtitle: 'Pay our team when you check in',
+                          leading: const Icon(
+                            PhosphorIconsRegular.money,
+                            color: AppColors.navy,
+                            size: 24,
                           ),
-                          onChanged: (v) => setState(() {
-                            _paymentMethod = v ?? 'cash';
+                          onChanged: (_) => setState(() {
+                            _paymentMethod = 'cash';
                             _errorText = null;
                           }),
                         ),
