@@ -146,21 +146,38 @@ class MenuItemCard extends ConsumerWidget {
                           currentQty: inCart.quantity,
                         )
                       else
-                        OutlinedButton(
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            ref.read(cartProvider.notifier).addMenuItem(
-                                  MenuItemLine.create(
-                                    menuItemId: id,
-                                    name: name,
-                                    brand: brand,
-                                    unitPricePaise: pricePaise,
-                                    quantity: 1,
-                                    imageUrl: imageUrl,
-                                  ),
-                                );
-                          },
-                          child: const Text('Add'),
+                        SizedBox(
+                          height: 36,
+                          child: FilledButton(
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              ref.read(cartProvider.notifier).addMenuItem(
+                                    MenuItemLine.create(
+                                      menuItemId: id,
+                                      name: name,
+                                      brand: brand,
+                                      unitPricePaise: pricePaise,
+                                      quantity: 1,
+                                      imageUrl: imageUrl,
+                                    ),
+                                  );
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.navy,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(100),
+                              ),
+                            ),
+                            child: Text(
+                              'Add',
+                              style: AppTextStyles.body(
+                                context,
+                                color: Colors.white,
+                              ).copyWith(fontWeight: FontWeight.w800),
+                            ),
+                          ),
                         ),
                     ],
                   ),

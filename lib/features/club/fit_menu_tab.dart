@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,8 @@ import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import '../../core/widgets/error_state.dart';
+import '../../core/widgets/skeleton_card.dart';
 import 'providers/menu_items_provider.dart';
 import 'widgets/menu_item_card.dart';
 
@@ -144,30 +147,44 @@ class _FitTemplatesSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(fitTemplatesCustomerProvider);
-    final templates = async.valueOrNull ?? const [];
-    if (templates.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Build your meal', style: AppTextStyles.h2(context)),
-          const SizedBox(height: 4),
-          Text(
-            'Pick a base, then customize the way you like.',
-            style: AppTextStyles.body(
-              context,
-              color: AppColors.lightTextSecondary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          for (final t in templates) ...[
-            _TemplateCard(template: t),
-            const SizedBox(height: 12),
-          ],
-        ],
+    return async.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
+        child: SkeletonList(itemCount: 2, itemHeight: 220),
       ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+        child: BrandedErrorState(
+          message: "Couldn't load meal templates",
+          onRetry: () => ref.invalidate(fitTemplatesCustomerProvider),
+        ),
+      ),
+      data: (templates) {
+        if (templates.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Build your meal', style: AppTextStyles.h2(context)),
+              const SizedBox(height: 4),
+              Text(
+                'Pick a base, then customize the way you like.',
+                style: AppTextStyles.body(
+                  context,
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final t in templates) ...[
+                _TemplateCard(template: t),
+                const SizedBox(height: 12),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -199,10 +216,13 @@ class _TemplateCard extends StatelessWidget {
             if (photo != null && photo.isNotEmpty)
               AspectRatio(
                 aspectRatio: 16 / 8,
-                child: Image.network(
-                  photo,
+                child: CachedNetworkImage(
+                  imageUrl: photo,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  placeholder: (_, __) => Container(
+                    color: AppColors.fitGreen.withValues(alpha: 0.10),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
                     color: AppColors.fitGreen.withValues(alpha: 0.15),
                   ),
                 ),
@@ -270,27 +290,41 @@ class _AlaCarteSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(menuItemsByBrandProvider('fit'));
-    final items = async.valueOrNull ?? const [];
-    if (items.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('À la carte', style: AppTextStyles.h2(context)),
-          const SizedBox(height: 4),
-          Text(
-            'Quick picks from the FIT menu.',
-            style: AppTextStyles.body(
-              context,
-              color: AppColors.lightTextSecondary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          for (final i in items) MenuItemCard(item: i),
-        ],
+    return async.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
+        child: SkeletonList(itemCount: 3, itemHeight: 96),
       ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+        child: BrandedErrorState(
+          message: "Couldn't load FIT menu",
+          onRetry: () => ref.invalidate(menuItemsByBrandProvider('fit')),
+        ),
+      ),
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('À la carte', style: AppTextStyles.h2(context)),
+              const SizedBox(height: 4),
+              Text(
+                'Quick picks from the FIT menu.',
+                style: AppTextStyles.body(
+                  context,
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final i in items) MenuItemCard(item: i),
+            ],
+          ),
+        );
+      },
     );
   }
 }

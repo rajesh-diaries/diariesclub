@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -387,10 +388,13 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                 if (((tpl['photo_url'] as String?) ?? '').isNotEmpty)
                   AspectRatio(
                     aspectRatio: 16 / 9,
-                    child: Image.network(
-                      (tpl['photo_url'] as String?) ?? '',
+                    child: CachedNetworkImage(
+                      imageUrl: (tpl['photo_url'] as String?) ?? '',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      placeholder: (_, __) => Container(
+                        color: AppColors.fitGreen.withValues(alpha: 0.10),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
                         color: AppColors.fitGreen.withValues(alpha: 0.15),
                       ),
                     ),

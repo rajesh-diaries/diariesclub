@@ -9,6 +9,8 @@ import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import '../../core/widgets/error_state.dart';
+import '../../core/widgets/skeleton_card.dart';
 import '../birthday/providers/birthday_packages_provider.dart';
 
 /// Birthdays tab in the Club section. Distinct from the transactional
@@ -364,33 +366,47 @@ class _PackagesPreviewSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(birthdayPackagesProvider);
-    final packages = async.valueOrNull ?? const [];
-    if (packages.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+    return async.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
+        child: SkeletonList(itemCount: 2, itemHeight: 220),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+        child: BrandedErrorState(
+          message: "Couldn't load birthday packages",
+          onRetry: () => ref.invalidate(birthdayPackagesProvider),
+        ),
+      ),
+      data: (packages) {
+        if (packages.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Text('Explore packages',
-                    style: AppTextStyles.h3(context)),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Explore packages',
+                        style: AppTextStyles.h3(context)),
+                  ),
+                  TextButton(
+                    onPressed: () => context.push('/birthday'),
+                    child: const Text('See all'),
+                  ),
+                ],
               ),
-              TextButton(
-                onPressed: () => context.push('/birthday'),
-                child: const Text('See all'),
-              ),
+              const SizedBox(height: 4),
+              for (final p in packages.take(3)) ...[
+                _PackageCard(pkg: p),
+                const SizedBox(height: 10),
+              ],
             ],
           ),
-          const SizedBox(height: 4),
-          for (final p in packages.take(3)) ...[
-            _PackageCard(pkg: p),
-            const SizedBox(height: 10),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 }

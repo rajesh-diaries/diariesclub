@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state.dart';
@@ -216,8 +217,23 @@ class _CategoryPills extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: ChoiceChip(
-              label: const Text('All'),
+              label: Text(
+                'All',
+                style: AppTextStyles.body(
+                  context,
+                  color: selected == null ? Colors.white : AppColors.navy,
+                ),
+              ),
               selected: selected == null,
+              selectedColor: AppColors.navy,
+              backgroundColor: AppColors.lightSurface,
+              side: BorderSide(
+                color: selected == null ? AppColors.navy : AppColors.lightBorder,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              showCheckmark: false,
               onSelected: (_) => ref
                   .read(menuCategoryFilterProvider(brand).notifier)
                   .state = null,
@@ -227,8 +243,23 @@ class _CategoryPills extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: ChoiceChip(
-                label: Text(_label(c)),
+                label: Text(
+                  _label(c),
+                  style: AppTextStyles.body(
+                    context,
+                    color: selected == c ? Colors.white : AppColors.navy,
+                  ),
+                ),
                 selected: selected == c,
+                selectedColor: AppColors.navy,
+                backgroundColor: AppColors.lightSurface,
+                side: BorderSide(
+                  color: selected == c ? AppColors.navy : AppColors.lightBorder,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                showCheckmark: false,
                 onSelected: (v) => ref
                     .read(menuCategoryFilterProvider(brand).notifier)
                     .state = v ? c : null,
