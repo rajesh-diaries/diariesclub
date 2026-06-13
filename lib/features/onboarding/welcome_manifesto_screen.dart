@@ -27,20 +27,7 @@ class WelcomeManifestoScreen extends ConsumerStatefulWidget {
 
 class _WelcomeManifestoScreenState
     extends ConsumerState<WelcomeManifestoScreen> {
-  bool _revealComplete = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.isRevisit) {
-      _revealComplete = true;
-    } else {
-      // Enable CTA only after the staggered reveal finishes (~6.5s).
-      Future<void>.delayed(const Duration(milliseconds: 6500), () {
-        if (mounted) setState(() => _revealComplete = true);
-      });
-    }
-  }
+  final bool _revealComplete = true;
 
   Future<void> _continue() async {
     if (widget.isRevisit) {
