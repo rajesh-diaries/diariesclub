@@ -15,8 +15,10 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../core/utils/venues.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/hero_avatar.dart';
+import '../../core/widgets/skeleton_card.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../core/widgets/selection_card.dart';
 import 'widgets/insufficient_balance_sheet.dart';
@@ -444,7 +446,10 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
             );
           }
           if (!snap.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const Padding(
+              padding: EdgeInsets.all(20),
+              child: SkeletonList(itemCount: 4),
+            );
           }
           final allChildren = snap.data!;
           // Filter out children who already have an open session — they
@@ -469,19 +474,10 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
           }
 
           if (children.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Text(
-                  'All your kids are already playing! Add another child '
-                  'in Profile to start a new session.',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.body(
-                    context,
-                    color: AppColors.lightTextSecondary,
-                  ),
-                ),
-              ),
+            return const BrandedEmptyState(
+              icon: PhosphorIconsFill.users,
+              title: 'All your kids are already playing!',
+              subtitle: 'Add another child in Profile to start a new session.',
             );
           }
 

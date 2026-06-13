@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import '../../core/widgets/error_state.dart';
+import '../../core/widgets/skeleton_card.dart';
 import '../providers/admin_streams.dart';
 import '../widgets/admin_app_bar.dart';
 import '../widgets/admin_buttons.dart';
@@ -1393,11 +1395,11 @@ class _ContextHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(adminReservationDetailProvider(reservationId));
     return async.when(
-      loading: () => const SizedBox(
-        height: 80,
-        child: Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonCard(),
+      error: (_, __) => BrandedErrorState(
+        message: "Couldn't load reservation details",
+        onRetry: () => ref.invalidate(adminReservationDetailProvider(reservationId)),
       ),
-      error: (_, __) => const SizedBox.shrink(),
       data: (d) {
         final family = (d['family'] as Map?)?.cast<String, dynamic>() ??
             const <String, dynamic>{};

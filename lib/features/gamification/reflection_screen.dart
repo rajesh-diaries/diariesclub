@@ -8,8 +8,10 @@ import '../../core/providers/hero_recap_provider.dart';
 import '../../core/providers/reflection_moments_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/primary_button.dart';
+import '../../core/widgets/skeleton_card.dart';
 import 'widgets/split_summary_sheet.dart';
 import 'widgets/stage_transition_overlay.dart';
 import 'widgets/trait_section.dart';
@@ -215,7 +217,12 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
           elevation: 0,
         ),
         body: recapAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const SafeArea(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: SkeletonList(itemCount: 5, itemHeight: 120),
+            ),
+          ),
           error: (e, _) => FriendlyErrorScreen(
             code: 'E-RFL',
             userMessage: "Couldn't load reflection",
@@ -224,9 +231,10 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
           data: (recap) {
             if (recap == null) {
               return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text("This recap doesn't exist anymore."),
+                child: BrandedEmptyState(
+                  icon: PhosphorIconsRegular.fileX,
+                  title: "This recap doesn't exist anymore",
+                  subtitle: 'It may have been removed or already completed.',
                 ),
               );
             }
@@ -247,7 +255,12 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
             }
 
             return momentsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: SkeletonList(itemCount: 5, itemHeight: 120),
+                ),
+              ),
               error: (e, _) => FriendlyErrorScreen(
                 code: 'E-RFL-2',
                 userMessage: "Couldn't load reflection moments",

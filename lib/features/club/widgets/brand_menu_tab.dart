@@ -2,8 +2,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/error_state.dart';
+import '../../../core/widgets/skeleton_card.dart';
 import '../providers/menu_items_provider.dart';
 import 'menu_item_card.dart';
 
@@ -36,11 +38,12 @@ class BrandMenuTab extends ConsumerWidget {
     final selectedCategory = ref.watch(menuCategoryFilterProvider(brand));
 
     return itemsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => _Empty(
-        icon: brandIcon,
-        message: "Couldn't load the menu. Pull to retry.",
-        color: brandColor,
+      loading: () => const SkeletonList(itemCount: 4, itemHeight: 112),
+      error: (e, _) => Center(
+        child: BrandedErrorState(
+          message: "Couldn't load the menu.",
+          onRetry: () => ref.invalidate(menuItemsByBrandProvider(brand)),
+        ),
       ),
       data: (items) {
         final categories = _categoriesFrom(items);
@@ -72,12 +75,13 @@ class BrandMenuTab extends ConsumerWidget {
               if (filtered.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: _Empty(
-                    icon: brandIcon,
-                    color: brandColor,
-                    message: items.isEmpty
-                        ? '$title menu is coming soon.'
-                        : 'Nothing here for that filter.',
+                  child: Center(
+                    child: BrandedEmptyState(
+                      icon: brandIcon,
+                      title: items.isEmpty
+                          ? '$title menu is coming soon.'
+                          : 'Nothing here for that filter.',
+                    ),
                   ),
                 )
               else
@@ -238,37 +242,4 @@ class _CategoryPills extends ConsumerWidget {
   String _label(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 }
 
-class _Empty extends StatelessWidget {
-  final IconData icon;
-  final String message;
-  final Color color;
-  const _Empty({
-    required this.icon,
-    required this.message,
-    required this.color,
-  });
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 56, color: color.withValues(alpha: 0.40)),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              style: AppTextStyles.body(
-                context,
-                color: AppColors.lightTextSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

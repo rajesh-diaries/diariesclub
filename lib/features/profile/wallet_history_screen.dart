@@ -10,6 +10,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/error_state.dart';
+import '../../core/widgets/skeleton_card.dart';
 import 'widgets/transaction_row.dart';
 
 /// Full wallet history screen — paginated, filterable, grouped by date.
@@ -143,10 +146,22 @@ class _WalletHistoryScreenState
                   onChanged: _onFilterChanged,
                 ),
               ),
-              if (_loaded.isEmpty && !_loading)
+              if (_loaded.isEmpty && _loading)
                 const SliverFillRemaining(
                   hasScrollBody: false,
-                  child: _EmptyState(),
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: SkeletonList(),
+                  ),
+                )
+              else if (_loaded.isEmpty && !_loading)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: BrandedEmptyState(
+                    icon: PhosphorIconsRegular.wallet,
+                    title: 'No transactions yet',
+                    subtitle: 'Transactions will appear here once you top up or spend.',
+                  ),
                 )
               else
                 for (final group in groups) ...[
@@ -172,36 +187,18 @@ class _WalletHistoryScreenState
                     ),
                   ),
                 ],
-              if (_loading)
+              if (_loading && _loaded.isNotEmpty)
                 const SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Center(child: CircularProgressIndicator()),
+                    padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    child: SkeletonCard(),
                   ),
                 )
               else if (_pageError)
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            "Couldn't load more transactions.",
-                            style: AppTextStyles.body(
-                              context,
-                              color: AppColors.lightTextSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: _loadNext,
-                            child: const Text('Try again'),
-                          ),
-                        ],
-                      ),
-                    ),
+                  child: BrandedErrorState(
+                    message: "Couldn't load more transactions",
+                    onRetry: _loadNext,
                   ),
                 ),
               const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -326,38 +323,6 @@ class _FilterPills extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              PhosphorIconsRegular.wallet,
-              size: 48,
-              color: AppColors.lightTextSecondary,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No transactions match this filter.',
-              style: AppTextStyles.body(
-                context,
-                color: AppColors.lightTextSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
       ),
     );
   }

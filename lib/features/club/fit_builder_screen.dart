@@ -12,8 +12,10 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../../core/utils/venues.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/primary_button.dart';
+import '../../core/widgets/skeleton_card.dart';
 import 'providers/cart_provider.dart';
 
 const _venueId = Venues.kondapurId;
@@ -299,7 +301,11 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
     final tpl = ref.watch(fitTemplateDetailProvider(widget.templateId));
     return tpl.when(
       loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: SafeArea(
+          child: Center(
+            child: SkeletonList(itemCount: 4, itemHeight: 120),
+          ),
+        ),
       ),
       error: (e, _) => Scaffold(
         body: FriendlyErrorScreen(
@@ -474,20 +480,13 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                             style: AppTextStyles.bodyLarge(context)),
                         const SizedBox(height: 8),
                         if (idleChildren.isEmpty)
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: AppColors.gold.withValues(alpha: 0.10),
-                              border: Border.all(
-                                  color:
-                                      AppColors.gold.withValues(alpha: 0.40)),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              'All your kids are already playing. '
-                              'Wrap up a session first to use this combo.',
-                              style: AppTextStyles.body(context),
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 16),
+                            child: BrandedEmptyState(
+                              icon: PhosphorIconsRegular.users,
+                              title: 'All your kids are already playing.',
+                              subtitle:
+                                  'Wrap up a session first to use this combo.',
                             ),
                           )
                         else
@@ -578,15 +577,11 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                           },
                         ),
                       if (data.linkedCategories.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 32),
-                          child: Center(
-                            child: Text(
-                              'No sections to customise.',
-                              style: AppTextStyles.body(
-                                context, color: AppColors.lightTextSecondary,
-                              ),
-                            ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32),
+                          child: BrandedEmptyState(
+                            icon: PhosphorIconsRegular.bowlFood,
+                            title: 'No sections to customise.',
                           ),
                         ),
                       if (_errorText != null) ...[

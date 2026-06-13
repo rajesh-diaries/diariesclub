@@ -10,6 +10,8 @@ import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import '../../core/widgets/error_state.dart';
+import '../../core/widgets/skeleton_card.dart';
 
 /// "Show details" screen behind the referral card. How-it-works (3 steps),
 /// monthly cap progress, total earned. Numbers come from venue_config so
@@ -108,11 +110,11 @@ class ReferralDetailsScreen extends ConsumerWidget {
                   stats: s,
                   monthlyCapPaise: monthlyCapPaise,
                 ),
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(child: CircularProgressIndicator()),
+                loading: () => const SkeletonCard(),
+                error: (_, __) => BrandedErrorState(
+                  message: "Couldn't load referral stats",
+                  onRetry: () => ref.invalidate(referralStatsProvider),
                 ),
-                error: (_, __) => const SizedBox.shrink(),
               ),
               const SizedBox(height: 24),
               Container(

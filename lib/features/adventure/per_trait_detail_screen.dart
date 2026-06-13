@@ -6,6 +6,8 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/providers/child_stage_history_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/skeleton_card.dart';
 import '../../core/widgets/trait_progress_bar.dart';
 import '../gamification/widgets/stage_history_timeline.dart';
 import 'providers/child_by_id_provider.dart';
@@ -38,7 +40,14 @@ class PerTraitDetailScreen extends ConsumerWidget {
         history.where((e) => e.trait == hero).length;
 
     if (child == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: SkeletonList(itemCount: 6, itemHeight: 96),
+          ),
+        ),
+      );
     }
 
     final color = _heroColor(hero);
@@ -107,22 +116,12 @@ class PerTraitDetailScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             if (filteredCount == 0)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.lightBackground,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    "Your kid hasn't reached their first milestone yet — "
-                    'keep playing to grow!',
-                    style: AppTextStyles.body(
-                      context,
-                      color: AppColors.lightTextSecondary,
-                    ),
-                  ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: BrandedEmptyState(
+                  icon: PhosphorIconsRegular.tree,
+                  title: 'No milestones yet',
+                  subtitle: "Keep playing after sessions to grow this hero's milestones.",
                 ),
               )
             else

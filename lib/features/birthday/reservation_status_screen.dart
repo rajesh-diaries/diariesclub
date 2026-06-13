@@ -10,6 +10,7 @@ import '../../core/providers/family_children_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/error_screen.dart';
+import '../../core/widgets/skeleton_card.dart';
 import 'providers/birthday_packages_provider.dart';
 import 'providers/reservation_providers.dart';
 
@@ -74,7 +75,10 @@ class ReservationStatusScreen extends ConsumerWidget {
         ],
       ),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SingleChildScrollView(
+          padding: EdgeInsets.all(16),
+          child: SkeletonList(),
+        ),
         error: (e, _) => FriendlyErrorScreen(
           code: 'E-BSTAT',
           userMessage: "Couldn't load this reservation",

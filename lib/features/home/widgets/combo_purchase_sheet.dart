@@ -15,6 +15,7 @@ import '../../sessions/widgets/insufficient_balance_sheet.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/selection_card.dart';
 import '../../../core/utils/venues.dart';
 import '../../club/providers/cart_provider.dart';
@@ -312,19 +313,10 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
                   style: AppTextStyles.bodyLarge(context)),
               const SizedBox(height: 8),
               if (idleChildren.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.gold.withValues(alpha: 0.10),
-                    border: Border.all(
-                        color: AppColors.gold.withValues(alpha: 0.40)),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'All your kids are already playing. '
-                    'Wrap up a session first to use this combo.',
-                    style: AppTextStyles.body(context),
-                  ),
+                const BrandedEmptyState(
+                  icon: PhosphorIconsFill.users,
+                  title: 'All your kids are already playing',
+                  subtitle: 'Wrap up a session first to use this combo.',
                 )
               else
                 Column(

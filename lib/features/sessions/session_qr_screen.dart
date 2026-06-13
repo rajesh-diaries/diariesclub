@@ -17,6 +17,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../core/widgets/error_state.dart';
 
 /// "Show this at the desk." Wakelock on, brightness boosted, large QR with
 /// gold border. The QR payload is currently a base64-encoded JSON stub
@@ -476,12 +477,15 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
           child: SafeArea(
             child: _error != null
                 ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        _error!,
-                        style: AppTextStyles.body(context),
-                        textAlign: TextAlign.center,
+                    child: Container(
+                      margin: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.lightBackground,
+                        borderRadius: BorderRadius.circular(kHomeCardRadius),
+                      ),
+                      child: BrandedErrorState(
+                        message: _error,
+                        onRetry: _loadSession,
                       ),
                     ),
                   )

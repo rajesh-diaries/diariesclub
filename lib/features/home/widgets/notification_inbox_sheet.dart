@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/notifications_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/theme/app_text_styles.dart';
 
 /// Bottom sheet inbox triggered by the bell icon on HomeAppBar. Sectioned
@@ -116,14 +118,9 @@ class NotificationInboxSheet extends ConsumerWidget {
             ),
             Expanded(
               child: list.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No notifications yet.',
-                        style: AppTextStyles.body(
-                          context,
-                          color: AppColors.lightTextSecondary,
-                        ),
-                      ),
+                  ? const BrandedEmptyState(
+                      icon: PhosphorIconsRegular.bell,
+                      title: 'No notifications yet',
                     )
                   : ListView(
                       controller: controller,

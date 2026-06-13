@@ -14,9 +14,11 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../../core/widgets/child_avatar.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../core/widgets/selection_card.dart';
+import '../../core/widgets/skeleton_card.dart';
 import '../sessions/widgets/insufficient_balance_sheet.dart';
 import 'providers/workshops_provider.dart';
 import 'widgets/trait_pill.dart';
@@ -263,7 +265,11 @@ class _WorkshopDetailScreenState
 
     return async.when(
       loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: SafeArea(
+          child: Center(
+            child: SkeletonList(itemCount: 4, itemHeight: 120),
+          ),
+        ),
       ),
       error: (e, _) => Scaffold(
         body: FriendlyErrorScreen(
@@ -276,10 +282,12 @@ class _WorkshopDetailScreenState
         if (workshop == null) {
           return Scaffold(
             appBar: AppBar(),
-            body: const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text("This workshop doesn't exist."),
+            body: const SafeArea(
+              child: Center(
+                child: BrandedEmptyState(
+                  icon: PhosphorIconsRegular.paintBrush,
+                  title: "This workshop doesn't exist.",
+                ),
               ),
             ),
           );

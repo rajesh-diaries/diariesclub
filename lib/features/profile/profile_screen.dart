@@ -19,8 +19,11 @@ import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_screen.dart';
+import '../../core/widgets/error_state.dart';
 import '../../core/widgets/hero_avatar.dart';
+import '../../core/widgets/skeleton_card.dart';
 import '../home/widgets/play_pass_purchase_sheet.dart';
 import '../home/widgets/top_up_sheet.dart';
 import 'widgets/children_list.dart';
@@ -46,7 +49,10 @@ class ProfileScreen extends ConsumerWidget {
       ),
       body: familyAsync.when(
         data: (_) => const _Body(),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SingleChildScrollView(
+          padding: EdgeInsets.all(16),
+          child: SkeletonList(itemCount: 6),
+        ),
         error: (e, _) => FriendlyErrorScreen(
           code: 'E-PROF',
           userMessage: "Couldn't load profile",
@@ -192,54 +198,19 @@ class _PlayPassesSection extends ConsumerWidget {
     final passesAsync = ref.watch(playPassesProvider);
 
     return passesAsync.when(
-      loading: () => const ProfileSectionCard(children: [
-        ListTile(
-          leading: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
+      loading: () => const ProfileSectionCard(
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: SkeletonCard(),
           ),
-          title: Text('Loading…'),
-        ),
-      ]),
+        ],
+      ),
       error: (_, __) => ProfileSectionCard(
         children: [
-          ListTile(
-            leading: const Icon(
-              PhosphorIconsRegular.ticket,
-              color: AppColors.navy,
-            ),
-            title: Text(
-              'Get Play Passes',
-              style: AppTextStyles.body(context),
-            ),
-            subtitle: Text(
-              'Membership coming soon — tap to explore',
-              style: AppTextStyles.caption(
-                context,
-                color: AppColors.lightTextSecondary,
-              ),
-            ),
-            trailing: Material(
-              color: AppColors.navy,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: () => _buy(context),
-                child: DefaultTextStyle(
-                  style: AppTextStyles.caption(
-                    context,
-                    color: Colors.white,
-                  ),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    child: Text('Explore'),
-                  ),
-                ),
-              ),
-            ),
+          BrandedErrorState(
+            message: "Couldn't load Play Passes",
+            onRetry: () => ref.invalidate(playPassesProvider),
           ),
         ],
       ),
@@ -528,29 +499,19 @@ class _HeroPerksSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(unredeemedHeroPerksProvider);
     return async.when(
-      loading: () => const ProfileSectionCard(children: [
-        ListTile(
-          leading: SizedBox(
-            width: 24, height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
+      loading: () => const ProfileSectionCard(
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: SkeletonCard(),
           ),
-          title: Text('Loading…'),
-        ),
-      ]),
+        ],
+      ),
       error: (_, __) => ProfileSectionCard(
         children: [
-          ListTile(
-            leading: const Icon(
-              PhosphorIconsRegular.warningCircle,
-              color: AppColors.lightTextSecondary,
-            ),
-            title: Text(
-              "Couldn't load perks. Pull to retry.",
-              style: AppTextStyles.body(
-                context,
-                color: AppColors.lightTextSecondary,
-              ),
-            ),
+          BrandedErrorState(
+            message: "Couldn't load perks",
+            onRetry: () => ref.invalidate(unredeemedHeroPerksProvider),
           ),
         ],
       ),
@@ -824,29 +785,19 @@ class _UnchosenPerkRowState extends ConsumerState<_UnchosenPerkRow> {
           ),
           const SizedBox(height: 12),
           options.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-            error: (_, __) => Text(
-              "Couldn't load reward options.",
-              style: AppTextStyles.caption(
-                context,
-                color: AppColors.lightTextSecondary,
+            loading: () => const SkeletonCard(),
+            error: (_, __) => BrandedErrorState(
+              message: "Couldn't load reward options",
+              onRetry: () => ref.invalidate(
+                stagePerkOptionsProvider((stage: stage, trait: trait)),
               ),
             ),
             data: (opts) {
               if (opts.isEmpty) {
-                return Text(
-                  'No reward options configured yet. Check back soon!',
-                  style: AppTextStyles.caption(
-                    context,
-                    color: AppColors.lightTextSecondary,
-                  ),
+                return const BrandedEmptyState(
+                  icon: PhosphorIconsRegular.gift,
+                  title: 'No reward options yet',
+                  subtitle: 'Check back soon once perks are configured.',
                 );
               }
               return Column(

@@ -11,6 +11,8 @@ import '../../../core/providers/current_family_provider.dart';
 import '../../../core/providers/server_clock_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/error_state.dart';
+import '../../../core/widgets/skeleton_card.dart';
 import '../../../features/club/providers/pending_club_tab_provider.dart';
 
 /// Provider for active home banners ordered by display_order.
@@ -143,8 +145,11 @@ class _HomeBannerCarouselState extends ConsumerState<HomeBannerCarousel> {
     final bannersAsync = ref.watch(homeBannersProvider);
 
     return bannersAsync.when(
-      loading: () => const _SkeletonBanner(),
-      error: (_, __) => const SizedBox.shrink(),
+      loading: () => const SkeletonCard(height: 140, margin: EdgeInsets.symmetric(horizontal: 24)),
+      error: (e, _) => BrandedErrorState(
+        message: "Couldn't load banners",
+        onRetry: () => ref.invalidate(homeBannersProvider),
+      ),
       data: (allBanners) {
         final banners = allBanners.where((b) => _isVisible(b, now)).toList();
         if (banners.isEmpty) return const SizedBox.shrink();
@@ -323,27 +328,3 @@ class _BannerPage extends StatelessWidget {
   }
 }
 
-class _SkeletonBanner extends StatelessWidget {
-  const _SkeletonBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        height: 140,
-        decoration: BoxDecoration(
-          color: AppColors.lightBorder,
-          borderRadius: BorderRadius.circular(kHomeCardRadius),
-        ),
-        child: const Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      ),
-    );
-  }
-}

@@ -7,7 +7,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/providers/profile_history_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import 'widgets/empty_state.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/error_state.dart';
+import '../../core/widgets/skeleton_card.dart';
 
 /// Birthday reservations — past or upcoming. Tapping a row deep-links to
 /// the existing /birthday/status/:id flow (Session 9 owns the detail).
@@ -28,18 +30,22 @@ class PastBirthdaysScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         child: async.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const ProfileEmptyState(
-            icon: PhosphorIconsRegular.cake,
-            message: "We couldn't load reservations. Try again in a moment.",
+          loading: () => const SingleChildScrollView(
+            padding: EdgeInsets.all(16),
+            child: SkeletonList(),
+          ),
+          error: (_, __) => BrandedErrorState(
+            message: "Couldn't load reservations",
+            onRetry: () => ref.invalidate(pastBirthdaysProvider),
           ),
           data: (rows) {
             if (rows.isEmpty) {
-              return const ProfileEmptyState(
+              return BrandedEmptyState(
                 icon: PhosphorIconsRegular.cake,
-                message: 'No celebrations yet. Plan a party →',
+                title: 'No celebrations yet',
+                subtitle: 'Plan your child\'s next birthday party.',
                 ctaLabel: 'Plan a birthday',
-                ctaRoute: '/birthday',
+                onCta: () => context.push('/birthday'),
               );
             }
             return RefreshIndicator(

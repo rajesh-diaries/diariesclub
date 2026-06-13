@@ -4,6 +4,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/current_wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/error_state.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
@@ -35,7 +36,10 @@ class WalletCard extends ConsumerWidget {
         coinsBalance: 0,
         loaded: false,
       ),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (e, _) => BrandedErrorState(
+        message: "Couldn't load wallet",
+        onRetry: () => ref.invalidate(currentWalletProvider),
+      ),
     );
   }
 }

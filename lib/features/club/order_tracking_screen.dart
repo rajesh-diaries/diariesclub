@@ -9,7 +9,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_screen.dart';
+import '../../core/widgets/skeleton_card.dart';
 import 'providers/order_stream_provider.dart';
 
 /// Realtime order tracking. Subscribes to a single `orders` row + a
@@ -36,7 +38,9 @@ class OrderTrackingScreen extends ConsumerWidget {
         ),
       ),
       body: orderAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(
+          child: SkeletonList(itemCount: 3, itemHeight: 140),
+        ),
         error: (e, _) => FriendlyErrorScreen(
           code: 'E-ORD',
           userMessage: "Couldn't load order",
@@ -45,9 +49,9 @@ class OrderTrackingScreen extends ConsumerWidget {
         data: (order) {
           if (order == null) {
             return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text("This order doesn't exist."),
+              child: BrandedEmptyState(
+                icon: PhosphorIconsRegular.shoppingBag,
+                title: "This order doesn't exist.",
               ),
             );
           }

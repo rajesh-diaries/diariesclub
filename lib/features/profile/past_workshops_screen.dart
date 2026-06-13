@@ -8,7 +8,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/providers/profile_history_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import 'widgets/empty_state.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/error_state.dart';
+import '../../core/widgets/skeleton_card.dart';
 
 /// All venue workshops with this family's registration state baked in.
 /// Two sections:
@@ -38,18 +40,22 @@ class PastWorkshopsScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         child: async.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const ProfileEmptyState(
-            icon: PhosphorIconsRegular.paintBrush,
-            message: "We couldn't load workshops. Try again in a moment.",
+          loading: () => const SingleChildScrollView(
+            padding: EdgeInsets.all(16),
+            child: SkeletonList(),
+          ),
+          error: (_, __) => BrandedErrorState(
+            message: "Couldn't load workshops",
+            onRetry: () => ref.invalidate(pastWorkshopsProvider),
           ),
           data: (rows) {
             if (rows.isEmpty) {
-              return const ProfileEmptyState(
+              return BrandedEmptyState(
                 icon: PhosphorIconsRegular.paintBrush,
-                message: 'No workshops scheduled yet. Check back soon!',
+                title: 'No workshops yet',
+                subtitle: 'Check back soon for upcoming workshops.',
                 ctaLabel: 'See Club',
-                ctaRoute: '/club',
+                onCta: () => context.push('/club'),
               );
             }
 

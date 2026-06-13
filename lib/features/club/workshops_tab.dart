@@ -5,6 +5,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/error_state.dart';
+import '../../core/widgets/skeleton_card.dart';
 import 'providers/workshops_provider.dart';
 import 'widgets/workshop_card.dart';
 
@@ -19,8 +22,13 @@ class WorkshopsTab extends ConsumerWidget {
     final tagline = (cfg['workshops_tagline'] as String?)?.trim() ?? '';
 
     return async.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) => const _Empty(text: "Couldn't load workshops."),
+      loading: () => const SkeletonList(itemCount: 3, itemHeight: 260),
+      error: (_, __) => Center(
+        child: BrandedErrorState(
+          message: "Couldn't load workshops.",
+          onRetry: () => ref.invalidate(workshopsProvider),
+        ),
+      ),
       data: (workshops) => RefreshIndicator(
         onRefresh: () async => ref.invalidate(workshopsProvider),
         child: CustomScrollView(
@@ -73,10 +81,13 @@ class WorkshopsTab extends ConsumerWidget {
             if (workshops.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
-                child: _Empty(
-                  text: filter == WorkshopFilter.past
-                      ? "You haven't attended any workshops yet."
-                      : 'No workshops scheduled for that window.',
+                child: Center(
+                  child: BrandedEmptyState(
+                    icon: PhosphorIconsRegular.paintBrush,
+                    title: filter == WorkshopFilter.past
+                        ? "You haven't attended any workshops yet."
+                        : 'No workshops scheduled for that window.',
+                  ),
                 ),
               )
             else
@@ -87,38 +98,6 @@ class WorkshopsTab extends ConsumerWidget {
                 ),
               ),
             const SliverToBoxAdapter(child: SizedBox(height: 96)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Empty extends StatelessWidget {
-  final String text;
-  const _Empty({required this.text});
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              PhosphorIconsRegular.paintBrush,
-              size: 56,
-              color: AppColors.lightTextSecondary,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              text,
-              style: AppTextStyles.body(
-                context,
-                color: AppColors.lightTextSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
           ],
         ),
       ),

@@ -11,6 +11,7 @@ import '../../core/providers/family_children_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/session_timer.dart';
+import '../../core/widgets/skeleton_card.dart';
 import '../home/widgets/healthy_bite_reminder_banner.dart';
 import '../home/widgets/hydration_reminder_banner.dart';
 import 'widgets/extend_session_sheet.dart';
@@ -127,7 +128,10 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
         if (mounted) context.go('/home');
       });
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Padding(
+          padding: EdgeInsets.all(20),
+          child: SkeletonList(itemCount: 4),
+        ),
       );
     }
 

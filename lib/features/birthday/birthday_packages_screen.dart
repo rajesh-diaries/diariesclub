@@ -12,6 +12,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../../core/widgets/error_screen.dart';
+import '../../core/widgets/skeleton_card.dart';
 import 'providers/birthday_packages_provider.dart';
 import 'providers/birthday_stats_provider.dart';
 import 'providers/saved_packages_provider.dart';
@@ -50,7 +51,10 @@ class BirthdayPackagesScreen extends ConsumerWidget {
         child: Stack(
           children: [
             pkgsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const SingleChildScrollView(
+                padding: EdgeInsets.all(16),
+                child: SkeletonList(),
+              ),
               error: (e, _) => FriendlyErrorScreen(
                 code: 'E-PKGS',
                 userMessage: "Couldn't load packages",

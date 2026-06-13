@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/error_state.dart';
+import '../../../core/widgets/skeleton_card.dart';
 import '../providers/child_by_id_provider.dart';
 
 const _heroOrder = ['rafi', 'ellie', 'gerry', 'zena'];
@@ -48,8 +50,17 @@ class GrowthThisMonthCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final eventsAsync = ref.watch(_recentXpEventsProvider(childId));
     return eventsAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        child: SkeletonCard(height: 160),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: BrandedErrorState(
+          message: "Couldn't load growth this month",
+          onRetry: () => ref.invalidate(childByIdProvider(childId)),
+        ),
+      ),
       data: (events) {
         final totals = <String, int>{
           for (final h in _heroOrder) h: 0,

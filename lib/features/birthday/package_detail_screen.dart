@@ -16,6 +16,7 @@ import '../../core/utils/currency.dart';
 import '../../core/utils/venues.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/primary_button.dart';
+import '../../core/widgets/skeleton_card.dart';
 import 'providers/birthday_packages_provider.dart';
 import 'providers/reservation_providers.dart';
 
@@ -280,7 +281,10 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
         ),
       ),
       body: pkgAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SingleChildScrollView(
+          padding: EdgeInsets.all(16),
+          child: SkeletonList(),
+        ),
         error: (e, _) => FriendlyErrorScreen(
           code: 'E-PKG',
           userMessage: "Couldn't load this package",

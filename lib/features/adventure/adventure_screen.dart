@@ -7,6 +7,7 @@ import '../../core/providers/family_children_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/error_screen.dart';
+import '../../core/widgets/skeleton_card.dart';
 import 'child_adventure_dashboard.dart';
 import 'providers/selected_adventure_child_id_provider.dart';
 import 'widgets/cafe_only_empty_state.dart';
@@ -55,7 +56,12 @@ class AdventureScreen extends ConsumerWidget {
         ],
       ),
       body: childrenAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: SkeletonList(itemCount: 4, itemHeight: 120),
+          ),
+        ),
         error: (e, _) => FriendlyErrorScreen(
           code: 'E-ADV',
           userMessage: "Couldn't load adventure",

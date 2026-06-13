@@ -6,6 +6,8 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/child_stage_history_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/error_state.dart';
+import '../../../core/widgets/skeleton_card.dart';
 
 /// Vertical timeline of every stage transition this child has had.
 /// Reused by the Adventure tab profile view (Session 8). Empty state
@@ -20,10 +22,16 @@ class StageHistoryTimeline extends ConsumerWidget {
 
     return async.when(
       loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        child: Center(child: CircularProgressIndicator()),
+        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        child: SkeletonCard(height: 140),
       ),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: BrandedErrorState(
+          message: "Couldn't load milestones",
+          onRetry: () => ref.invalidate(childStageHistoryProvider(childId)),
+        ),
+      ),
       data: (entries) {
         if (entries.isEmpty) {
           return _Empty();

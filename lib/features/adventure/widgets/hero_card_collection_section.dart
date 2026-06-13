@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/skeleton_card.dart';
 import '../providers/hero_cards_providers.dart';
 import 'card_detail_sheet.dart';
 import 'card_grid_item.dart';
@@ -38,7 +39,7 @@ class HeroCardCollectionSection extends ConsumerWidget {
     if (rows.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(child: CircularProgressIndicator()),
+        child: SkeletonList(itemCount: 4, itemHeight: 96),
       );
     }
 

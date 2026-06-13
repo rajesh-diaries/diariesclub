@@ -9,7 +9,9 @@ import '../../core/providers/profile_history_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
-import 'widgets/empty_state.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/error_state.dart';
+import '../../core/widgets/skeleton_card.dart';
 
 /// Past Café Diaries / FIT Diaries / Combos orders. Empty state CTA goes
 /// to the Club tab to browse the menu (Session 7 builds the placement
@@ -31,19 +33,23 @@ class PastOrdersScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         child: async.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const ProfileEmptyState(
-            icon: PhosphorIconsRegular.coffee,
-            message: "We couldn't load orders. Try again in a moment.",
+          loading: () => const SingleChildScrollView(
+            padding: EdgeInsets.all(16),
+            child: SkeletonList(),
+          ),
+          error: (_, __) => BrandedErrorState(
+            message: "Couldn't load orders",
+            onRetry: () => ref.invalidate(pastOrdersProvider),
           ),
           data: (rows) {
             if (rows.isEmpty) {
-              return const ProfileEmptyState(
+              return BrandedEmptyState(
                 icon: PhosphorIconsRegular.coffee,
-                message:
-                    "You'll see your café and FIT orders here. Browse the menu →",
+                title: 'No orders yet',
+                subtitle:
+                    "You'll see your café and FIT orders here once you've placed one.",
                 ctaLabel: 'Browse menu',
-                ctaRoute: '/club',
+                onCta: () => context.push('/club'),
               );
             }
             return RefreshIndicator(

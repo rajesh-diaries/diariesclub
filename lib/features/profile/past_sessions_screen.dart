@@ -8,7 +8,9 @@ import '../../core/providers/profile_history_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
-import 'widgets/empty_state.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/error_state.dart';
+import '../../core/widgets/skeleton_card.dart';
 
 /// "Past sessions" — every play session for this family, most recent first.
 /// Status badge shows {Active, Reflected, Auto-split, Completed, Cancelled}.
@@ -29,24 +31,22 @@ class PastSessionsScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         child: async.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                "Couldn't load sessions.",
-                style: AppTextStyles.body(context),
-                textAlign: TextAlign.center,
-              ),
-            ),
+          loading: () => const SingleChildScrollView(
+            padding: EdgeInsets.all(16),
+            child: SkeletonList(),
+          ),
+          error: (e, _) => BrandedErrorState(
+            message: "Couldn't load sessions",
+            onRetry: () => ref.invalidate(pastSessionsProvider),
           ),
           data: (rows) {
             if (rows.isEmpty) {
-              return const ProfileEmptyState(
+              return BrandedEmptyState(
                 icon: PhosphorIconsRegular.timer,
-                message: 'Your first session is just a tap away.',
+                title: 'No sessions yet',
+                subtitle: 'Your first session is just a tap away.',
                 ctaLabel: 'Start a session',
-                ctaRoute: '/session/start',
+                onCta: () => context.push('/session/start'),
               );
             }
             return RefreshIndicator(

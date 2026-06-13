@@ -9,6 +9,7 @@ import '../../core/providers/family_children_provider.dart';
 import '../../core/providers/home_state_provider.dart';
 import '../../core/providers/recent_activity_provider.dart';
 import '../../core/widgets/error_screen.dart';
+import '../../core/widgets/skeleton_card.dart';
 import 'home_app_bar.dart';
 import 'views/idle_home_view.dart';
 import 'views/multi_session_home_view.dart';
@@ -181,7 +182,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         };
       },
       loading: () {
-        return const Center(child: CircularProgressIndicator());
+        return const SkeletonList(itemCount: 4);
       },
       error: (e, st) {
         debugPrint('[E-HOME] homeStateProvider error: $e');
