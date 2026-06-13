@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +18,7 @@ import '../../../core/widgets/success_celebration.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/selection_card.dart';
 import '../../sessions/widgets/insufficient_balance_sheet.dart';
+import 'quantity_stepper.dart';
 import '../providers/active_orders_provider.dart';
 import '../providers/cart_provider.dart';
 
@@ -332,30 +334,34 @@ class _LineCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(cartProvider.notifier);
-    final (Color accent, IconData icon, String typeLabel) = switch (line) {
+    final (Color accent, IconData fallbackIcon, String typeLabel, String? imageUrl) = switch (line) {
       MenuItemLine m when m.brand == 'coffee' => (
           AppColors.coffeeBrown,
           PhosphorIconsRegular.coffee,
           'COFFEE',
+          m.imageUrl,
         ),
-      MenuItemLine _ => (
+      MenuItemLine m => (
           AppColors.fitGreen,
           PhosphorIconsRegular.carrot,
           'FIT',
+          m.imageUrl,
         ),
-      ComboLine _ => (
+      ComboLine c => (
           AppColors.gold,
           PhosphorIconsFill.gift,
           'COMBO',
+          c.imageUrl,
         ),
-      FitMealLine _ => (
+      FitMealLine f => (
           AppColors.fitGreen,
           PhosphorIconsRegular.bowlFood,
           'FIT MEAL',
+          f.imageUrl,
         ),
     };
 
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: accent.withValues(alpha: 0.06),
@@ -365,8 +371,27 @@ class _LineCard extends ConsumerWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: accent, size: 18),
-          const SizedBox(width: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              width: 56,
+              height: 56,
+              color: accent.withValues(alpha: 0.12),
+              child: imageUrl != null && imageUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Center(
+                        child: Icon(fallbackIcon, color: accent, size: 22),
+                      ),
+                      errorWidget: (_, __, ___) => Center(
+                        child: Icon(fallbackIcon, color: accent, size: 22),
+                      ),
+                    )
+                  : Center(child: Icon(fallbackIcon, color: accent, size: 22)),
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -433,19 +458,31 @@ class _LineCard extends ConsumerWidget {
               ],
             ),
           ),
-          IconButton(
-            onPressed: () => notifier.changeQuantityById(line.id, -1),
-            icon: const Icon(PhosphorIconsRegular.minusCircle),
-            visualDensity: VisualDensity.compact,
-          ),
-          Text('${line.quantity}', style: AppTextStyles.bodyLarge(context)),
-          IconButton(
-            onPressed: () => notifier.changeQuantityById(line.id, 1),
-            icon: const Icon(PhosphorIconsRegular.plusCircle),
-            visualDensity: VisualDensity.compact,
+          QuantityStepper(
+            lineId: line.id,
+            currentQty: line.quantity,
           ),
         ],
       ),
+    );
+
+    return Dismissible(
+      key: ValueKey(line.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16),
+        decoration: BoxDecoration(
+          color: AppColors.adminRed.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(
+          PhosphorIconsRegular.trash,
+          color: AppColors.adminRed,
+        ),
+      ),
+      onDismissed: (_) => notifier.removeLineById(line.id),
+      child: card,
     );
   }
 }

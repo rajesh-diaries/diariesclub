@@ -11,18 +11,29 @@ import '../providers/cart_provider.dart';
 /// Decrements remove the line entirely when qty drops to 0 (handled by
 /// the cart notifier).
 class QuantityStepper extends ConsumerWidget {
-  final String menuItemId;
+  final String? menuItemId;
+  final String? lineId;
   final int currentQty;
 
   const QuantityStepper({
     super.key,
-    required this.menuItemId,
+    this.menuItemId,
+    this.lineId,
     required this.currentQty,
-  });
+  }) : assert(menuItemId != null || lineId != null);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(cartProvider.notifier);
+    void change(int delta) {
+      HapticFeedback.lightImpact();
+      if (lineId != null) {
+        notifier.changeQuantityById(lineId!, delta);
+      } else {
+        notifier.changeQuantity(menuItemId!, delta);
+      }
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.navy,
@@ -33,10 +44,7 @@ class QuantityStepper extends ConsumerWidget {
         children: [
           _Btn(
             icon: PhosphorIconsRegular.minus,
-            onTap: () {
-              HapticFeedback.lightImpact();
-              notifier.changeQuantity(menuItemId, -1);
-            },
+            onTap: () => change(-1),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -53,10 +61,7 @@ class QuantityStepper extends ConsumerWidget {
           ),
           _Btn(
             icon: PhosphorIconsRegular.plus,
-            onTap: () {
-              HapticFeedback.lightImpact();
-              notifier.changeQuantity(menuItemId, 1);
-            },
+            onTap: () => change(1),
           ),
         ],
       ),

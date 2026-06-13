@@ -138,16 +138,47 @@ class _ClubScreenState extends ConsumerState<ClubScreen>
         bottom: TabBar(
           controller: _tab,
           isScrollable: true,
-          // Default scrollable TabBar reserves ~52dp leading padding, so
-          // "Cafe" hangs off the left edge. Pin to the start so the first
-          // tab sits flush with the screen edge.
           tabAlignment: TabAlignment.start,
+          labelStyle: AppTextStyles.body(
+            context,
+            color: AppColors.navy,
+          ).copyWith(fontWeight: FontWeight.w800),
+          unselectedLabelStyle: AppTextStyles.body(
+            context,
+            color: AppColors.lightTextSecondary,
+          ),
+          labelColor: AppColors.navy,
+          unselectedLabelColor: AppColors.lightTextSecondary,
+          indicator: UnderlineTabIndicator(
+            borderSide: const BorderSide(
+              color: AppColors.gold,
+              width: 3,
+            ),
+            borderRadius: BorderRadius.circular(3),
+            insets: const EdgeInsets.symmetric(horizontal: 16),
+          ),
+          dividerColor: AppColors.lightBorder,
           tabs: const [
-            Tab(text: 'Cafe'),
-            Tab(text: 'FIT'),
-            Tab(text: 'Combos'),
-            Tab(text: 'Birthdays'),
-            Tab(text: 'Workshops'),
+            Tab(
+              icon: Icon(PhosphorIconsRegular.coffee, size: 18),
+              text: 'Cafe',
+            ),
+            Tab(
+              icon: Icon(PhosphorIconsRegular.bowlFood, size: 18),
+              text: 'FIT',
+            ),
+            Tab(
+              icon: Icon(PhosphorIconsRegular.gift, size: 18),
+              text: 'Combos',
+            ),
+            Tab(
+              icon: Icon(PhosphorIconsRegular.cake, size: 18),
+              text: 'Birthdays',
+            ),
+            Tab(
+              icon: Icon(PhosphorIconsRegular.paintBrush, size: 18),
+              text: 'Workshops',
+            ),
           ],
         ),
       ),
