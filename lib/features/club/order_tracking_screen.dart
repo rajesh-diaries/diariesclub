@@ -13,6 +13,7 @@ import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/skeleton_card.dart';
 import 'providers/order_stream_provider.dart';
+import 'widgets/order_status_timeline.dart';
 
 /// Realtime order tracking. Subscribes to a single `orders` row + a
 /// one-shot `order_items` fetch (line items don't mutate after insert).
@@ -104,6 +105,8 @@ class _Body extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _StatusHero(status: status),
+            const SizedBox(height: 16),
+            OrderStatusTimeline(currentStatus: status),
             const SizedBox(height: 24),
             if (invoice != null) ...[
               _TaxInvoiceHeader(
@@ -273,7 +276,7 @@ class _StatusHero extends StatelessWidget {
         ),
       'preparing' => (
           'Preparing your order',
-          'Estimated time: 8 min',
+          '',
           AppColors.gold,
           PhosphorIconsFill.fire,
         ),
