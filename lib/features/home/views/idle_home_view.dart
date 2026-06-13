@@ -12,7 +12,6 @@ import '../widgets/live_orders_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
 import '../widgets/order_food_card.dart';
 import '../widgets/play_pass_promo_card.dart';
-import '../widgets/recent_activity_list.dart';
 import '../widgets/referral_entry_card.dart';
 
 /// "No active session" state. Greeting + wallet + start CTA + birthday +
@@ -82,8 +81,6 @@ class IdleHomeBody extends ConsumerWidget {
         // Announcements moved BELOW the start CTA so the primary
         // action lands first. Self-margined: collapses if no rows.
         const AnnouncementsFeed(),
-        const SizedBox(height: kHomeSectionGap),
-        const RecentActivityList(),
         const SizedBox(height: kHomeSectionGap),
       ],
     );
