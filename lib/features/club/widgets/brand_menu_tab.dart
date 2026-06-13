@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state.dart';
-import '../../../core/widgets/skeleton_card.dart';
 import '../providers/menu_items_provider.dart';
 import 'menu_item_card.dart';
 
@@ -39,7 +38,22 @@ class BrandMenuTab extends ConsumerWidget {
     final selectedCategory = ref.watch(menuCategoryFilterProvider(brand));
 
     return itemsAsync.when(
-      loading: () => const SkeletonList(itemCount: 4, itemHeight: 112),
+      loading: () => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(color: AppColors.navy),
+            const SizedBox(height: 12),
+            Text(
+              'Loading $title...',
+              style: AppTextStyles.body(
+                context,
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
       error: (e, _) => Center(
         child: BrandedErrorState(
           message: "Couldn't load the menu.",
@@ -54,7 +68,10 @@ class BrandMenuTab extends ConsumerWidget {
 
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(menuItemsByBrandProvider(brand)),
+          color: AppColors.navy,
+          backgroundColor: Colors.white,
           child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverToBoxAdapter(
                 child: _Hero(
