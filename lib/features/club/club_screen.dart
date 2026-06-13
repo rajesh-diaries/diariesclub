@@ -182,14 +182,29 @@ class _ClubScreenState extends ConsumerState<ClubScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tab,
-        children: const [
-          CoffeeMenuTab(),
-          FitMenuTab(),
-          CombosTab(),
-          BirthdaysTab(),
-          WorkshopsTab(),
+      body: Column(
+        children: [
+          Container(
+            color: Colors.amber,
+            height: 30,
+            alignment: Alignment.center,
+            child: Text(
+              'DEBUG tab=${_tab.index}',
+              style: const TextStyle(color: Colors.black),
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tab,
+              children: const [
+                CoffeeMenuTab(),
+                FitMenuTab(),
+                CombosTab(),
+                BirthdaysTab(),
+                WorkshopsTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );
