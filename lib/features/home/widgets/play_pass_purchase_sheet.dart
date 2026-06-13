@@ -253,7 +253,7 @@ class _PassOptionCard extends StatelessWidget {
     final tag = option['tag'] as String;
     final perSession = price ~/ total;
     const singleSessionPrice = 80000; // 1hr price
-    final saves = singleSessionPrice - perSession;
+    final totalSavings = (singleSessionPrice - perSession) * total;
 
     return InkWell(
       onTap: busy ? null : onTap,
@@ -326,7 +326,7 @@ class _PassOptionCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          'Save ${Money.fromPaise(saves)}',
+                          'Save ${Money.fromPaise(totalSavings)}',
                           style: AppTextStyles.caption(context).copyWith(
                             color: AppColors.fitGreen,
                             fontWeight: FontWeight.w700,
