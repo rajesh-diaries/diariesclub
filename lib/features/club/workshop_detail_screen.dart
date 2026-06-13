@@ -115,7 +115,7 @@ class _WorkshopDetailScreenState
                 color: AppColors.activeGreen,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_rounded,
+              child: const Icon(PhosphorIconsBold.check,
                   color: Colors.white, size: 36),
             ),
             const SizedBox(height: 16),
@@ -191,7 +191,7 @@ class _WorkshopDetailScreenState
         if (e.message.contains('workshop_full')) {
           error = 'Sorry, that just filled up. Try another?';
         } else if (e.message.contains('workshop_registration_closed')) {
-          error = "Registrations are closed — this workshop has already started.";
+          error = 'Registrations are closed — this workshop has already started.';
         } else if (e.message.contains('insufficient_balance')) {
           insufficient = true;
         } else if (e.message.contains('already_registered')) {
@@ -333,7 +333,7 @@ class _WorkshopDetailScreenState
         return Scaffold(
           appBar: AppBar(
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
+              icon: const Icon(PhosphorIconsRegular.arrowLeft),
               onPressed: () => context.pop(),
             ),
             actions: [
@@ -487,10 +487,12 @@ class _WorkshopDetailScreenState
                                               (_selectedChildIds.isEmpty
                                                   ? 1
                                                   : _selectedChildIds.length))
-                                      ? const Text(
+                                      ? Text(
                                           'Not enough balance',
-                                          style: TextStyle(
-                                              color: AppColors.adminRed),
+                                          style: AppTextStyles.caption(
+                                            context,
+                                            color: AppColors.adminRed,
+                                          ),
                                         )
                                       : null,
                                   onChanged: (v) =>
@@ -734,7 +736,7 @@ class _ChildPicker extends StatelessWidget {
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
-                              Icons.check_rounded,
+                              PhosphorIconsBold.check,
                               color: Colors.white,
                               size: 14,
                             ),

@@ -42,7 +42,7 @@ class ReferralDetailsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Referral details'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),

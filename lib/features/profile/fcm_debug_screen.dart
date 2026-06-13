@@ -2,12 +2,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/notifications/fcm_setup.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/primary_button.dart';
-import '../../flavors.dart';
 
 /// Dev-flavor-only screen to verify FCM end-to-end on a physical device.
 /// Shows the current token + permission state + a one-line curl command
@@ -95,7 +95,7 @@ curl -X POST https://fcm.googleapis.com/fcm/send \\
         title: const Text('FCM debug'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(PhosphorIconsRegular.arrowClockwise),
             onPressed: _busy ? null : _refresh,
           ),
         ],
@@ -132,7 +132,7 @@ curl -X POST https://fcm.googleapis.com/fcm/send \\
                   children: [
                     SelectableText(
                       _token ?? '(none yet — try requesting permission)',
-                      style: const TextStyle(
+                      style: AppTextStyles.caption(context).copyWith(
                         fontFamily: 'monospace',
                         fontSize: 12,
                       ),
@@ -148,7 +148,7 @@ curl -X POST https://fcm.googleapis.com/fcm/send \\
                             const SnackBar(content: Text('Token copied.')),
                           );
                         },
-                        icon: const Icon(Icons.copy),
+                        icon: const Icon(PhosphorIconsRegular.copy),
                         label: const Text('Copy'),
                       ),
                   ],
@@ -177,7 +177,7 @@ curl -X POST https://fcm.googleapis.com/fcm/send \\
                       ),
                       child: SelectableText(
                         _curlSnippet(),
-                        style: const TextStyle(
+                        style: AppTextStyles.caption(context).copyWith(
                           fontFamily: 'monospace',
                           fontSize: 11,
                         ),

@@ -4,13 +4,13 @@ import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/providers/current_family_provider.dart';
 import '../../../core/providers/current_wallet_provider.dart';
-import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
@@ -602,7 +602,7 @@ class _PickingBody extends StatelessWidget {
             Text('Top up wallet', style: AppTextStyles.h2(context)),
             IconButton(
               onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close),
+              icon: const Icon(PhosphorIconsRegular.x),
               tooltip: 'Close',
             ),
           ],
@@ -748,7 +748,7 @@ class _SuccessView extends StatelessWidget {
       child: Column(
         children: [
           const Icon(
-            Icons.check_circle_rounded,
+            PhosphorIconsFill.checkCircle,
             size: 64,
             color: AppColors.activeGreen,
           ),

@@ -4,6 +4,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../providers/hero_cards_providers.dart';
 import 'card_detail_sheet.dart';
 import 'card_grid_item.dart';
@@ -60,10 +61,10 @@ class HeroCardCollectionSection extends ConsumerWidget {
             title: 'CARD COLLECTION',
             trailing: '$earnedCount of ${rows.length} earned',
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: kHomeSectionGap),
           // Birthday Memories shelf is parked — birthday cards still
           // earn + appear under each character's section below.
-          if (earnedCount == 0) _CollectionEmpty(),
+          if (earnedCount == 0) const _CollectionEmpty(),
           for (final hero in _heroOrder) ...[
             _PerHeroSection(
               hero: hero,
@@ -194,14 +195,17 @@ class _HeroGrid extends StatelessWidget {
 }
 
 class _CollectionEmpty extends StatelessWidget {
+  const _CollectionEmpty();
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(kHomeCardPadding),
       decoration: BoxDecoration(
         color: AppColors.lightBackground,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
         border: Border.all(color: AppColors.lightBorder),
+        boxShadow: [kHomeCardShadow(context)],
       ),
       child: Row(
         children: [

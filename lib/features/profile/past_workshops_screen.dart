@@ -32,7 +32,7 @@ class PastWorkshopsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Workshops'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),
@@ -305,7 +305,7 @@ class _WorkshopRegistrationCard extends StatelessWidget {
                 if (workshopId != null) ...[
                   const SizedBox(width: 8),
                   const Icon(
-                    Icons.chevron_right,
+                    PhosphorIconsRegular.caretRight,
                     color: AppColors.lightTextSecondary,
                   ),
                 ],

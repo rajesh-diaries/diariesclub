@@ -216,7 +216,7 @@ class _CartSheetState extends ConsumerState<CartSheet> {
                 const Spacer(),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(PhosphorIconsRegular.x),
                 ),
               ],
             ),
@@ -426,13 +426,13 @@ class _LineCard extends ConsumerWidget {
           ),
           IconButton(
             onPressed: () => notifier.changeQuantityById(line.id, -1),
-            icon: const Icon(Icons.remove_circle_outline),
+            icon: const Icon(PhosphorIconsRegular.minusCircle),
             visualDensity: VisualDensity.compact,
           ),
           Text('${line.quantity}', style: AppTextStyles.bodyLarge(context)),
           IconButton(
             onPressed: () => notifier.changeQuantityById(line.id, 1),
-            icon: const Icon(Icons.add_circle_outline),
+            icon: const Icon(PhosphorIconsRegular.plusCircle),
             visualDensity: VisualDensity.compact,
           ),
         ],
@@ -620,9 +620,12 @@ class _PaymentSelector extends ConsumerWidget {
           groupValue: selected,
           title: Text('Wallet (${Money.fromPaise(walletBalance)})'),
           subtitle: walletShort
-              ? const Text(
+              ? Text(
                   'Not enough balance',
-                  style: TextStyle(color: AppColors.adminRed),
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.adminRed,
+                  ),
                 )
               : null,
           onChanged: (v) => ref.read(cartPaymentMethodProvider.notifier).state =

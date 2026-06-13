@@ -6,6 +6,7 @@ import '../../../core/providers/family_children_provider.dart';
 import '../../../core/providers/hero_quests_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 
 const _heroOrder = ['rafi', 'ellie', 'gerry', 'zena'];
 
@@ -76,7 +77,7 @@ class HeroQuestsCard extends ConsumerWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
         border: Border.all(color: AppColors.gold.withValues(alpha: 0.40)),
       ),
       child: Column(

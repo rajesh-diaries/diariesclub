@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers/auth_provider.dart';
@@ -67,7 +68,7 @@ class _NotificationsSettingsScreenState
       appBar: AppBar(
         title: const Text('Notifications'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),
@@ -168,7 +169,7 @@ class _NotificationsSettingsScreenState
               _Toggle(
                 title: 'Wallet alerts',
                 subtitle:
-                    "Top-up confirmations, and a heads-up if your balance is running low.",
+                    'Top-up confirmations, and a heads-up if your balance is running low.',
                 value: prefs.walletAlerts,
                 onChanged: _busy
                     ? null
@@ -209,7 +210,7 @@ class _NotificationsSettingsScreenState
               ),
               _Toggle(
                 title: 'Workshop reminders',
-                subtitle: "Upcoming workshops we think your kids would enjoy.",
+                subtitle: 'Upcoming workshops we think your kids would enjoy.',
                 value: prefs.workshopReminders,
                 onChanged: _busy
                     ? null

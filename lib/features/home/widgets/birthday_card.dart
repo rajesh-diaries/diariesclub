@@ -8,6 +8,7 @@ import '../../../core/providers/family_children_provider.dart';
 import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/ist_dates.dart';
 import '../../birthday/providers/reservation_providers.dart';
 
@@ -150,7 +151,7 @@ class BirthdayCardList extends ConsumerWidget {
       children: [
         for (final e in reservationEntries) ...[
           _BirthdayCardTile(entry: e),
-          const SizedBox(height: 12),
+          const SizedBox(height: kHomeSectionGap),
         ],
         if (residualCard != null) residualCard,
       ],
@@ -222,17 +223,18 @@ class _BirthdayCardTile extends StatelessWidget {
     final destination = '/birthday/status/${r['id']}';
 
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(kHomeCardRadius),
       onTap: () => context.push(destination),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(kHomeCardPadding),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: spec.gradient,
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
+          boxShadow: [kHomeCardShadow(context)],
         ),
         child: Row(
           children: [
@@ -384,10 +386,10 @@ class _RichBirthdayCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = (child['name'] as String?) ?? 'Your child';
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(kHomeCardRadius),
       onTap: () => context.push('/birthday'),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(kHomeCardPadding),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -397,7 +399,8 @@ class _RichBirthdayCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
+          boxShadow: [kHomeCardShadow(context)],
         ),
         child: Row(
           children: [

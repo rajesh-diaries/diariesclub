@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -14,6 +15,7 @@ import '../../core/providers/play_passes_provider.dart';
 import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../core/utils/venues.dart';
 import '../../core/widgets/error_screen.dart';
@@ -424,7 +426,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       appBar: AppBar(
         title: const Text('Start a session'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),
@@ -696,9 +698,12 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                               'Wallet (${Money.fromPaise(balance)})'),
                           subtitle: !walletEnough &&
                                   _selectedDurationMinutes != null
-                              ? const Text(
+                              ? Text(
                                   'Not enough balance',
-                                  style: TextStyle(color: AppColors.adminRed),
+                                  style: AppTextStyles.caption(
+                                    context,
+                                    color: AppColors.adminRed,
+                                  ),
                                 )
                               : null,
                           onChanged: (v) => setState(() {
@@ -820,7 +825,7 @@ class _DurationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(kHomeCardRadius),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         decoration: BoxDecoration(
@@ -831,7 +836,7 @@ class _DurationCard extends StatelessWidget {
             color: selected ? AppColors.gold : AppColors.lightBorder,
             width: selected ? 2 : 1,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1077,11 +1082,11 @@ class _CouponSection extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       minimumSize: const Size(60, 36),
                     ),
-                    child: const Text(
+                    child: Text(
                       'APPLY',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
+                      style: AppTextStyles.button(
+                        context,
+                        color: AppColors.navy,
                       ),
                     ),
                   ),
@@ -1148,8 +1153,8 @@ class _SiblingCouponChips extends StatelessWidget {
                 children: [
                   Icon(
                     isApplied
-                        ? Icons.check_circle_outline
-                        : Icons.local_offer_outlined,
+                        ? PhosphorIconsRegular.checkCircle
+                        : PhosphorIconsRegular.tag,
                     color: isApplied
                         ? AppColors.fitGreen
                         : AppColors.lightTextSecondary,

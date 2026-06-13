@@ -745,7 +745,7 @@ class _ExperienceBlockDetail extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.check_circle,
+                    const Icon(PhosphorIconsRegular.checkCircle,
                         size: 16, color: AppColors.navy),
                     const SizedBox(width: 6),
                     Text(label, style: AppTextStyles.body(context)),

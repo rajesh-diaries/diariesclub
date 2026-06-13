@@ -90,7 +90,7 @@ class _CardUnboxingScreenState extends ConsumerState<CardUnboxingScreen>
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(PhosphorIconsRegular.x),
           onPressed: () => context.go('/adventure'),
         ),
       ),
@@ -106,12 +106,12 @@ class _CardUnboxingScreenState extends ConsumerState<CardUnboxingScreen>
           ),
           data: (row) {
             if (row == null) {
-              return const Center(
+              return Center(
                 child: Padding(
-                  padding: EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(24),
                   child: Text(
                     "This card isn't in your collection.",
-                    style: TextStyle(color: Colors.white),
+                    style: AppTextStyles.body(context, color: Colors.white),
                   ),
                 ),
               );

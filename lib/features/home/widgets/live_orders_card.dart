@@ -123,7 +123,7 @@ class _OrderRow extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          const Text('✨', style: TextStyle(fontSize: 14)),
+                          Text('✨', style: AppTextStyles.caption(context)),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(

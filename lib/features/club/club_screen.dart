@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
 import 'birthdays_tab.dart';
 import 'coffee_menu_tab.dart';
 import 'combos_tab.dart';
@@ -119,10 +120,12 @@ class _ClubScreenState extends ConsumerState<ClubScreen>
                       child: Text(
                         count > 9 ? '9+' : '$count',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: AppTextStyles.caption(
+                          context,
                           color: AppColors.navy,
-                          fontWeight: FontWeight.w900,
+                        ).copyWith(
                           fontSize: 11,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),

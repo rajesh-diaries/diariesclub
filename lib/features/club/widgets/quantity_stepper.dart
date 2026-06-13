@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_text_styles.dart';
 import '../providers/cart_provider.dart';
 
 /// −/qty/+ stepper used on menu cards once the item is in the cart.
@@ -30,7 +32,7 @@ class QuantityStepper extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _Btn(
-            icon: Icons.remove,
+            icon: PhosphorIconsRegular.minus,
             onTap: () {
               HapticFeedback.lightImpact();
               notifier.changeQuantity(menuItemId, -1);
@@ -40,14 +42,17 @@ class QuantityStepper extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               '$currentQty',
-              style: const TextStyle(
+              style: AppTextStyles.body(
+                context,
                 color: Colors.white,
+              ).copyWith(
+                fontSize: 14,
                 fontWeight: FontWeight.w800,
               ),
             ),
           ),
           _Btn(
-            icon: Icons.add,
+            icon: PhosphorIconsRegular.plus,
             onTap: () {
               HapticFeedback.lightImpact();
               notifier.changeQuantity(menuItemId, 1);

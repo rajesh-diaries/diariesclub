@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/providers/family_children_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// FEATURE-002 — complimentary Healthy Bite reminder banner.
 ///
@@ -97,7 +98,7 @@ class _HealthyBiteReminderBannerState
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
         boxShadow: [
           BoxShadow(
             color: AppColors.gold.withValues(alpha: 0.30),

@@ -42,9 +42,9 @@ class AdventureScreen extends ConsumerWidget {
               size: 18,
               color: AppColors.navy,
             ),
-            label: const Text(
+            label: Text(
               'About',
-              style: TextStyle(color: AppColors.navy),
+              style: AppTextStyles.body(context, color: AppColors.navy),
             ),
             style: TextButton.styleFrom(
               padding:

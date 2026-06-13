@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -274,7 +275,7 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
           tooltip: 'Back',
         ),
@@ -505,10 +506,7 @@ class _OtpCell extends StatelessWidget {
       child: character != null
           ? Text(
               character!,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-              ),
+              style: AppTextStyles.h2(context),
             )
           : active
               ? const _BlinkingCursor()

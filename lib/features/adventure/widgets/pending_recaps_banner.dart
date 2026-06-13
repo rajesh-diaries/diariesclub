@@ -66,7 +66,7 @@ class PendingRecapsBanner extends ConsumerWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward, color: AppColors.gold, size: 18),
+              const Icon(PhosphorIconsRegular.arrowRight, color: AppColors.gold, size: 18),
             ],
           ),
         ),

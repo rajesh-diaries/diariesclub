@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers/current_family_provider.dart';
@@ -96,7 +97,7 @@ class _AddChildScreenState extends ConsumerState<AddChildScreen> {
       appBar: AppBar(
         title: const Text('Add a child'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),
@@ -129,7 +130,7 @@ class _AddChildScreenState extends ConsumerState<AddChildScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    suffixIcon: const Icon(Icons.calendar_today, size: 20),
+                    suffixIcon: const Icon(PhosphorIconsRegular.calendarBlank, size: 20),
                   ),
                   child: Text(dobText, style: AppTextStyles.body(context)),
                 ),

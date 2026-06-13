@@ -99,7 +99,8 @@ class _Step extends StatelessWidget {
                             : AppColors.lightBorder,
                   ),
                   child: isPast
-                      ? const Icon(Icons.check, color: Colors.white, size: 14)
+                      ? const Icon(PhosphorIconsBold.check,
+                          color: Colors.white, size: 14)
                       : isCurrent
                           ? const SizedBox(
                               width: 12,

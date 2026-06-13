@@ -336,7 +336,7 @@ class _TestimonialCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.format_quote, color: AppColors.gold, size: 18),
+          const Icon(PhosphorIconsRegular.quotes, color: AppColors.gold, size: 18),
           const SizedBox(height: 4),
           Text(quote, style: AppTextStyles.body(context)),
           if (author.isNotEmpty) ...[
@@ -544,7 +544,7 @@ class _BottomCta extends StatelessWidget {
                       .copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
-              const Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+              const Icon(PhosphorIconsRegular.arrowRight, color: Colors.white, size: 16),
             ],
           ),
         ),

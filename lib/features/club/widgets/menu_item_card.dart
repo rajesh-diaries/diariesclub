@@ -6,6 +6,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
 import '../providers/cart_provider.dart';
 import 'quantity_stepper.dart';
@@ -42,7 +43,7 @@ class MenuItemCard extends ConsumerWidget {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: AppColors.lightSurface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
           border: Border.all(color: AppColors.lightBorder),
         ),
         padding: const EdgeInsets.all(12),

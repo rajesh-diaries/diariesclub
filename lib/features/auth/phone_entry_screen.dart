@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -283,7 +284,7 @@ class _PhoneField extends StatelessWidget {
                 hintText: '98765 43210',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 suffixIcon: isValid
-                    ? const Icon(Icons.check_circle, color: AppColors.activeGreen)
+                    ? const Icon(PhosphorIconsFill.checkCircle, color: AppColors.activeGreen)
                     : null,
               ),
               style: AppTextStyles.body(context),
@@ -342,14 +343,18 @@ class _ConsentCheckbox extends StatelessWidget {
                     ),
                     TextSpan(
                       text: 'Privacy Policy',
-                      style: const TextStyle(decoration: TextDecoration.underline),
+                      style: AppTextStyles.caption(context).copyWith(
+                            decoration: TextDecoration.underline,
+                          ),
                       recognizer: TapGestureRecognizer()
                         ..onTap = () => onOpenUrl(privacyUrl),
                     ),
                     const TextSpan(text: ' and '),
                     TextSpan(
                       text: 'Terms',
-                      style: const TextStyle(decoration: TextDecoration.underline),
+                      style: AppTextStyles.caption(context).copyWith(
+                            decoration: TextDecoration.underline,
+                          ),
                       recognizer: TapGestureRecognizer()
                         ..onTap = () => onOpenUrl(termsUrl),
                     ),

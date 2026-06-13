@@ -10,6 +10,7 @@ import '../../../core/providers/active_sessions_provider.dart';
 import '../../../core/providers/server_clock_provider.dart';
 import '../../../core/providers/urgent_home_prompts_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/session_timer.dart';
 import '../../club/widgets/while_you_wait_card.dart';
 import '../../sessions/widgets/extend_session_sheet.dart';
@@ -238,7 +239,7 @@ class _CompactLayout extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.lightSurface,
             border: Border.all(color: AppColors.lightBorder),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(kHomeCardRadius),
           ),
           child: Row(
             children: [

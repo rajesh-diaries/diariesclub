@@ -159,10 +159,12 @@ class WorkshopCard extends ConsumerWidget {
                               ),
                               child: Text(
                                 isFull ? 'Full' : 'Register',
-                                style: const TextStyle(
+                                style: AppTextStyles.caption(
+                                  context,
                                   color: Colors.white,
-                                  fontWeight: FontWeight.w600,
+                                ).copyWith(
                                   fontSize: 14,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),

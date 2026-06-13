@@ -155,7 +155,7 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
       appBar: AppBar(
         title: Text("$childName's session"),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.go('/home'),
         ),
       ),

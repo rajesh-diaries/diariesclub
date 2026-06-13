@@ -90,7 +90,7 @@ class HeroRecapCardWidget extends ConsumerWidget {
                 ),
                 const SizedBox(width: 4),
                 const Icon(
-                  Icons.arrow_forward,
+                  PhosphorIconsRegular.arrowRight,
                   color: AppColors.gold,
                   size: 18,
                 ),

@@ -15,6 +15,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 
 /// "Show this at the desk." Wakelock on, brightness boosted, large QR with
@@ -632,7 +633,7 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(kHomeCardRadius),
                       border: Border.all(
                         color: AppColors.gold,
                         width: 2 + glow * 2,

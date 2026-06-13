@@ -36,7 +36,7 @@ class ReservationStatusScreen extends ConsumerWidget {
         // when this page is the entry point (refresh or push notification
         // deep link).
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           // Don't fall back to /birthday — the discovery screen
           // auto-redirects back to this same status page when the
           // family has an active reservation, so the user appeared

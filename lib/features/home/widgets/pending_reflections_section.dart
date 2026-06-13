@@ -93,19 +93,15 @@ class _ReflectionCard extends StatelessWidget {
                 color: AppColors.navy,
                 borderRadius: BorderRadius.circular(999),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     'Reflect',
-                    style: TextStyle(
-                      color: AppColors.gold,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: AppTextStyles.pillLabel(context, color: AppColors.gold),
                   ),
-                  SizedBox(width: 6),
-                  Icon(
+                  const SizedBox(width: 6),
+                  const Icon(
                     PhosphorIconsFill.sparkle,
                     color: AppColors.gold,
                     size: 14,
@@ -138,11 +134,7 @@ class _Avatar extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         initial,
-        style: const TextStyle(
-          color: AppColors.navy,
-          fontWeight: FontWeight.w800,
-          fontSize: 18,
-        ),
+        style: AppTextStyles.cardTitle(context, color: AppColors.navy),
       ),
     );
   }

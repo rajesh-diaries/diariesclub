@@ -12,6 +12,7 @@ import '../../../core/providers/current_wallet_provider.dart';
 import '../../../core/providers/play_passes_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
 import 'top_up_sheet.dart';
 
@@ -249,13 +250,13 @@ class _PassOptionCard extends StatelessWidget {
 
     return InkWell(
       onTap: busy ? null : onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(kHomeCardRadius),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.lightSurface,
           border: Border.all(color: AppColors.lightBorder),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
         ),
         child: Row(
           children: [

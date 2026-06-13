@@ -289,7 +289,7 @@ class _InquiryBottomSheetState extends ConsumerState<InquiryBottomSheet> {
                 const SizedBox(height: 20),
 
                 if (children.length > 1) ...[
-                  _SectionLabel('Whose birthday'),
+                  const _SectionLabel('Whose birthday'),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -338,7 +338,7 @@ class _InquiryBottomSheetState extends ConsumerState<InquiryBottomSheet> {
                   ),
                 ],
 
-                _SectionLabel('Date of celebration'),
+                const _SectionLabel('Date of celebration'),
                 const SizedBox(height: 8),
                 _RowButton(
                   icon: PhosphorIconsRegular.calendarBlank,
@@ -360,7 +360,7 @@ class _InquiryBottomSheetState extends ConsumerState<InquiryBottomSheet> {
                 ],
                 const SizedBox(height: 20),
 
-                _SectionLabel('Slot'),
+                const _SectionLabel('Slot'),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -379,7 +379,7 @@ class _InquiryBottomSheetState extends ConsumerState<InquiryBottomSheet> {
                 ),
                 const SizedBox(height: 20),
 
-                _SectionLabel('Approximate guest count'),
+                const _SectionLabel('Approximate guest count'),
                 const SizedBox(height: 8),
                 _GuestStepper(
                   count: _guestCount,
@@ -474,7 +474,7 @@ class _ChildChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (selected) ...[
-              const Icon(Icons.check, size: 16, color: Colors.white),
+              const Icon(PhosphorIconsRegular.check, size: 16, color: Colors.white),
               const SizedBox(width: 6),
             ],
             Text(
@@ -592,7 +592,7 @@ class _GuestStepper extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.remove),
+            icon: const Icon(PhosphorIconsRegular.minus),
             onPressed: count > min ? () => onChanged(count - 5) : null,
           ),
           Expanded(
@@ -604,7 +604,7 @@ class _GuestStepper extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(PhosphorIconsRegular.plus),
             onPressed: count < max ? () => onChanged(count + 5) : null,
           ),
         ],

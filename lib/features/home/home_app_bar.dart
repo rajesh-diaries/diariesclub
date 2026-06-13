@@ -115,8 +115,10 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
                       child: Text(
                         unread > 9 ? '9+' : '$unread',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: AppTextStyles.caption(
+                          context,
                           color: AppColors.navy,
+                        ).copyWith(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                         ),

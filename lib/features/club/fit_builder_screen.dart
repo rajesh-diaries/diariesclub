@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -408,7 +409,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Icon(
-                                Icons.local_offer,
+                                PhosphorIconsRegular.tag,
                                 size: 18,
                                 color: AppColors.navy,
                               ),
@@ -455,7 +456,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.play_circle_outline,
+                              const Icon(PhosphorIconsRegular.playCircle,
                                   color: AppColors.navy, size: 18),
                               const SizedBox(width: 8),
                               Expanded(
@@ -528,7 +529,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Icon(
-                              Icons.check_circle,
+                              PhosphorIconsFill.checkCircle,
                               size: 18,
                               color: AppColors.fitGreen,
                             ),
@@ -916,8 +917,8 @@ class _ComboChildTile extends StatelessWidget {
           children: [
             Icon(
               selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
+                  ? PhosphorIconsFill.radioButton
+                  : PhosphorIconsRegular.circle,
               color: selected ? AppColors.navy : AppColors.lightBorder,
             ),
             const SizedBox(width: 12),

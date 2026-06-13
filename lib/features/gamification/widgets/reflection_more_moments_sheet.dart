@@ -120,7 +120,7 @@ class _ReflectionMoreMomentsSheetState
                     ),
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(null),
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(PhosphorIconsRegular.x),
                     ),
                   ],
                 ),
@@ -239,7 +239,7 @@ class _MultiSelectTile extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: selected
-                    ? const Icon(Icons.check, color: Colors.white, size: 14)
+                    ? const Icon(PhosphorIconsRegular.check, color: Colors.white, size: 14)
                     : null,
               ),
               const SizedBox(width: 12),

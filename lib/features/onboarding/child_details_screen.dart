@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers/onboarding_state_provider.dart';
@@ -227,7 +228,7 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
         title: const ProgressDots(currentStep: 3),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () async {
             await ref
                 .read(onboardingStepProvider.notifier)
@@ -274,7 +275,7 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.calendar_today, size: 20),
+                    icon: const Icon(PhosphorIconsRegular.calendarBlank, size: 20),
                     onPressed: _pickDob,
                   ),
                 ),

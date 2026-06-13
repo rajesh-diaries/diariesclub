@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers/current_family_provider.dart';
 import '../../core/providers/onboarding_state_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/hero_avatar.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../core/widgets/progress_dots.dart';
@@ -81,7 +82,7 @@ class _HeroPickScreenState extends ConsumerState<HeroPickScreen> {
         title: const ProgressDots(currentStep: 4),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () async {
             await ref
                 .read(onboardingStepProvider.notifier)
@@ -186,12 +187,12 @@ class _HeroCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 120),
             decoration: BoxDecoration(
               color: hero.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(kHomeCardRadius),
               border: Border.all(
                 color: selected ? hero.color : AppColors.lightBorder,
                 width: selected ? 3 : 1,

@@ -23,7 +23,7 @@ class PastSessionsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Past sessions'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),
@@ -130,7 +130,7 @@ class _Row extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           const Icon(
-            Icons.chevron_right,
+            PhosphorIconsRegular.caretRight,
             size: 18,
             color: AppColors.lightTextSecondary,
           ),

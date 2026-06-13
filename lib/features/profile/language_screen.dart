@@ -17,7 +17,7 @@ class LanguageScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Language'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),

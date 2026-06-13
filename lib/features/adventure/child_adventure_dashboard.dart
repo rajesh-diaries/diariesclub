@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/trait_progress_bar.dart';
 import '../gamification/widgets/stage_history_timeline.dart';
 import 'providers/child_by_id_provider.dart';
@@ -59,14 +61,14 @@ class ChildAdventureDashboard extends ConsumerWidget {
       children: [
         ChildHeader(child: child),
         PendingRecapsBanner(childId: childId),
-        const SizedBox(height: 12),
+        const SizedBox(height: kHomeSectionGap),
         HeroWithinCelebrationCard(childId: childId, childName: childName),
         StatsSummary(childId: childId),
-        const SizedBox(height: 12),
+        const SizedBox(height: kHomeSectionGap),
         StreakTrackerWidget(childId: childId),
-        const SizedBox(height: 12),
+        const SizedBox(height: kHomeSectionGap),
         GrowthThisMonthCard(childId: childId, childName: childName),
-        const SizedBox(height: 12),
+        const SizedBox(height: kHomeSectionGap),
         _HeroProgress(child: child),
         const SizedBox(height: 16),
         KidQuestsCard(childId: childId),
@@ -109,7 +111,7 @@ class _HeroProgress extends StatelessWidget {
               color: AppColors.lightTextSecondary,
             ).copyWith(letterSpacing: 1.0, fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: kHomeSectionGap),
           for (final hero in const ['rafi', 'ellie', 'gerry', 'zena']) ...[
             InkWell(
               onTap: () => context.push('/adventure/trait/$childId/$hero'),
@@ -136,7 +138,7 @@ class _HeroProgress extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     const Icon(
-                      Icons.chevron_right,
+                      PhosphorIconsRegular.caretRight,
                       color: AppColors.lightTextSecondary,
                       size: 22,
                     ),

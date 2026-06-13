@@ -22,7 +22,7 @@ class PastBirthdaysScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Birthday parties'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),

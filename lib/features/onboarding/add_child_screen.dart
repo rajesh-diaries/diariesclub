@@ -69,7 +69,7 @@ class _AddChildScreenState extends ConsumerState<AddChildScreen> {
         title: const ProgressDots(currentStep: 2),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: _isSkipping
               ? null
               : () async {

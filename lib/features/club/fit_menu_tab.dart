@@ -103,7 +103,7 @@ class _SubscriptionBanner extends ConsumerWidget {
                       .copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
-              const Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+              const Icon(PhosphorIconsRegular.arrowRight, color: Colors.white, size: 16),
             ],
           ),
         ),

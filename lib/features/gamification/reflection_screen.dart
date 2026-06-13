@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers/hero_recap_provider.dart';
@@ -207,7 +208,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(
-            icon: const Icon(Icons.close),
+            icon: const Icon(PhosphorIconsRegular.x),
             onPressed: _close,
           ),
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -404,7 +405,7 @@ class _AlreadySavedView extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.check_rounded,
+                PhosphorIconsRegular.check,
                 color: AppColors.navy,
                 size: 56,
               ),

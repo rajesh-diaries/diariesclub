@@ -8,6 +8,7 @@ import '../../core/providers/current_wallet_provider.dart';
 import '../../core/providers/wallet_history_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import 'widgets/transaction_row.dart';
 
@@ -120,7 +121,7 @@ class _WalletHistoryScreenState
       appBar: AppBar(
         title: const Text('Wallet history'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),
@@ -272,7 +273,8 @@ class _BalanceBanner extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
+        boxShadow: [kHomeCardShadow(context)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

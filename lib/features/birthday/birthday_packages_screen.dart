@@ -41,7 +41,7 @@ class BirthdayPackagesScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Birthday packages'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/home'),
         ),
@@ -355,8 +355,8 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
                           const SizedBox(width: 4),
                           Icon(
                             _menuExpanded
-                                ? Icons.keyboard_arrow_up
-                                : Icons.keyboard_arrow_down,
+                                ? PhosphorIconsRegular.caretUp
+                                : PhosphorIconsRegular.caretDown,
                             color: AppColors.navy,
                           ),
                         ],
@@ -374,13 +374,13 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
                       children: [
                         if (menuLines.isNotEmpty) ...[
                           const SizedBox(height: 6),
-                          _SectionEyebrow(text: 'MENU'),
+                          const _SectionEyebrow(text: 'MENU'),
                           const SizedBox(height: 6),
                           _InclusionsGrid(lines: menuLines),
                         ],
                         if (nonFoodOfferings.isNotEmpty) ...[
                           const SizedBox(height: 14),
-                          _SectionEyebrow(text: 'DECOR & EXTRAS'),
+                          const _SectionEyebrow(text: 'DECOR & EXTRAS'),
                           const SizedBox(height: 6),
                           _InclusionsGrid(lines: nonFoodOfferings),
                         ],
@@ -407,12 +407,9 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Inquire',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                      ),
+                      style: AppTextStyles.button(context),
                     ),
                   ),
                 ),
@@ -542,7 +539,7 @@ class _InclusionsGrid extends StatelessWidget {
                     const Padding(
                       padding: EdgeInsets.only(top: 4),
                       child: Icon(
-                        Icons.check,
+                        PhosphorIconsRegular.check,
                         size: 16,
                         color: AppColors.activeGreen,
                       ),
@@ -594,7 +591,7 @@ class _ExperienceBlock extends StatelessWidget {
               child: Row(
                 children: [
                   const Icon(
-                    Icons.check_circle,
+                    PhosphorIconsRegular.checkCircle,
                     size: 16,
                     color: AppColors.navy,
                   ),
@@ -676,9 +673,9 @@ class _FloatingWhatsappCta extends ConsumerWidget {
         );
       },
       icon: const Icon(PhosphorIconsFill.whatsappLogo),
-      label: const Text(
+      label: Text(
         'Talk to our team',
-        style: TextStyle(fontWeight: FontWeight.w700),
+        style: AppTextStyles.button(context),
       ),
     );
   }

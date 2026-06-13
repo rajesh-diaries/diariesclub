@@ -144,17 +144,17 @@ class _WalletSection extends ConsumerWidget {
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                   onTap: () => _topUp(context),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
+                  child: DefaultTextStyle(
+                    style: AppTextStyles.caption(
+                      context,
+                      color: Colors.white,
                     ),
-                    child: Text(
-                      'Top up',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
                       ),
+                      child: Text('Top up'),
                     ),
                   ),
                 ),
@@ -228,14 +228,14 @@ class _PlayPassesSection extends ConsumerWidget {
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: () => _buy(context),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  child: Text(
-                    'Explore',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
+                child: DefaultTextStyle(
+                  style: AppTextStyles.caption(
+                    context,
+                    color: Colors.white,
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    child: Text('Explore'),
                   ),
                 ),
               ),
@@ -279,17 +279,17 @@ class _PlayPassesSection extends ConsumerWidget {
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () => _buy(context),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
+                    child: DefaultTextStyle(
+                      style: AppTextStyles.caption(
+                        context,
+                        color: Colors.white,
                       ),
-                      child: Text(
-                        'Explore',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
                         ),
+                        child: Text('Explore'),
                       ),
                     ),
                   ),
@@ -318,17 +318,17 @@ class _PlayPassesSection extends ConsumerWidget {
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                   onTap: () => _buy(context),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
+                  child: DefaultTextStyle(
+                    style: AppTextStyles.caption(
+                      context,
+                      color: Colors.white,
                     ),
-                    child: Text(
-                      'Buy more',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
                       ),
+                      child: Text('Buy more'),
                     ),
                   ),
                 ),
@@ -354,9 +354,7 @@ class _PassRow extends StatelessWidget {
     final remaining = total - used;
     final expiresAt =
         DateTime.tryParse((pass['expires_at'] as String?) ?? '');
-    final daysLeft = expiresAt == null
-        ? null
-        : expiresAt.difference(DateTime.now()).inDays;
+    final daysLeft = expiresAt?.difference(DateTime.now()).inDays;
 
     return ListTile(
       leading: const Icon(
@@ -594,7 +592,7 @@ class _HeroPerksSection extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "Complete sessions to unlock real-world perks.",
+                      'Complete sessions to unlock real-world perks.',
                       textAlign: TextAlign.center,
                       style: AppTextStyles.caption(
                         context,
@@ -647,9 +645,7 @@ class _PickedPerkRow extends StatelessWidget {
     final childName = (row['child_name'] as String?) ?? '';
     final expiresAt =
         DateTime.tryParse((row['expires_at'] as String?) ?? '');
-    final daysLeft = expiresAt == null
-        ? null
-        : expiresAt.difference(DateTime.now()).inDays;
+    final daysLeft = expiresAt?.difference(DateTime.now()).inDays;
     final traitName = _traitName(trait);
 
     return ListTile(
@@ -690,11 +686,13 @@ class _PickedPerkRow extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     code,
-                    style: const TextStyle(
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.navy,
+                    ).copyWith(
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.5,
-                      color: AppColors.navy,
                     ),
                   ),
                 ],
@@ -718,7 +716,7 @@ class _PickedPerkRow extends StatelessWidget {
         ),
       ),
       trailing: IconButton(
-        icon: const Icon(Icons.copy_outlined),
+        icon: const Icon(PhosphorIconsRegular.copy),
         tooltip: 'Copy code',
         onPressed: () async {
           await Clipboard.setData(ClipboardData(text: code));

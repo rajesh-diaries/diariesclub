@@ -76,7 +76,7 @@ class _ChildRow extends StatelessWidget {
           ? null
           : Text('$age year${age == 1 ? '' : 's'} old'),
       trailing: const Icon(
-        Icons.chevron_right,
+        PhosphorIconsRegular.caretRight,
         color: AppColors.lightTextSecondary,
         size: 22,
       ),

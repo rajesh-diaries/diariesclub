@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/recent_activity_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
 
 /// Last few activity rows from the `home_recent_activity` view, with a
@@ -23,7 +24,7 @@ class RecentActivityList extends ConsumerWidget {
       decoration: BoxDecoration(
         color: AppColors.lightSurface,
         border: Border.all(color: AppColors.lightBorder),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -343,7 +344,7 @@ class _AnimatedHeroBox extends StatelessWidget {
               heroAsset,
               fit: BoxFit.contain,
               errorBuilder: (_, __, ___) => const Icon(
-                Icons.face,
+                PhosphorIconsRegular.smiley,
                 size: 72,
                 color: Colors.white,
               ),
@@ -463,7 +464,7 @@ class _FloatingSparkle extends StatelessWidget {
       left: left,
       right: right,
       child: Icon(
-        Icons.star,
+        PhosphorIconsFill.star,
         color: AppColors.gold.withValues(alpha: 0.80),
         size: 18,
       )

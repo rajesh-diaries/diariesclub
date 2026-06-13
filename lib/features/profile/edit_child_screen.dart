@@ -176,7 +176,7 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
       appBar: AppBar(
         title: const Text('Edit child'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),
@@ -211,7 +211,7 @@ class _EditChildScreenState extends ConsumerState<EditChildScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    suffixIcon: const Icon(Icons.calendar_today, size: 20),
+                    suffixIcon: const Icon(PhosphorIconsRegular.calendarBlank, size: 20),
                   ),
                   child: Text(dobText, style: AppTextStyles.body(context)),
                 ),

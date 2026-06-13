@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/current_wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
 import 'top_up_sheet.dart';
 
@@ -71,7 +72,7 @@ class _Card extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
       ),
       padding: EdgeInsets.all(compact ? 16 : 24),
       child: Column(

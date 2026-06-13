@@ -9,6 +9,7 @@ import '../../../core/providers/current_family_provider.dart';
 import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
 
 /// Promoted "Invite a friend" card at the top of Profile. Pulls credit
@@ -60,21 +61,15 @@ class ReferralCard extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(kHomeCardPadding),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF2A4A8B), AppColors.navy],
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
           ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.gold.withValues(alpha: 0.15),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
+          boxShadow: [kHomeCardShadow(context)],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

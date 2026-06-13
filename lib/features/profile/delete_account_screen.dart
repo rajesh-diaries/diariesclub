@@ -139,7 +139,7 @@ class _DeleteAccountScreenState
       appBar: AppBar(
         title: const Text('Delete account'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),
@@ -299,8 +299,7 @@ class _DeleteAccountScreenState
 
 class _Bullet extends StatelessWidget {
   final String text;
-  final bool muted;
-  const _Bullet({required this.text, this.muted = false});
+  const _Bullet({required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -314,11 +313,9 @@ class _Bullet extends StatelessWidget {
             child: Container(
               width: 6,
               height: 6,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: muted
-                    ? AppColors.lightTextSecondary
-                    : AppColors.adminRed,
+                color: AppColors.adminRed,
               ),
             ),
           ),
@@ -327,9 +324,7 @@ class _Bullet extends StatelessWidget {
               text,
               style: AppTextStyles.body(
                 context,
-                color: muted
-                    ? AppColors.lightTextSecondary
-                    : AppColors.lightTextPrimary,
+                color: AppColors.lightTextPrimary,
               ),
             ),
           ),

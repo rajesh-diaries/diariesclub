@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/providers/onboarding_state_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_theme.dart';
 
 /// The "Brave. Kind. Curious. Creative." welcome manifesto. Shown once
 /// to every new family right after OTP verify, before the family-name
@@ -66,7 +68,7 @@ class _WelcomeManifestoScreenState
               backgroundColor: AppColors.lightBackground,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.close),
+                icon: const Icon(PhosphorIconsRegular.x),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             )
@@ -332,7 +334,7 @@ class _HeroCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 alignment: Alignment.center,
-                child: Text(emoji, style: const TextStyle(fontSize: 28)),
+                child: Text(emoji, style: AppTextStyles.h2(context)),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -524,7 +526,7 @@ class _Stages extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 5),
             child: Row(
               children: [
-                Text(s.$1, style: const TextStyle(fontSize: 22)),
+                Text(s.$1, style: AppTextStyles.h3(context)),
                 const SizedBox(width: 10),
                 Text(
                   s.$2,
@@ -562,7 +564,7 @@ class _RewardsPromise extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.gold.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
         border: Border.all(color: AppColors.gold.withValues(alpha: 0.30)),
       ),
       child: Column(
@@ -682,7 +684,7 @@ class _HeroWithinRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 18)),
+          Text(emoji, style: AppTextStyles.bodyLarge(context)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

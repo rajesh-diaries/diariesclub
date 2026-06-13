@@ -40,7 +40,9 @@ final activeOrdersProvider =
       if (status != 'pending' &&
           status != 'preparing' &&
           status != 'ready' &&
-          status != 'served') continue;
+          status != 'served') {
+        continue;
+      }
       final createdRaw = m['created_at'] as String?;
       final created = createdRaw != null
           ? DateTime.tryParse(createdRaw)?.toUtc()

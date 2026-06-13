@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -46,7 +47,7 @@ class ProfileNavRow extends StatelessWidget {
             const SizedBox(width: 4),
           ],
           const Icon(
-            Icons.chevron_right,
+            PhosphorIconsRegular.caretRight,
             color: AppColors.lightTextSecondary,
             size: 22,
           ),
@@ -90,7 +91,7 @@ class ProfileExternalRow extends StatelessWidget {
           : Icon(leading, color: AppColors.navy),
       title: Text(label, style: AppTextStyles.body(context)),
       trailing: const Icon(
-        Icons.north_east,
+        PhosphorIconsRegular.arrowUpRight,
         color: AppColors.lightTextSecondary,
         size: 18,
       ),
@@ -131,7 +132,7 @@ class ProfileActionRow extends StatelessWidget {
       ),
       trailing: trailing == null
           ? const Icon(
-              Icons.chevron_right,
+              PhosphorIconsRegular.caretRight,
               color: AppColors.lightTextSecondary,
               size: 22,
             )
@@ -147,7 +148,7 @@ class ProfileActionRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 const Icon(
-                  Icons.chevron_right,
+                  PhosphorIconsRegular.caretRight,
                   color: AppColors.lightTextSecondary,
                   size: 22,
                 ),

@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../providers/cart_provider.dart';
 import '../providers/while_you_wait_provider.dart';
 
@@ -39,7 +40,7 @@ class WhileYouWaitCard extends ConsumerWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
         border: Border.all(color: AppColors.lightBorder),
       ),
       child: Column(
@@ -80,7 +81,7 @@ class WhileYouWaitCard extends ConsumerWidget {
                   backgroundColor: AppColors.navy,
                   foregroundColor: Colors.white,
                 ),
-                icon: const Icon(Icons.arrow_forward),
+                icon: const Icon(PhosphorIconsRegular.arrowRight),
                 label: const Text('Browse menu'),
               ),
               const SizedBox(width: 8),

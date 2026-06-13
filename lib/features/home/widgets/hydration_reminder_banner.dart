@@ -4,6 +4,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// Shown on the active session view once the session has been running
 /// for 20+ minutes. The push notification fires server-side via the
@@ -52,7 +53,7 @@ class _HydrationReminderBannerState
       decoration: BoxDecoration(
         color: const Color(0xFFE3F2FD),
         border: Border.all(color: const Color(0xFF64B5F6).withValues(alpha: 0.6)),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
       ),
       child: Row(
         children: [
@@ -93,7 +94,7 @@ class _HydrationReminderBannerState
           ),
           IconButton(
             tooltip: 'Got it',
-            icon: const Icon(Icons.close, size: 20),
+            icon: const Icon(PhosphorIconsRegular.x, size: 20),
             color: AppColors.lightTextSecondary,
             onPressed: () => setState(() => _dismissed = true),
           ),

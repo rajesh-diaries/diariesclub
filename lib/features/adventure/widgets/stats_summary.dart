@@ -4,6 +4,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_theme.dart';
 import '../providers/child_stats_summary_provider.dart';
 
 /// 4-stat grid: completed sessions, total XP, current level, days as a
@@ -21,11 +22,12 @@ class StatsSummary extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(kHomeCardPadding),
         decoration: BoxDecoration(
           color: AppColors.lightSurface,
           border: Border.all(color: AppColors.lightBorder),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
+          boxShadow: [kHomeCardShadow(context)],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

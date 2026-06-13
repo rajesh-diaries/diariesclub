@@ -10,6 +10,7 @@ import '../../core/providers/current_family_provider.dart';
 import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/phone.dart';
 
 /// Help screen with a quick-contact bar at the top, an FAQ accordion, and
@@ -71,7 +72,7 @@ class _HelpScreenState extends ConsumerState<HelpScreen> {
       appBar: AppBar(
         title: const Text('Help'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),
@@ -177,7 +178,7 @@ class _QuickContactBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(kHomeCardPadding),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -187,8 +188,9 @@ class _QuickContactBar extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
         border: Border.all(color: AppColors.lightBorder),
+        boxShadow: [kHomeCardShadow(context)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

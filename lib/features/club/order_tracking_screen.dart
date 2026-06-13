@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../core/widgets/error_screen.dart';
 import 'providers/order_stream_provider.dart';
@@ -30,7 +31,7 @@ class OrderTrackingScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(invoice ?? 'Order #${orderId.substring(0, 6)}'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.go('/club'),
         ),
       ),
@@ -344,7 +345,7 @@ class _Section extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.lightSurface,
         border: Border.all(color: AppColors.lightBorder),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -391,7 +392,7 @@ class _TaxInvoiceHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.lightSurface,
         border: Border.all(color: AppColors.navy.withValues(alpha: 0.30)),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(kHomeCardRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

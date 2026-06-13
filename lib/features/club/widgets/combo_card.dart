@@ -172,7 +172,7 @@ class ComboCard extends ConsumerWidget {
                     onPressed: () => ref
                         .read(cartProvider.notifier)
                         .removeLineById('combo:$id'),
-                    icon: const Icon(Icons.remove_circle_outline),
+                    icon: const Icon(PhosphorIconsRegular.minusCircle),
                     label: const Text('Remove from bag'),
                   )
                 else if (fitTemplateId != null)
@@ -202,7 +202,7 @@ class ComboCard extends ConsumerWidget {
                       backgroundColor: AppColors.navy,
                       foregroundColor: Colors.white,
                     ),
-                    icon: const Icon(Icons.add_shopping_cart),
+                    icon: const Icon(PhosphorIconsRegular.shoppingCart),
                     label: const Text('Add combo to bag'),
                   ),
               ],

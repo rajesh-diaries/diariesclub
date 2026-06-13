@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -158,7 +159,7 @@ class _ExtendSessionSheetState extends ConsumerState<ExtendSessionSheet> {
               Text('Extend session', style: AppTextStyles.h2(context)),
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
+                icon: const Icon(PhosphorIconsRegular.x),
               ),
             ],
           ),
@@ -201,7 +202,13 @@ class _ExtendSessionSheetState extends ConsumerState<ExtendSessionSheet> {
               'Wallet${balance != null ? ' (${Money.fromPaise(balance)})' : ''}',
             ),
             subtitle: balance != null && balance < amountPaise
-                ? const Text('Not enough balance', style: TextStyle(color: AppColors.adminRed))
+                ? Text(
+                    'Not enough balance',
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.adminRed,
+                    ),
+                  )
                 : null,
             onChanged: (v) => setState(() => _paymentMethod = v ?? 'wallet'),
           ),

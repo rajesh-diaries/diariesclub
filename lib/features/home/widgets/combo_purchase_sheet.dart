@@ -1,3 +1,6 @@
+// ignore_for_file: deprecated_member_use
+// ^ RadioListTile.groupValue/onChanged — see extend_session_sheet.dart.
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -425,7 +428,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
             RadioListTile<String>(
               value: 'wallet',
               groupValue: _paymentMethod,
-              title: Text('Wallet'),
+              title: const Text('Wallet'),
               subtitle: _paymentMethod == 'wallet'
                   ? Text(
                       'Balance: ${Money.fromPaise(ref.watch(walletBalancePaiseProvider) ?? 0)}',
@@ -537,8 +540,8 @@ class _ChildRadioTile extends StatelessWidget {
           children: [
             Icon(
               selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
+                  ? PhosphorIconsFill.radioButton
+                  : PhosphorIconsRegular.circle,
               color: selected ? AppColors.navy : AppColors.lightBorder,
             ),
             const SizedBox(width: 12),

@@ -16,7 +16,7 @@ class OrderFoodCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(kHomeCardRadius),
       onTap: () {
         ref.read(pendingClubTabProvider.notifier).state = 0; // Cafe
         context.go('/club');
