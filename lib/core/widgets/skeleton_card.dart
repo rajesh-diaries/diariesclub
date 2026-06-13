@@ -46,8 +46,8 @@ class _SkeletonCardState extends State<SkeletonCard>
           margin: widget.margin ?? const EdgeInsets.only(bottom: kHomeSectionGap),
           decoration: BoxDecoration(
             color: Color.lerp(
-              Theme.of(context).colorScheme.surfaceContainerHighest,
-              Theme.of(context).colorScheme.surface,
+              const Color(0xFFE0E0E0),
+              const Color(0xFFF0F0F0),
               _controller.value,
             ),
             borderRadius: BorderRadius.circular(kHomeCardRadius),
