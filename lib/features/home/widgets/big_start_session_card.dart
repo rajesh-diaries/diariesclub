@@ -20,7 +20,7 @@ class BigStartSessionCard extends StatefulWidget {
 }
 
 class _BigStartSessionCardState extends State<BigStartSessionCard>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _gradientController;
   late final AnimationController _bounceController;
   late final String _hero;
