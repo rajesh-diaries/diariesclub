@@ -35,7 +35,7 @@ class _AnnouncementsFeedState extends ConsumerState<AnnouncementsFeed> {
 
   @override
   Widget build(BuildContext context) {
-    final async = ref.watch(_announcementsStreamProvider);
+    final async = ref.watch(announcementsStreamProvider);
     final rows = async.valueOrNull ?? const [];
     if (rows.isEmpty) return const SizedBox.shrink();
 
@@ -239,7 +239,7 @@ class _AnnouncementBanner extends StatelessWidget {
 /// Realtime stream of active announcements, capped at 5 and ordered by
 /// type priority + recency. Sorting happens client-side because Supabase
 /// `.stream()` does not support arbitrary CASE expressions in order_by.
-final _announcementsStreamProvider =
+final announcementsStreamProvider =
     StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) async* {
   const order = {
     'workshop': 1,

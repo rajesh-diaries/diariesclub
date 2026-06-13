@@ -5,15 +5,22 @@ import 'package:go_router/go_router.dart';
 import '../../core/notifications/fcm_lifecycle_provider.dart';
 import '../../core/notifications/fcm_setup.dart';
 import '../../core/providers/active_sessions_provider.dart';
+import '../../core/providers/current_family_provider.dart';
+import '../../core/providers/current_wallet_provider.dart';
 import '../../core/providers/family_children_provider.dart';
 import '../../core/providers/home_state_provider.dart';
+import '../../core/providers/play_passes_provider.dart';
 import '../../core/providers/recent_activity_provider.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/skeleton_card.dart';
+import '../club/providers/active_orders_provider.dart';
+import '../club/providers/combos_provider.dart';
 import 'home_app_bar.dart';
 import 'views/idle_home_view.dart';
 import 'views/multi_session_home_view.dart';
 import 'views/post_session_home_view.dart';
+import 'widgets/announcements_feed.dart';
 import 'widgets/session_welcome_overlay.dart';
 
 /// Tab 1 — Home. The single source of truth for which sub-view to render
@@ -147,6 +154,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
+  /// Pull-to-refresh: re-fetch every data source shown on Home so the
+  /// customer sees live wallet, passes, orders, sessions, announcements
+  /// and combos without leaving the tab.
+  Future<void> _refreshProviders(WidgetRef ref) async {
+    await Future.wait<void>([
+      ref.read(currentFamilyProvider.future),
+      ref.read(familyChildrenProvider.future),
+      ref.read(playPassesProvider.future),
+      ref.read(currentWalletProvider.future),
+      ref.read(activeOrdersProvider.future),
+      ref.read(activeSessionsProvider.future),
+      ref.read(combosProvider.future),
+      ref.read(announcementsStreamProvider.future),
+      ref.read(homeStateProvider.future),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(homeStateProvider);
@@ -182,17 +206,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         };
       },
       loading: () {
-        return const SkeletonList(itemCount: 4);
+        return const _RefreshableFill(
+          child: SkeletonList(itemCount: 4),
+        );
       },
       error: (e, st) {
         debugPrint('[E-HOME] homeStateProvider error: $e');
         debugPrint('[E-HOME] stack: $st');
-        return FriendlyErrorScreen(
-          code: 'E-HOME',
-          userMessage: "Couldn't load home",
-          technicalDetails: e.toString(),
+        return _RefreshableFill(
+          child: FriendlyErrorScreen(
+            code: 'E-HOME',
+            userMessage: "Couldn't load home",
+            technicalDetails: e.toString(),
+          ),
         );
       },
+    );
+
+    body = RefreshIndicator(
+      color: AppColors.gold,
+      backgroundColor: Colors.white,
+      onRefresh: () async => _refreshProviders(ref),
+      child: body,
     );
 
     // Layer welcome overlay on top when a fresh session is detected.
@@ -215,6 +250,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: const HomeAppBar(),
       body: SafeArea(child: body),
+    );
+  }
+}
+
+/// Wraps a non-scrollable placeholder (skeleton/error) in a scrollable
+/// viewport so [RefreshIndicator] can always be pulled, even while Home
+/// is still loading or in an error state.
+class _RefreshableFill extends StatelessWidget {
+  final Widget child;
+  const _RefreshableFill({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: child,
+        ),
+      ),
     );
   }
 }

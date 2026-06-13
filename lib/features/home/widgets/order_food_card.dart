@@ -6,6 +6,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/haptics.dart';
 import '../../club/providers/pending_club_tab_provider.dart';
 
 /// "Order food" CTA on idle & multi-session home. Warm cream card that
@@ -18,6 +19,7 @@ class OrderFoodCard extends ConsumerWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(kHomeCardRadius),
       onTap: () {
+        AppHaptics.light();
         ref.read(pendingClubTabProvider.notifier).state = 0; // Cafe
         context.go('/club');
       },

@@ -14,6 +14,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../core/utils/haptics.dart';
 import '../../core/utils/venues.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_screen.dart';
@@ -117,6 +118,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   void _applySiblingCoupon() {
     final coupon = _siblingCouponFor(_selectedChildIds.length);
     if (coupon == null) return;
+    AppHaptics.success();
     setState(() {
       _couponDiscountPaise = coupon['discount_paise'] as int;
       _appliedCouponCode = coupon['name'] as String;
@@ -149,6 +151,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       if (!mounted) return;
       if (res['valid'] == true) {
         final returnedCode = (res['code'] as String?) ?? code.toUpperCase();
+        AppHaptics.success();
         setState(() {
           _validatingCoupon = false;
           _couponDiscountPaise = res['discount_paise'] as int? ?? 0;
@@ -156,6 +159,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
           _couponBackendCode = returnedCode;
         });
       } else {
+        AppHaptics.error();
         setState(() {
           _validatingCoupon = false;
           _couponDiscountPaise = null;
@@ -165,6 +169,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+      AppHaptics.error();
       setState(() {
         _validatingCoupon = false;
         _couponDiscountPaise = null;
@@ -231,6 +236,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       final passes = ref.read(remainingPassesCountProvider);
       if (passes < _selectedChildIds.length) {
         if (!mounted) return;
+        AppHaptics.error();
         setState(() {
           _busy = false;
           _errorText = 'Not enough Play Passes for all selected kids.';
@@ -267,6 +273,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       }
 
       if (!mounted) return;
+      AppHaptics.success();
       // Refresh active sessions so Home reflects the new batch on the
       // next frame — without this the multi-session stack appears empty
       // until the stream's next 15s tick.
@@ -314,6 +321,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
           _handlePartialOrFullFailure(createdCount[0], children.length);
           return;
         }
+        AppHaptics.error();
         setState(() {
           _busy = false;
           _errorText =
@@ -323,6 +331,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       }
       if (e.message.contains('play_pass_1hr_only')) {
         if (!mounted) return;
+        AppHaptics.error();
         setState(() {
           _busy = false;
           _errorText = 'Play Passes are for 1-hour visits only. Pick 1 hour or switch payment.';
@@ -335,6 +344,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
           _handlePartialOrFullFailure(createdCount[0], children.length);
           return;
         }
+        AppHaptics.error();
         setState(() {
           _busy = false;
           _errorText = 'Not enough Play Passes. Buy more in Profile.';
@@ -395,6 +405,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       context.go('/home');
       return;
     }
+    AppHaptics.error();
     setState(() {
       _busy = false;
       _errorText = "Couldn't start session. Please try again.";
@@ -519,35 +530,38 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                   favouriteHero:
                                       c['favourite_hero'] as String?,
                                   selected: selected,
-                                  onTap: () => setState(() {
-                                    if (selected) {
-                                      _selectedChildIds.remove(id);
-                                    } else {
-                                      _selectedChildIds.add(id);
-                                    }
-                                    _errorText = null;
-                                    // If Play Pass can no longer cover the
-                                    // selection, fall back to wallet so the
-                                    // user never sees a disabled pass CTA.
-                                    if (_paymentMethod == 'play_pass' &&
-                                        remainingPasses <
-                                            _selectedChildIds.length) {
-                                      _paymentMethod = 'wallet';
-                                    }
-                                    // Clearing a sibling coupon if kid
-                                    // count drops below its threshold keeps
-                                    // the tally honest.
-                                    if (_couponBackendCode != null &&
-                                        _couponBackendCode!
-                                            .startsWith('SIBLING')) {
-                                      final stillValid =
-                                          _siblingCouponFor(
-                                                  _selectedChildIds.length)
-                                              ?['code'] ==
-                                          _couponBackendCode;
-                                      if (!stillValid) _clearCoupon();
-                                    }
-                                  }),
+                                  onTap: () {
+                                    AppHaptics.light();
+                                    setState(() {
+                                      if (selected) {
+                                        _selectedChildIds.remove(id);
+                                      } else {
+                                        _selectedChildIds.add(id);
+                                      }
+                                      _errorText = null;
+                                      // If Play Pass can no longer cover the
+                                      // selection, fall back to wallet so the
+                                      // user never sees a disabled pass CTA.
+                                      if (_paymentMethod == 'play_pass' &&
+                                          remainingPasses <
+                                              _selectedChildIds.length) {
+                                        _paymentMethod = 'wallet';
+                                      }
+                                      // Clearing a sibling coupon if kid
+                                      // count drops below its threshold keeps
+                                      // the tally honest.
+                                      if (_couponBackendCode != null &&
+                                          _couponBackendCode!
+                                              .startsWith('SIBLING')) {
+                                        final stillValid =
+                                            _siblingCouponFor(
+                                                    _selectedChildIds.length)
+                                                ?['code'] ==
+                                            _couponBackendCode;
+                                        if (!stillValid) _clearCoupon();
+                                      }
+                                    });
+                                  },
                                 );
                               },
                             ),
@@ -603,15 +617,18 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                 tagline: 'Quick play',
                                 pricePaise: price1hr,
                                 selected: _selectedDurationMinutes == 60,
-                                onTap: () => setState(() {
-                                  _selectedDurationMinutes = 60;
-                                  _errorText = null;
-                                  if (_paymentMethod == 'play_pass' &&
-                                      remainingPasses <
-                                          _selectedChildIds.length) {
-                                    _paymentMethod = 'wallet';
-                                  }
-                                }),
+                                onTap: () {
+                                  AppHaptics.light();
+                                  setState(() {
+                                    _selectedDurationMinutes = 60;
+                                    _errorText = null;
+                                    if (_paymentMethod == 'play_pass' &&
+                                        remainingPasses <
+                                            _selectedChildIds.length) {
+                                      _paymentMethod = 'wallet';
+                                    }
+                                  });
+                                },
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -621,14 +638,17 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                 tagline: 'Best value',
                                 pricePaise: price2hr,
                                 selected: _selectedDurationMinutes == 120,
-                                onTap: () => setState(() {
-                                  _selectedDurationMinutes = 120;
-                                  _errorText = null;
-                                  // Play Passes are 1-hour only.
-                                  if (_paymentMethod == 'play_pass') {
-                                    _paymentMethod = 'wallet';
-                                  }
-                                }),
+                                onTap: () {
+                                  AppHaptics.light();
+                                  setState(() {
+                                    _selectedDurationMinutes = 120;
+                                    _errorText = null;
+                                    // Play Passes are 1-hour only.
+                                    if (_paymentMethod == 'play_pass') {
+                                      _paymentMethod = 'wallet';
+                                    }
+                                  });
+                                },
                               ),
                             ),
                           ],

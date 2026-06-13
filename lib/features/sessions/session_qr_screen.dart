@@ -16,7 +16,9 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/app_review_helper.dart';
 import '../../core/utils/currency.dart';
+import '../../core/utils/haptics.dart';
 import '../../core/widgets/error_state.dart';
 
 /// "Show this at the desk." Wakelock on, brightness boosted, large QR with
@@ -107,6 +109,7 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
       if (!mounted) return;
       if (row == null) {
         setState(() => _error = 'Session not found.');
+        AppHaptics.error();
         return;
       }
 
@@ -196,6 +199,7 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _error = "Couldn't load session.");
+      AppHaptics.error();
     }
   }
 
@@ -366,12 +370,14 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
       // to it, the RPC returns success — we won't land here. This catch
       // is for unexpected server errors only.
       if (!mounted) return;
+      AppHaptics.error();
       setState(() => _cancelling = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Couldn't cancel: ${e.message}")),
       );
     } catch (e) {
       if (!mounted) return;
+      AppHaptics.error();
       setState(() => _cancelling = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Couldn't cancel: $e")),
@@ -551,6 +557,15 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
     _confetti.play();
+    AppHaptics.success();
+    _maybeRequestReview();
+  }
+
+  Future<void> _maybeRequestReview() async {
+    final isHappyWindow = await AppReviewHelper.recordSuccessfulSession();
+    if (isHappyWindow) {
+      await AppReviewHelper.maybeRequestAfterHappyMoment();
+    }
   }
 
   @override

@@ -3,6 +3,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/haptics.dart';
 
 /// A branded, selectable card that replaces the deprecated
 /// `RadioListTile` pattern for payment and kid-selection flows.
@@ -71,7 +72,10 @@ class SelectableCard<T> extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: enabled && onChanged != null
-              ? () => onChanged!(value)
+              ? () {
+                  AppHaptics.light();
+                  onChanged!(value);
+                }
               : null,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

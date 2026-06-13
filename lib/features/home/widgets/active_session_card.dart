@@ -10,6 +10,7 @@ import '../../../core/providers/family_children_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/haptics.dart';
 
 /// Immersive "Playing now" card pinned at the top of multi-session home.
 /// One card surface holds 1+ live sessions: each kid gets a ring timer
@@ -267,7 +268,10 @@ class _SingleKidBody extends StatelessWidget {
     final glowColor = entry.isUrgent ? AppColors.adminRed : this.glowColor;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => context.push(entry.route()),
+      onTap: () {
+        AppHaptics.light();
+        context.push(entry.route());
+      },
       child: Column(
         children: [
           Center(
@@ -378,7 +382,10 @@ class _MultiKidTile extends StatelessWidget {
     final ringColor = entry.isUrgent ? AppColors.adminRed : entry.heroColor;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => context.push(entry.route()),
+      onTap: () {
+        AppHaptics.light();
+        context.push(entry.route());
+      },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: Column(

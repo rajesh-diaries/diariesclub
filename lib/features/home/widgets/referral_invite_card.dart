@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/utils/haptics.dart';
 
 /// Compact "Refer friends" card for the active-session home view.
 ///
@@ -38,7 +39,10 @@ class ReferralInviteCard extends ConsumerWidget {
         : newFamilyPaise;
     return InkWell(
       borderRadius: BorderRadius.circular(kHomeCardRadius),
-      onTap: () => context.push('/profile/referral-details'),
+      onTap: () {
+        AppHaptics.light();
+        context.push('/profile/referral-details');
+      },
       child: Container(
         padding: const EdgeInsets.all(kHomeCardPadding),
         decoration: BoxDecoration(

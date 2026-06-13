@@ -14,6 +14,7 @@ import '../../../core/providers/current_wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/utils/haptics.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../flavors.dart';
 
@@ -79,6 +80,7 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
   //  Selection
   // ---------------------------------------------------------------------
   void _selectQuick(int amount, int bonus) {
+    AppHaptics.light();
     setState(() {
       _selectedAmountPaise = amount;
       _selectedBonusPaise = bonus;
@@ -421,6 +423,7 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
     if (!mounted || _stage != _SheetStage.processing) return;
     _txTimeout?.cancel();
     _txSub?.cancel();
+    AppHaptics.success();
     setState(() => _stage = _SheetStage.success);
     final total = (_selectedAmountPaise ?? 0) + (_selectedBonusPaise ?? 0);
     Future<void>.delayed(const Duration(milliseconds: 900), () {
@@ -439,6 +442,7 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
     if (!mounted) return;
     _txTimeout?.cancel();
     _txSub?.cancel();
+    AppHaptics.error();
     setState(() {
       _stage = _SheetStage.picking;
       _errorText = message;
@@ -631,7 +635,10 @@ class _PickingBody extends StatelessWidget {
                 amountPaise: o['amount_paise'] ?? 0,
                 selected: selectedAmountPaise == (o['amount_paise'] ?? 0) &&
                     customController.text.isEmpty,
-                onTap: () => onSelectQuick(o['amount_paise'] ?? 0, 0),
+                onTap: () {
+                  AppHaptics.light();
+                  onSelectQuick(o['amount_paise'] ?? 0, 0);
+                },
               ),
           ],
         ),

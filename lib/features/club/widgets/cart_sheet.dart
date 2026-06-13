@@ -11,7 +11,9 @@ import '../../../core/providers/venue_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/utils/haptics.dart';
 import '../../../core/utils/venues.dart';
+import '../../../core/widgets/success_celebration.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/selection_card.dart';
 import '../../sessions/widgets/insufficient_balance_sheet.dart';
@@ -35,6 +37,7 @@ class CartSheet extends ConsumerStatefulWidget {
 class _CartSheetState extends ConsumerState<CartSheet> {
   bool _busy = false;
   String? _errorText;
+  bool _celebrate = false;
 
   Future<void> _placeOrder() async {
     final cart = ref.read(cartProvider);
@@ -100,6 +103,8 @@ class _CartSheetState extends ConsumerState<CartSheet> {
       final orderId = result['order_id'] as String?;
       if (orderId == null) throw StateError('order_place returned no id');
 
+      AppHaptics.success();
+      setState(() => _celebrate = true);
       ref.read(cartProvider.notifier).clear();
       // Wallet just got debited by order_place — invalidate so the next
       // purchase sees the fresh balance instead of the pre-order one.
@@ -108,12 +113,15 @@ class _CartSheetState extends ConsumerState<CartSheet> {
       // shows the new order immediately.
       ref.invalidate(activeOrdersProvider);
       if (!mounted) return;
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      if (!mounted) return;
       Navigator.of(context).pop();
       context.go('/home');
     } on PostgrestException catch (e) {
       debugPrint('[ORDER_PLACE] PostgrestException: code=${e.code} '
           'message=${e.message} details=${e.details} hint=${e.hint}');
       if (!mounted) return;
+      AppHaptics.error();
       setState(() => _busy = false);
       if (e.message.contains('insufficient_balance')) {
         showModalBottomSheet<void>(
@@ -142,6 +150,7 @@ class _CartSheetState extends ConsumerState<CartSheet> {
     } catch (e) {
       debugPrint('[ORDER_PLACE] generic error: $e');
       if (!mounted) return;
+      AppHaptics.error();
       setState(() {
         _busy = false;
         _errorText = "Couldn't place order: $e";
@@ -185,12 +194,14 @@ class _CartSheetState extends ConsumerState<CartSheet> {
     final coins = (coinsBasePaise / 100 * cashbackPct / 100).floor();
     final payment = ref.watch(cartPaymentMethodProvider);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
+    return SuccessCelebration(
+      shouldPlay: _celebrate,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 12),
@@ -290,7 +301,7 @@ class _CartSheetState extends ConsumerState<CartSheet> {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 

@@ -7,6 +7,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/haptics.dart';
 
 /// Prominent "Let's Play!" card on idle home. Uses a four-hero-color
 /// moving gradient, places the hero character inside the card, and keeps
@@ -21,6 +22,7 @@ class BigStartSessionCard extends StatefulWidget {
 class _BigStartSessionCardState extends State<BigStartSessionCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _gradientController;
+  late final AnimationController _bounceController;
   late final String _hero;
 
   @override
@@ -30,6 +32,10 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
       vsync: this,
       duration: const Duration(seconds: 10),
     )..repeat();
+    _bounceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
     // Random hero each time home loads — persisted for this session
     const heroes = ['rafi', 'ellie', 'gerry', 'zena'];
     _hero = heroes[DateTime.now().millisecond % heroes.length];
@@ -38,6 +44,7 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
   @override
   void dispose() {
     _gradientController.dispose();
+    _bounceController.dispose();
     super.dispose();
   }
 
@@ -96,18 +103,36 @@ class _BigStartSessionCardState extends State<BigStartSessionCard>
                     ],
                   ),
                 ),
-                // Hero centred vertically
-                Image.asset(
-                  'assets/hero/$_hero.png',
-                  height: 64,
-                  fit: BoxFit.contain,
+                // Hero centred vertically with a subtle idle bounce.
+                AnimatedBuilder(
+                  animation: _bounceController,
+                  builder: (context, child) {
+                    final t = _bounceController.value;
+                    final offset = math.sin(t * math.pi) * 4.0;
+                    final scale = 1.0 + math.sin(t * math.pi) * 0.04;
+                    return Transform.translate(
+                      offset: Offset(0, -offset),
+                      child: Transform.scale(
+                        scale: scale,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Image.asset(
+                    'assets/hero/$_hero.png',
+                    height: 64,
+                    fit: BoxFit.contain,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 // PLAY button on the right, vertically centred
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () => context.push('/session/start'),
+                    onTap: () {
+                      AppHaptics.light();
+                      context.push('/session/start');
+                    },
                     borderRadius: BorderRadius.circular(999),
                     child: Container(
                       padding: const EdgeInsets.symmetric(

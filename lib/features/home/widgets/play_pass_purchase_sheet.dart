@@ -14,6 +14,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/utils/haptics.dart';
 import 'top_up_sheet.dart';
 
 const _passOptions = <Map<String, dynamic>>[
@@ -98,6 +99,7 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
 
       if (res['success'] != true) {
         final err = res['error'] as String?;
+        AppHaptics.error();
         if (err == 'insufficient_balance') {
           // Race: balance dropped between read and RPC.
           setState(() {
@@ -114,6 +116,7 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
       }
 
       // Success — refresh providers and dismiss.
+      AppHaptics.success();
       ref.invalidate(currentWalletProvider);
       ref.invalidate(playPassesProvider);
       if (!mounted) return;
@@ -129,6 +132,7 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
     } catch (e, st) {
       dev.log('[play_pass_purchase] error', error: e, stackTrace: st);
       if (!mounted) return;
+      AppHaptics.error();
       final msg = e.toString().toLowerCase();
       String display;
       if (msg.contains('play_pass_purchase') &&
@@ -194,7 +198,10 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
               _PassOptionCard(
                 option: opt,
                 busy: _buyingType == opt['type'],
-                onTap: () => _buy(opt),
+                onTap: () {
+                  AppHaptics.light();
+                  _buy(opt);
+                },
               ),
               const SizedBox(height: 12),
             ],

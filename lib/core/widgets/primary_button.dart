@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../utils/haptics.dart';
 
 /// Single primary CTA used across the app. Filled, rounded, navy by default.
 ///
@@ -38,7 +39,12 @@ class PrimaryButton extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: disabled ? null : onPressed,
+        onTap: disabled
+            ? null
+            : () {
+                AppHaptics.light();
+                onPressed!();
+              },
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           child: Row(
