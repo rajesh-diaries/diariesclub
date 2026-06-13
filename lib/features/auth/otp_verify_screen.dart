@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinput/pinput.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -306,11 +307,12 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
               ),
               const SizedBox(height: 16),
 
-              _OtpBoxes(
+              _PinputOtp(
                 controller: _controller,
                 focusNode: _focusNode,
-                onCompleted: _verify,
-                isVerifying: _isVerifying,
+                onCompleted: (_) => _verify(),
+                hasError: _errorText != null,
+                enabled: !_isVerifying,
               ),
 
               if (_errorText != null) ...[
@@ -369,189 +371,65 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
   }
 }
 
-/// Single TextField rendered invisibly behind six visible boxes.
-///
-/// All keyboard input — typing, deleting, iOS Messages autofill, paste —
-/// lands on the one TextField. The boxes are pure decoration that
-/// display the controller's characters with a "next box" indicator.
-/// Single focus means iOS doesn't dismiss/re-present the keyboard
-/// between digits → no flicker.
-class _OtpBoxes extends StatefulWidget {
+class _PinputOtp extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
-  final VoidCallback onCompleted;
-  final bool isVerifying;
+  final ValueChanged<String> onCompleted;
+  final bool hasError;
+  final bool enabled;
 
-  const _OtpBoxes({
+  const _PinputOtp({
     required this.controller,
     required this.focusNode,
     required this.onCompleted,
-    required this.isVerifying,
+    required this.hasError,
+    required this.enabled,
   });
 
   @override
-  State<_OtpBoxes> createState() => _OtpBoxesState();
-}
-
-class _OtpBoxesState extends State<_OtpBoxes> {
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_onTextChanged);
-    widget.focusNode.addListener(_onFocusChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Small delay so Android's IME attaches reliably after
-      // the screen transition animation settles.
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) widget.focusNode.requestFocus();
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_onTextChanged);
-    widget.focusNode.removeListener(_onFocusChanged);
-    super.dispose();
-  }
-
-  void _onTextChanged() {
-    setState(() {});
-    if (widget.controller.text.length == 6 && !widget.isVerifying) {
-      widget.focusNode.unfocus();
-      widget.onCompleted();
-    }
-  }
-
-  void _onFocusChanged() => setState(() {});
-
-  void _requestFocus() {
-    if (widget.isVerifying) return;
-    widget.focusNode.requestFocus();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final text = widget.controller.text;
-    final hasFocus = widget.focusNode.hasFocus;
-
-    return AutofillGroup(
-      child: GestureDetector(
-        onTap: _requestFocus,
-        behavior: HitTestBehavior.opaque,
-        child: Stack(
-          children: [
-            // Invisible-but-functional TextField. SizedBox.shrink keeps it
-            // out of the layout flow but still lets the framework attach
-            // the platform keyboard.
-            SizedBox(
-              height: 56,
-              child: Opacity(
-                opacity: 0,
-                child: TextField(
-                  controller: widget.controller,
-                  focusNode: widget.focusNode,
-                  autofocus: true,
-                  enabled: !widget.isVerifying,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLength: 6,
-                  autofillHints: const [AutofillHints.oneTimeCode],
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(6),
-                  ],
-                  decoration: const InputDecoration(counterText: ''),
-                ),
-              ),
-            ),
-            // Visible cells — pure presentation.
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(6, (i) {
-                final hasChar = i < text.length;
-                final isNext = i == text.length && hasFocus;
-                return _OtpCell(
-                  character: hasChar ? text[i] : null,
-                  active: isNext,
-                );
-              }),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _OtpCell extends StatelessWidget {
-  final String? character;
-  final bool active;
-  const _OtpCell({required this.character, required this.active});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
+    final defaultPinTheme = PinTheme(
       width: 48,
       height: 56,
-      alignment: Alignment.center,
+      textStyle: AppTextStyles.h2(context, color: AppColors.navy),
       decoration: BoxDecoration(
         color: AppColors.lightSurface,
-        border: Border.all(
-          color: active ? AppColors.navy : AppColors.lightBorder,
-          width: active ? 2 : 1,
-        ),
+        border: Border.all(color: AppColors.lightBorder),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: character != null
-          ? Text(
-              character!,
-              style: AppTextStyles.h2(context),
-            )
-          : active
-              ? const _BlinkingCursor()
-              : null,
     );
-  }
-}
 
-/// Lightweight blinking caret for the "next box". A 600ms toggle keeps it
-/// feeling alive without burning frames.
-class _BlinkingCursor extends StatefulWidget {
-  const _BlinkingCursor();
-
-  @override
-  State<_BlinkingCursor> createState() => _BlinkingCursorState();
-}
-
-class _BlinkingCursorState extends State<_BlinkingCursor> {
-  Timer? _timer;
-  bool _on = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(milliseconds: 600), (_) {
-      if (mounted) setState(() => _on = !_on);
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      opacity: _on ? 1.0 : 0.0,
-      duration: const Duration(milliseconds: 150),
-      child: Container(
-        width: 2,
-        height: 28,
-        color: AppColors.navy,
+    return Pinput(
+      controller: controller,
+      focusNode: focusNode,
+      length: 6,
+      enabled: enabled,
+      keyboardType: TextInputType.number,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(6),
+      ],
+      autofillHints: const [AutofillHints.oneTimeCode],
+      autofocus: true,
+      forceErrorState: hasError,
+      errorPinTheme: defaultPinTheme.copyWith(
+        decoration: defaultPinTheme.decoration!.copyWith(
+          border: Border.all(color: AppColors.adminRed, width: 2),
+        ),
       ),
+      focusedPinTheme: defaultPinTheme.copyWith(
+        decoration: defaultPinTheme.decoration!.copyWith(
+          border: Border.all(color: AppColors.navy, width: 2),
+        ),
+      ),
+      submittedPinTheme: defaultPinTheme.copyWith(
+        decoration: defaultPinTheme.decoration!.copyWith(
+          border: Border.all(color: AppColors.gold, width: 2),
+        ),
+      ),
+      defaultPinTheme: defaultPinTheme,
+      hapticFeedbackType: HapticFeedbackType.lightImpact,
+      onCompleted: onCompleted,
     );
   }
 }

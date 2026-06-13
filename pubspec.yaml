@@ -81,6 +81,7 @@ dependencies:
   screen_brightness: ^2.1.7
   flutter_animate: ^4.5.2
   confetti: ^0.8.0
+  pinput: ^5.0.0
 
 dev_dependencies:
   flutter_test:
