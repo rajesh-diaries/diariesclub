@@ -1,4 +1,3 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -6,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../utils/admin_image_picker.dart';
 import '../widgets/admin_buttons.dart';
 import '../widgets/admin_list_scaffold.dart';
 
@@ -430,37 +430,21 @@ class _HeroCardEditorState extends State<_HeroCardEditor> {
 
   Future<void> _pickAndUpload() async {
     if (_uploading) return;
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp'],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null) {
-      setState(() => _error = "Couldn't read that file.");
-      return;
-    }
     setState(() {
       _uploading = true;
       _error = null;
     });
     try {
-      final ext = (file.extension ?? 'png').toLowerCase();
-      final contentType = switch (ext) {
-        'png' => 'image/png',
-        'jpg' || 'jpeg' => 'image/jpeg',
-        'webp' => 'image/webp',
-        _ => 'application/octet-stream',
-      };
+      final compressed = await pickAndCompressImage(maxDimension: 1200);
+      if (compressed == null || !mounted) return;
+
       // Path scoped by hero + timestamp so renames don't collide.
       final ts = DateTime.now().millisecondsSinceEpoch;
-      final path = '$_hero/${ts}_${file.name}';
+      final path = '$_hero/${ts}_$ts.jpg';
       await Supabase.instance.client.storage.from(_bucket).uploadBinary(
             path,
-            bytes,
-            fileOptions: FileOptions(contentType: contentType),
+            compressed,
+            fileOptions: const FileOptions(contentType: 'image/jpeg'),
           );
       final publicUrl =
           Supabase.instance.client.storage.from(_bucket).getPublicUrl(path);

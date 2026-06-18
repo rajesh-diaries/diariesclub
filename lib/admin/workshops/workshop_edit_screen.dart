@@ -1,8 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -10,8 +11,10 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../utils/admin_image_picker.dart';
 import '../widgets/admin_app_bar.dart';
 import '../widgets/admin_buttons.dart';
+import 'workshops_list_screen.dart' show workshopsListProvider;
 
 const _kondapurVenueId = '00000000-0000-0000-0000-000000000001';
 
@@ -54,6 +57,7 @@ class _WorkshopEditScreenState extends ConsumerState<WorkshopEditScreen> {
   String? _existingPhotoUrl;
   bool _busy = false;
   bool _loading = true;
+  bool _photoLoading = false;
   String? _errorText;
 
   bool get _isEditing => widget.workshopId != null;
@@ -126,40 +130,31 @@ class _WorkshopEditScreenState extends ConsumerState<WorkshopEditScreen> {
   }
 
   Future<void> _pickPhoto() async {
+    if (_busy || _photoLoading) return;
+    setState(() {
+      _photoLoading = true;
+      _errorText = null;
+    });
     try {
-      final picked = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1600,
-        maxHeight: 1600,
-      );
-      if (picked == null) return;
-      final raw = await picked.readAsBytes();
+      final compressed = await pickAndCompressImage(maxDimension: 1200);
+      if (compressed == null || !mounted) return;
+      setState(() => _photoBytes = compressed);
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _photoBytes = raw);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _errorText = "Couldn't load that image.");
+      setState(() => _errorText = "Couldn't load image: $e");
+    } finally {
+      if (mounted) setState(() => _photoLoading = false);
     }
   }
 
   Future<String?> _uploadPhotoIfNew() async {
     if (_photoBytes == null) return _existingPhotoUrl;
-    final fileName = '${const Uuid().v4()}.jpg';
-    final path = 'workshops/$fileName';
-    await Supabase.instance.client.storage
-        .from('workshop-photos')
-        .uploadBinary(
-          path,
-          _photoBytes!,
-          fileOptions: const FileOptions(
-            contentType: 'image/jpeg',
-            upsert: false,
-          ),
-        );
-    final pub = Supabase.instance.client.storage
-        .from('workshop-photos')
-        .getPublicUrl(path);
-    return pub;
+    return uploadImageBytes(
+      bytes: _photoBytes!,
+      bucket: 'workshop-photos',
+      folder: 'workshops',
+      timeoutSeconds: 30,
+    );
   }
 
   String? _validate() {
@@ -223,6 +218,7 @@ class _WorkshopEditScreenState extends ConsumerState<WorkshopEditScreen> {
         );
       }
       if (!mounted) return;
+      ref.invalidate(workshopsListProvider);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -231,6 +227,13 @@ class _WorkshopEditScreenState extends ConsumerState<WorkshopEditScreen> {
         ),
       );
       context.go('/admin/workshops');
+    } on TimeoutException catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _errorText =
+            'Photo upload timed out. Please check your network and try again.';
+      });
     } on PostgrestException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -493,7 +496,7 @@ class _WorkshopEditScreenState extends ConsumerState<WorkshopEditScreen> {
     final hasNew = _photoBytes != null;
     final hasExisting = _existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty;
     return InkWell(
-      onTap: _busy ? null : _pickPhoto,
+      onTap: (_busy || _photoLoading) ? null : _pickPhoto,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         height: 200,
@@ -513,47 +516,49 @@ class _WorkshopEditScreenState extends ConsumerState<WorkshopEditScreen> {
                     )
                   : null,
         ),
-        child: hasNew || hasExisting
-            ? Align(
-                alignment: Alignment.bottomRight,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      hasNew ? 'New photo' : 'Tap to change',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ),
-              )
-            : Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      PhosphorIconsRegular.image,
-                      size: 36,
-                      color: AppColors.lightTextSecondary,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Tap to add cover photo',
-                      style: AppTextStyles.caption(
-                        context,
-                        color: AppColors.lightTextSecondary,
+        child: _photoLoading
+            ? const Center(child: CircularProgressIndicator())
+            : hasNew || hasExisting
+                ? Align(
+                    alignment: Alignment.bottomRight,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          hasNew ? 'New photo' : 'Tap to change',
+                          style: const TextStyle(color: Colors.white),
+                        ),
                       ),
                     ),
-                  ],
-                ),
-              ),
+                  )
+                : Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          PhosphorIconsRegular.image,
+                          size: 36,
+                          color: AppColors.lightTextSecondary,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Tap to add cover photo',
+                          style: AppTextStyles.caption(
+                            context,
+                            color: AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
       ),
     );
   }

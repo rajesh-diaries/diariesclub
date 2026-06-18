@@ -415,6 +415,7 @@ Future<void> _showOptionDialog(
   final orderCtrl = TextEditingController(
     text: (existing?['display_order'] as int?)?.toString() ?? '0',
   );
+  String? dietaryType = existing?['dietary_type'] as String?;
 
   final ok = await showDialog<bool>(
     context: context,
@@ -454,6 +455,22 @@ Future<void> _showOptionDialog(
                 border: OutlineInputBorder(),
               ),
             ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String?>(
+              value: dietaryType,
+              decoration: const InputDecoration(
+                labelText: 'Dietary type (optional)',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: null, child: Text('— Not set —')),
+                DropdownMenuItem(value: 'veg', child: Text('Veg')),
+                DropdownMenuItem(value: 'non_veg', child: Text('Non-Veg')),
+                DropdownMenuItem(value: 'egg', child: Text('Egg')),
+                DropdownMenuItem(value: 'customizable', child: Text('Customizable')),
+              ],
+              onChanged: (v) => dietaryType = v,
+            ),
           ],
         ),
       ),
@@ -483,6 +500,7 @@ Future<void> _showOptionDialog(
           'p_name': nameCtrl.text.trim(),
           'p_upcharge_paise': (int.tryParse(upchargeCtrl.text.trim()) ?? 0) * 100,
           'p_display_order': int.tryParse(orderCtrl.text.trim()) ?? 0,
+          'p_dietary_type': dietaryType,
         },
       );
     } else {
@@ -495,6 +513,7 @@ Future<void> _showOptionDialog(
           'p_is_available': null,
           'p_is_published': null,
           'p_display_order': int.tryParse(orderCtrl.text.trim()) ?? 0,
+          'p_dietary_type': dietaryType,
         },
       );
     }

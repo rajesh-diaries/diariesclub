@@ -14,10 +14,73 @@ import '../../core/utils/currency.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/skeleton_card.dart';
 import 'providers/birthday_packages_provider.dart';
-import 'providers/birthday_stats_provider.dart';
 import 'providers/saved_packages_provider.dart';
 import 'widgets/inquiry_bottom_sheet.dart';
 import 'widgets/whatsapp_helpers.dart';
+
+Color? _parseHexColor(String hex) {
+  final buffer = StringBuffer();
+  if (hex.length == 4) {
+    final r = hex[1];
+    final g = hex[2];
+    final b = hex[3];
+    buffer.write('FF$r$r$g$g$b$b');
+  } else if (hex.length == 7) {
+    buffer.write('FF${hex.substring(1)}');
+  } else if (hex.length == 9) {
+    buffer.write(hex.substring(1));
+  } else {
+    return null;
+  }
+  final value = int.tryParse(buffer.toString(), radix: 16);
+  if (value == null) return null;
+  return Color(value);
+}
+
+Color _staticAccentColor(String name) => switch (name) {
+      'Happy Tales' => AppColors.rafiCoral,
+      'Grand' => AppColors.navy,
+      'Magical' => AppColors.gold,
+      _ => AppColors.fitGreen,
+    };
+
+String? _staticBadgeText(String name) => switch (name) {
+      'Happy Tales' => 'Most Booked',
+      'Grand' => 'Big celebration',
+      'Magical' => 'Premium',
+      _ => null,
+    };
+
+String? _staticTagline(String name) => switch (name) {
+      'Little Joy' => 'Perfect for intimate celebrations',
+      'Happy Tales' => 'Our most loved package',
+      'Grand' => 'Grand scale, seamless fun',
+      'Magical' => 'The full enchanted experience',
+      _ => null,
+    };
+
+Color _resolveAccentColor(Map<String, dynamic> package, String name) {
+  final hex = (package['accent_color_hex'] as String?)?.trim();
+  if (hex != null && hex.isNotEmpty) {
+    final parsed = _parseHexColor(hex);
+    if (parsed != null) return parsed;
+  }
+  return _staticAccentColor(name);
+}
+
+String? _resolveBadgeText(Map<String, dynamic> package) {
+  final text = (package['badge_text'] as String?)?.trim();
+  if (text != null && text.isNotEmpty) return text;
+  final name = (package['name'] as String?) ?? '';
+  return _staticBadgeText(name);
+}
+
+String? _resolveTagline(Map<String, dynamic> package) {
+  final text = (package['tagline'] as String?)?.trim();
+  if (text != null && text.isNotEmpty) return text;
+  final name = (package['name'] as String?) ?? '';
+  return _staticTagline(name);
+}
 
 /// Birthday packages screen — the conversion surface.
 ///
@@ -33,7 +96,6 @@ class BirthdayPackagesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final pkgsAsync = ref.watch(birthdayPackagesProvider);
     final venueCfg = ref.watch(venueConfigProvider).valueOrNull;
-    final completed = ref.watch(completedBirthdayCountProvider).valueOrNull;
 
     final teamPhone =
         (venueCfg?['birthday_whatsapp_phone'] as String?)?.trim();
@@ -47,100 +109,52 @@ class BirthdayPackagesScreen extends ConsumerWidget {
               context.canPop() ? context.pop() : context.go('/home'),
         ),
       ),
+      bottomNavigationBar: (teamPhone != null && teamPhone.isNotEmpty)
+          ? _TalkToTeamBar(teamPhone: teamPhone)
+          : null,
       body: SafeArea(
-        child: Stack(
-          children: [
-            pkgsAsync.when(
-              loading: () => const SingleChildScrollView(
-                padding: EdgeInsets.all(16),
-                child: SkeletonList(),
-              ),
-              error: (e, _) => FriendlyErrorScreen(
-                code: 'E-PKGS',
-                userMessage: "Couldn't load packages",
-                technicalDetails: e.toString(),
-              ),
-              data: (packages) => RefreshIndicator(
-                onRefresh: () async {
-                  ref.invalidate(birthdayPackagesProvider);
-                  ref.invalidate(completedBirthdayCountProvider);
-                  ref.invalidate(savedBirthdayPackageIdsProvider);
-                },
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 120),
-                  children: [
-                    if (completed != null && completed > 0)
-                      _HostedCounter(count: completed),
-                    _TopBrochureRow(
-                      brochureUrl:
-                          (venueCfg?['birthday_brochure_url'] as String?)
-                              ?.trim(),
-                      teamPhone: teamPhone,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                      child: Text(
-                        'All packages include hall, play and food.',
-                        style: AppTextStyles.body(
-                          context,
-                          color: AppColors.lightTextSecondary,
-                        ),
-                      ),
-                    ),
-                    for (final p in packages) _PackageCard(package: p),
-                    const SizedBox(height: 16),
-                    _GrandHallNote(),
-                    const SizedBox(height: 24),
-                  ],
+        child: pkgsAsync.when(
+          loading: () => const SingleChildScrollView(
+            padding: EdgeInsets.all(16),
+            child: SkeletonList(),
+          ),
+          error: (e, _) => FriendlyErrorScreen(
+            code: 'E-PKGS',
+            userMessage: "Couldn't load packages",
+            technicalDetails: e.toString(),
+          ),
+          data: (packages) => RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(birthdayPackagesProvider);
+              ref.invalidate(savedBirthdayPackageIdsProvider);
+            },
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
+              children: [
+                _TopBrochureRow(
+                  brochureUrl:
+                      (venueCfg?['birthday_brochure_url'] as String?)
+                          ?.trim(),
+                  teamPhone: teamPhone,
                 ),
-              ),
-            ),
-            if (teamPhone != null && teamPhone.isNotEmpty)
-              Positioned(
-                right: 16,
-                bottom: 20,
-                child: _FloatingWhatsappCta(teamPhone: teamPhone),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Social-proof banner — "Hosted 247 parties so far" — at the top of
-/// the screen. Pulled live from completed birthday_reservations count.
-class _HostedCounter extends StatelessWidget {
-  final int count;
-  const _HostedCounter({required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.gold.withValues(alpha: 0.20),
-            AppColors.rafiCoral.withValues(alpha: 0.12),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          const Icon(PhosphorIconsFill.confetti, color: AppColors.navy),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Hosted $count happy birthdays so far ✨',
-              style: AppTextStyles.bodyLarge(context),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: Text(
+                    'All packages include hall, play and food.',
+                    style: AppTextStyles.body(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    ),
+                  ),
+                ),
+                for (final p in packages) _PackageCard(package: p),
+                const SizedBox(height: 16),
+                _GrandHallNote(),
+                const SizedBox(height: 24),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -197,8 +211,6 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
     final p = widget.package;
     final id = p['id'] as String;
     final name = (p['name'] as String?) ?? '';
-    final description = (p['description'] as String?) ?? '';
-    final tier = p['tier'] as String?;
     final cover = p['cover_image_url'] as String?;
     final priceVeg = (p['price_per_pax_veg_paise'] as int?) ?? 0;
     final priceNonVeg = (p['price_per_pax_non_veg_paise'] as int?) ?? 0;
@@ -208,23 +220,22 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
     // Per-package pdf_url retired; brochure is now a single venue-level
     // PDF rendered at the top of the screen via _TopBrochureRow.
 
-    final menuLines = ((p['inclusions'] as List?) ?? const [])
-        .whereType<String>()
-        .toList();
-    final experienceLines =
-        ((p['experience_inclusions'] as List?) ?? const [])
-            .whereType<String>()
-            .toList();
-    final nonFoodOfferings =
-        ((p['non_food_offerings'] as List?) ?? const [])
-            .whereType<String>()
-            .toList();
+    final inclusions = [
+      ...((p['inclusions'] as List?) ?? const []).whereType<String>(),
+      ...((p['experience_inclusions'] as List?) ?? const [])
+          .whereType<String>(),
+      ...((p['non_food_offerings'] as List?) ?? const [])
+          .whereType<String>(),
+    ];
 
-    final badge = tier == 'magical'
-        ? const _Badge(text: 'Premium', color: AppColors.navy)
-        : tier == 'happy_tales'
-            ? const _Badge(text: 'Most Booked', color: AppColors.gold)
-            : null;
+    final accentColor = _resolveAccentColor(p, name);
+    final badgeText = _resolveBadgeText(p);
+    final tagline = _resolveTagline(p);
+    final badge = badgeText != null
+        ? _Badge(text: badgeText, color: accentColor)
+        : null;
+    final topInclusions = inclusions.take(3).toList();
+    final remainingInclusions = inclusions.skip(3).toList();
 
     final savedIds =
         ref.watch(savedBirthdayPackageIdsProvider).valueOrNull ??
@@ -249,50 +260,70 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Hero photo — the visual lead.
-          Stack(
-            children: [
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: cover == null || cover.isEmpty
-                    ? Container(
-                        color: AppColors.gold.withValues(alpha: 0.30),
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          PhosphorIconsFill.cake,
-                          color: AppColors.gold,
-                          size: 56,
-                        ),
-                      )
-                    : CachedNetworkImage(
-                        imageUrl: cover,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => Container(
-                          color: AppColors.gold.withValues(alpha: 0.30),
-                        ),
-                      ),
-              ),
-              if (badge != null)
-                Positioned(top: 12, left: 12, child: badge),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: _HeartButton(
-                  saved: isSaved,
-                  onTap: _toggleSave,
-                ),
-              ),
-            ],
+          // Tier accent bar.
+          Container(
+            height: 6,
+            color: accentColor,
           ),
+
+          // Hero photo — only when an actual cover is uploaded.
+          if (cover != null && cover.isNotEmpty)
+            Stack(
+              children: [
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: _HeroImage(coverUrl: cover),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: _HeartButton(
+                    saved: isSaved,
+                    onTap: _toggleSave,
+                  ),
+                ),
+              ],
+            ),
 
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: AppTextStyles.h2(context)),
+                if (badge != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: badge,
+                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name, style: AppTextStyles.h2(context)),
+                          if (tagline != null && tagline.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              tagline,
+                              style: AppTextStyles.body(
+                                context,
+                                color: accentColor,
+                              ).copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    _HeartButton(
+                      saved: isSaved,
+                      onTap: _toggleSave,
+                    ),
+                  ],
+                ),
                 if (hallName.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Text(
                     '$hallName · $minGuests–$maxGuests guests',
                     style: AppTextStyles.caption(
@@ -301,15 +332,23 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
 
-                // Price row — clearer than "per pax".
+                // Price row.
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
+                  spacing: 10,
+                  runSpacing: 8,
                   children: [
-                    _PriceChip(label: 'Veg', pricePaise: priceVeg),
-                    _PriceChip(label: 'Non-Veg', pricePaise: priceNonVeg),
+                    _PriceChip(
+                      label: 'Veg',
+                      pricePaise: priceVeg,
+                      color: accentColor,
+                    ),
+                    _PriceChip(
+                      label: 'Non-Veg',
+                      pricePaise: priceNonVeg,
+                      color: accentColor,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -321,26 +360,16 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
                   ),
                 ),
 
-                // Experience first — the headline benefit.
-                if (experienceLines.isNotEmpty) ...[
+                // Top inclusions — always visible so the card has value even
+                // when collapsed.
+                if (topInclusions.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  _ExperienceBlock(lines: experienceLines),
+                  _InclusionsGrid(lines: topInclusions, iconColor: accentColor),
                 ],
 
-                if (description.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  Text(
-                    description,
-                    style: AppTextStyles.body(
-                      context,
-                      color: AppColors.lightTextSecondary,
-                    ),
-                  ),
-                ],
-
-                // Menu — collapsed by default. Expander keeps cards short.
-                if (menuLines.isNotEmpty || nonFoodOfferings.isNotEmpty) ...[
-                  const SizedBox(height: 16),
+                // Remaining inclusions — collapsed by default.
+                if (remainingInclusions.isNotEmpty) ...[
+                  const SizedBox(height: 6),
                   InkWell(
                     onTap: () =>
                         setState(() => _menuExpanded = !_menuExpanded),
@@ -351,8 +380,8 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
                         children: [
                           Text(
                             _menuExpanded
-                                ? 'Hide menu & extras'
-                                : 'See menu & extras',
+                                ? 'Show less'
+                                : 'Show all inclusions',
                             style: AppTextStyles.bodyLarge(context)
                                 .copyWith(color: AppColors.navy),
                           ),
@@ -376,18 +405,11 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
                     secondChild: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (menuLines.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          const _SectionEyebrow(text: 'MENU'),
-                          const SizedBox(height: 6),
-                          _InclusionsGrid(lines: menuLines),
-                        ],
-                        if (nonFoodOfferings.isNotEmpty) ...[
-                          const SizedBox(height: 14),
-                          const _SectionEyebrow(text: 'DECOR & EXTRAS'),
-                          const SizedBox(height: 6),
-                          _InclusionsGrid(lines: nonFoodOfferings),
-                        ],
+                        const SizedBox(height: 6),
+                        _InclusionsGrid(
+                          lines: remainingInclusions,
+                          iconColor: accentColor,
+                        ),
                       ],
                     ),
                   ),
@@ -395,10 +417,7 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
 
                 const SizedBox(height: 18),
 
-                // Inquire CTA — opens the bottom sheet, no new screen.
-                // Brochure (PDF) + Send to WhatsApp moved to a screen-level
-                // row at the top of BirthdayPackagesScreen — the PDF is a
-                // single venue-wide brochure now, not per-package.
+                // Inquire CTA.
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -429,21 +448,27 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
 class _PriceChip extends StatelessWidget {
   final String label;
   final int pricePaise;
-  const _PriceChip({required this.label, required this.pricePaise});
+  final Color color;
+  const _PriceChip({
+    required this.label,
+    required this.pricePaise,
+    this.color = AppColors.gold,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.gold.withValues(alpha: 0.18),
+        color: color.withValues(alpha: 0.12),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
         borderRadius: BorderRadius.circular(100),
       ),
       child: Text(
         '$label ${Money.fromPaise(pricePaise)}',
         style: AppTextStyles.body(context).copyWith(
           fontWeight: FontWeight.w800,
-          color: AppColors.navy,
+          color: color,
         ),
       ),
     );
@@ -505,24 +530,65 @@ class _HeartButton extends StatelessWidget {
   }
 }
 
-class _SectionEyebrow extends StatelessWidget {
-  final String text;
-  const _SectionEyebrow({required this.text});
+class _HeroImage extends StatelessWidget {
+  final String? coverUrl;
+  const _HeroImage({required this.coverUrl});
+
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: AppTextStyles.caption(
-        context,
-        color: AppColors.lightTextSecondary,
-      ).copyWith(letterSpacing: 0.8, fontWeight: FontWeight.w800),
+    final hasUrl = coverUrl != null && coverUrl!.isNotEmpty;
+
+    Widget buildPlaceholder(BuildContext _) => Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.gold.withValues(alpha: 0.25),
+                AppColors.rafiCoral.withValues(alpha: 0.15),
+              ],
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                PhosphorIconsFill.cake,
+                color: AppColors.navy.withValues(alpha: 0.35),
+                size: 48,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Birthday package',
+                style: AppTextStyles.caption(
+                  context,
+                  color: AppColors.navy.withValues(alpha: 0.45),
+                ).copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.6),
+              ),
+            ],
+          ),
+        );
+
+    if (!hasUrl) return buildPlaceholder(context);
+
+    return CachedNetworkImage(
+      imageUrl: coverUrl!,
+      fit: BoxFit.cover,
+      fadeInDuration: const Duration(milliseconds: 250),
+      placeholder: (ctx, _) => buildPlaceholder(ctx),
+      errorWidget: (_, __, ___) => buildPlaceholder(context),
     );
   }
 }
 
 class _InclusionsGrid extends StatelessWidget {
   final List<String> lines;
-  const _InclusionsGrid({required this.lines});
+  final Color iconColor;
+  const _InclusionsGrid({
+    required this.lines,
+    this.iconColor = AppColors.activeGreen,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -540,12 +606,12 @@ class _InclusionsGrid extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
                       child: Icon(
                         PhosphorIconsRegular.check,
                         size: 16,
-                        color: AppColors.activeGreen,
+                        color: iconColor,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -561,53 +627,6 @@ class _InclusionsGrid extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _ExperienceBlock extends StatelessWidget {
-  final List<String> lines;
-  const _ExperienceBlock({required this.lines});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.navy.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.navy.withValues(alpha: 0.12)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'EXPERIENCE',
-            style: AppTextStyles.caption(
-              context,
-              color: AppColors.lightTextSecondary,
-            ).copyWith(letterSpacing: 0.8, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 6),
-          for (final line in lines)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: [
-                  const Icon(
-                    PhosphorIconsRegular.checkCircle,
-                    size: 16,
-                    color: AppColors.navy,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(line, style: AppTextStyles.body(context)),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -653,33 +672,53 @@ class _GrandHallNote extends StatelessWidget {
   }
 }
 
-class _FloatingWhatsappCta extends ConsumerWidget {
+/// Sticky bottom bar that opens WhatsApp with the team. Replaces the old
+/// floating button: it never overlaps scrollable content because it lives
+/// in the scaffold's bottom slot.
+class _TalkToTeamBar extends ConsumerWidget {
   final String teamPhone;
-  const _FloatingWhatsappCta({required this.teamPhone});
+  const _TalkToTeamBar({required this.teamPhone});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return FloatingActionButton.extended(
-      backgroundColor: AppColors.activeGreen,
-      foregroundColor: Colors.white,
-      onPressed: () async {
-        final family = ref.read(currentFamilyProvider).valueOrNull;
-        final parentName = (family?['name'] as String?)?.trim();
-        final children =
-            ref.read(familyChildrenProvider).valueOrNull ?? const [];
-        final childName = children.isEmpty
-            ? null
-            : (children.first['name'] as String?)?.trim();
-        await openTalkToTeamWhatsapp(
-          teamPhone: teamPhone,
-          childName: childName,
-          parentName: parentName,
-        );
-      },
-      icon: const Icon(PhosphorIconsFill.whatsappLogo),
-      label: Text(
-        'Talk to our team',
-        style: AppTextStyles.button(context),
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: AppColors.lightBorder),
+          ),
+        ),
+        child: FilledButton.icon(
+          onPressed: () async {
+            final family = ref.read(currentFamilyProvider).valueOrNull;
+            final parentName = (family?['name'] as String?)?.trim();
+            final children =
+                ref.read(familyChildrenProvider).valueOrNull ?? const [];
+            final childName = children.isEmpty
+                ? null
+                : (children.first['name'] as String?)?.trim();
+            await openTalkToTeamWhatsapp(
+              teamPhone: teamPhone,
+              childName: childName,
+              parentName: parentName,
+            );
+          },
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.activeGreen,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(PhosphorIconsFill.whatsappLogo, size: 22),
+          label: Text(
+            'Talk to our team',
+            style: AppTextStyles.button(context),
+          ),
+        ),
       ),
     );
   }

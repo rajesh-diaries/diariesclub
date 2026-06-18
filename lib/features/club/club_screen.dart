@@ -8,9 +8,9 @@ import 'birthdays_tab.dart';
 import 'coffee_menu_tab.dart';
 import 'combos_tab.dart';
 import 'fit_menu_tab.dart';
-import 'providers/cart_provider.dart';
+import 'providers/club_search_provider.dart';
 import 'providers/pending_club_tab_provider.dart';
-import 'widgets/cart_sheet.dart';
+import 'widgets/club_cart_bar.dart';
 import 'workshops_tab.dart';
 
 /// Tab 2 — Club. Top tabs: Cafe | FIT | Combos | Birthdays | Workshops.
@@ -63,20 +63,8 @@ class _ClubScreenState extends ConsumerState<ClubScreen>
     super.dispose();
   }
 
-  void _openCart() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const CartSheet(),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final count = ref.watch(cartItemCountProvider);
-
     // Honour one-shot tab requests (e.g. Home's "Order food" card forces
     // Cafe, /club/workshops redirect sets index 3). The first-mount case
     // — where the value was set BEFORE this screen built — is handled
@@ -86,55 +74,8 @@ class _ClubScreenState extends ConsumerState<ClubScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Club'),
+        title: const _ClubSearchBar(),
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            tooltip: 'Bag',
-            onPressed: _openCart,
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(
-                  PhosphorIconsRegular.shoppingBag,
-                  color: AppColors.navy,
-                  size: 26,
-                ),
-                if (count > 0)
-                  Positioned(
-                    right: -6,
-                    top: -4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.gold,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 18,
-                        minHeight: 18,
-                      ),
-                      child: Text(
-                        count > 9 ? '9+' : '$count',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.caption(
-                          context,
-                          color: AppColors.navy,
-                        ).copyWith(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
         bottom: TabBar(
           controller: _tab,
           isScrollable: true,
@@ -182,16 +123,105 @@ class _ClubScreenState extends ConsumerState<ClubScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tab,
-        children: const [
-          CoffeeMenuTab(),
-          FitMenuTab(),
-          CombosTab(),
-          BirthdaysTab(),
-          WorkshopsTab(),
+      body: Stack(
+        children: [
+          TabBarView(
+            controller: _tab,
+            children: const [
+              CoffeeMenuTab(),
+              FitMenuTab(),
+              CombosTab(),
+              BirthdaysTab(),
+              WorkshopsTab(),
+            ],
+          ),
+          AnimatedBuilder(
+            animation: _tab,
+            builder: (_, __) {
+              final showCart = _tab.index <= 2; // Cafe, FIT, Combos only
+              return Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16,
+                child: ClubCartBar(visible: showCart),
+              );
+            },
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _ClubSearchBar extends ConsumerStatefulWidget {
+  const _ClubSearchBar();
+
+  @override
+  ConsumerState<_ClubSearchBar> createState() => _ClubSearchBarState();
+}
+
+class _ClubSearchBarState extends ConsumerState<_ClubSearchBar> {
+  late final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      textAlignVertical: TextAlignVertical.center,
+      style: AppTextStyles.body(context),
+      decoration: InputDecoration(
+        hintText: 'Search Cafe, FIT, Combos...',
+        hintStyle: AppTextStyles.body(
+          context,
+          color: AppColors.lightTextSecondary,
+        ),
+        prefixIcon: const Icon(
+          PhosphorIconsRegular.magnifyingGlass,
+          color: AppColors.lightTextSecondary,
+          size: 20,
+        ),
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _controller,
+          builder: (_, value, __) {
+            if (value.text.isEmpty) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(
+                PhosphorIconsRegular.x,
+                color: AppColors.lightTextSecondary,
+                size: 18,
+              ),
+              onPressed: () {
+                _controller.clear();
+                ref.read(clubSearchQueryProvider.notifier).state = '';
+              },
+            );
+          },
+        ),
+        filled: true,
+        fillColor: AppColors.lightSurface,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.gold, width: 1.5),
+        ),
+      ),
+      onChanged: (value) {
+        ref.read(clubSearchQueryProvider.notifier).state = value.trim().toLowerCase();
+      },
     );
   }
 }

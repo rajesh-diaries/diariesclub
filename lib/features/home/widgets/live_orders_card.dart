@@ -195,19 +195,19 @@ class _StatusPills extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final current = _currentStep;
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
+    return Row(
       children: [
-        for (final (step, label) in _steps)
+        for (var i = 0; i < _steps.length; i++) ...[
           _StatusPill(
-            label: label,
-            state: step.index < current.index
+            label: _steps[i].$2,
+            state: _steps[i].$1.index < current.index
                 ? _PillState.past
-                : step.index == current.index
+                : _steps[i].$1.index == current.index
                     ? _PillState.current
                     : _PillState.future,
           ),
+          if (i < _steps.length - 1) const SizedBox(width: 6),
+        ],
       ],
     );
   }
@@ -251,7 +251,7 @@ class _StatusPill extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: fill,
         border: Border.all(color: border),

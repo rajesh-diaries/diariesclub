@@ -95,6 +95,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       technicalDetails: state.error?.toString(),
     ),
     redirect: (context, state) {
+      // 0) Wait until auth state has resolved at least once. Without this,
+      //    a signed-in user can briefly flash /auth/phone while Supabase
+      //    recovers the session from storage. Keep them on the splash screen
+      //    until we know for sure.
+      final loc = state.matchedLocation;
+      final authAsync = ref.read(authStateProvider);
+      if (authAsync.isLoading) {
+        debugPrint('[ROUTER] auth still loading → stay on splash');
+        return loc == '/' ? null : '/';
+      }
+
       // 1) Force-update gate.
       final version = ref.read(appVersionStatusProvider).valueOrNull;
       final isOnUpdate = state.matchedLocation == '/update-required';
@@ -107,7 +118,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       // 2) Auth gate. Signed-out + protected route → /auth/phone.
       final familyId = ref.read(currentFamilyIdProvider);
-      final loc = state.matchedLocation;
       debugPrint('[ROUTER] redirect loc=$loc familyId=$familyId');
       if (familyId == null && !_isPublic(loc)) {
         debugPrint('[ROUTER] → redirecting to /auth/phone');

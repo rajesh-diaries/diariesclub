@@ -40,6 +40,7 @@ class _CartSheetState extends ConsumerState<CartSheet> {
   bool _busy = false;
   String? _errorText;
   bool _celebrate = false;
+  bool _orderPlaced = false;
 
   Future<void> _placeOrder() async {
     final cart = ref.read(cartProvider);
@@ -106,7 +107,10 @@ class _CartSheetState extends ConsumerState<CartSheet> {
       if (orderId == null) throw StateError('order_place returned no id');
 
       AppHaptics.success();
-      setState(() => _celebrate = true);
+      setState(() {
+        _celebrate = true;
+        _orderPlaced = true;
+      });
       ref.read(cartProvider.notifier).clear();
       // Wallet just got debited by order_place — invalidate so the next
       // purchase sees the fresh balance instead of the pre-order one.
@@ -115,10 +119,10 @@ class _CartSheetState extends ConsumerState<CartSheet> {
       // shows the new order immediately.
       ref.invalidate(activeOrdersProvider);
       if (!mounted) return;
-      await Future<void>.delayed(const Duration(milliseconds: 900));
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
       if (!mounted) return;
       Navigator.of(context).pop();
-      context.go('/home');
+      context.go('/club/order/$orderId');
     } on PostgrestException catch (e) {
       debugPrint('[ORDER_PLACE] PostgrestException: code=${e.code} '
           'message=${e.message} details=${e.details} hint=${e.hint}');
@@ -167,6 +171,26 @@ class _CartSheetState extends ConsumerState<CartSheet> {
     final cfg = ref.watch(venueConfigProvider).valueOrNull ?? const {};
     final cashbackPct = (cfg['cashback_percent'] as num?)?.toDouble() ?? 7.0;
     final foodGstPct = (cfg['food_gst_percent'] as num?)?.toDouble() ?? 5.0;
+
+    if (_orderPlaced) {
+      return SuccessCelebration(
+        shouldPlay: _celebrate,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: const SafeArea(
+            top: false,
+            child: Center(
+              child: _OrderPlacedView(),
+            ),
+          ),
+        ),
+      );
+    }
 
     if (cart.isEmpty) return const _EmptyBag();
 
@@ -746,6 +770,35 @@ class _EmptyBag extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _OrderPlacedView extends StatelessWidget {
+  const _OrderPlacedView();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          PhosphorIconsFill.checkCircle,
+          size: 64,
+          color: AppColors.fitGreen,
+        ),
+        const SizedBox(height: 16),
+        Text('Order placed!', style: AppTextStyles.h2(context)),
+        const SizedBox(height: 8),
+        Text(
+          'Taking you to your order...',
+          style: AppTextStyles.body(
+            context,
+            color: AppColors.lightTextSecondary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }

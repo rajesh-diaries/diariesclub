@@ -20,14 +20,15 @@ class WalletCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final wallet = ref.watch(currentWalletProvider);
+    final balancePaise = ref.watch(walletBalancePaiseProvider);
 
     return wallet.when(
       data: (w) => _Card(
         compact: compact,
-        balancePaise: (w?['balance_paise'] as int?) ?? 0,
+        balancePaise: balancePaise ?? 0,
         heldPaise: (w?['held_paise'] as int?) ?? 0,
         coinsBalance: (w?['coins_balance'] as int?) ?? 0,
-        loaded: w != null,
+        loaded: w != null && balancePaise != null,
       ),
       loading: () => _Card(
         compact: compact,
@@ -38,7 +39,10 @@ class WalletCard extends ConsumerWidget {
       ),
       error: (e, _) => BrandedErrorState(
         message: "Couldn't load wallet",
-        onRetry: () => ref.invalidate(currentWalletProvider),
+        onRetry: () {
+          ref.invalidate(currentWalletProvider);
+          ref.invalidate(walletBalancePaiseProvider);
+        },
       ),
     );
   }

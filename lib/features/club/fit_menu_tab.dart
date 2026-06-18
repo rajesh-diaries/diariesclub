@@ -13,6 +13,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
 import '../../core/widgets/error_state.dart';
 import '../../core/widgets/skeleton_card.dart';
+import 'providers/club_search_provider.dart';
 import 'providers/menu_items_provider.dart';
 import 'widgets/menu_item_card.dart';
 
@@ -29,51 +30,11 @@ class FitMenuTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return ListView(
       children: const [
-        _FitHero(),
         _SubscriptionBanner(),
         _FitTemplatesSection(),
         _AlaCarteSection(),
         SizedBox(height: 32),
       ],
-    );
-  }
-}
-
-class _FitHero extends ConsumerWidget {
-  const _FitHero();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cfg = ref.watch(venueConfigProvider).valueOrNull ?? const {};
-    final tagline = (cfg['fit_diaries_tagline'] as String?)?.trim() ?? '';
-    return Container(
-      height: 140,
-      color: AppColors.fitGreen,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(PhosphorIconsFill.forkKnife,
-                  color: Colors.white, size: 22),
-              const SizedBox(width: 8),
-              Text(
-                'FIT Diaries',
-                style: AppTextStyles.h2(context, color: Colors.white),
-              ),
-            ],
-          ),
-          if (tagline.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            Text(
-              tagline,
-              style: AppTextStyles.body(context, color: Colors.white70),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }
@@ -199,6 +160,9 @@ class _TemplateCard extends StatelessWidget {
     final name = (template['name'] as String?) ?? '—';
     final desc = template['description'] as String?;
     final basePrice = (template['base_price_paise'] as int?) ?? 0;
+    final showVeg = (template['_showVeg'] as bool?) ?? false;
+    final showNonVeg = (template['_showNonVeg'] as bool?) ?? false;
+
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: () =>
@@ -213,20 +177,20 @@ class _TemplateCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (photo != null && photo.isNotEmpty)
-              AspectRatio(
-                aspectRatio: 16 / 8,
-                child: CachedNetworkImage(
-                  imageUrl: photo,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(
-                    color: AppColors.fitGreen.withValues(alpha: 0.10),
-                  ),
-                  errorWidget: (_, __, ___) => Container(
-                    color: AppColors.fitGreen.withValues(alpha: 0.15),
-                  ),
-                ),
-              ),
+            AspectRatio(
+              aspectRatio: 1 / 1,
+              child: photo != null && photo.isNotEmpty
+                  ? Container(
+                      color: AppColors.lightSurface,
+                      child: CachedNetworkImage(
+                        imageUrl: photo,
+                        fit: BoxFit.contain,
+                        placeholder: (_, __) => _ImagePlaceholder(),
+                        errorWidget: (_, __, ___) => _ImagePlaceholder(),
+                      ),
+                    )
+                  : _ImagePlaceholder(),
+            ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -246,8 +210,19 @@ class _TemplateCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (showVeg || showNonVeg) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        if (showVeg) _DietaryBadge(type: 'veg'),
+                        if (showNonVeg) _DietaryBadge(type: 'non_veg'),
+                      ],
+                    ),
+                  ],
                   if (desc != null && desc.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Text(
                       desc,
                       style: AppTextStyles.body(
@@ -281,6 +256,69 @@ class _TemplateCard extends StatelessWidget {
   }
 }
 
+class _ImagePlaceholder extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.fitGreen.withValues(alpha: 0.12),
+            AppColors.gold.withValues(alpha: 0.08),
+          ],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        PhosphorIconsFill.bowlFood,
+        size: 40,
+        color: AppColors.fitGreen.withValues(alpha: 0.35),
+      ),
+    );
+  }
+}
+
+class _DietaryBadge extends StatelessWidget {
+  final String type;
+  const _DietaryBadge({required this.type});
+
+  @override
+  Widget build(BuildContext context) {
+    final isVeg = type == 'veg';
+    final label = isVeg ? 'Veg' : 'Non-Veg';
+    final color = isVeg ? AppColors.activeGreen : AppColors.rafiCoral;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        border: Border.all(color: color.withValues(alpha: 0.40)),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: AppTextStyles.caption(context, color: color)
+                .copyWith(fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// À la carte legacy menu_items where brand='fit'. Rendered inline as
 /// flat MenuItemCard widgets — never as its own scrollable — so it
 /// nests safely inside the parent ListView.
@@ -290,6 +328,7 @@ class _AlaCarteSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(menuItemsByBrandProvider('fit'));
+    final query = ref.watch(clubSearchQueryProvider);
 
     return async.when(
       loading: () => const Padding(
@@ -304,7 +343,10 @@ class _AlaCarteSection extends ConsumerWidget {
         ),
       ),
       data: (items) {
-        if (items.isEmpty) return const SizedBox.shrink();
+        final filtered = query.isEmpty
+            ? items
+            : items.where((i) => _matchesQuery(i, query)).toList();
+        if (filtered.isEmpty) return const SizedBox.shrink();
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
           child: Column(
@@ -320,21 +362,93 @@ class _AlaCarteSection extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              for (final i in items) MenuItemCard(item: i),
+              for (final i in filtered) MenuItemCard(item: i),
             ],
           ),
         );
       },
     );
   }
+
+  bool _matchesQuery(Map<String, dynamic> item, String query) {
+    final haystack = [
+      item['name']?.toString() ?? '',
+      item['description']?.toString() ?? '',
+      item['category']?.toString() ?? '',
+      ...(item['tags'] as List<dynamic>? ?? []).map((t) => t.toString()),
+      ...(item['symbols'] as List<dynamic>? ?? []).map((s) => s.toString()),
+    ].join(' ').toLowerCase();
+    return haystack.contains(query);
+  }
 }
 
 /// Customer-visible templates: only published+available, ordered by sort.
+/// Also computes Veg / Non-Veg badge visibility: admin override wins,
+/// otherwise we look at the dietary_type of published, available options.
 final fitTemplatesCustomerProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final rows = await Supabase.instance.client
+  final supabase = Supabase.instance.client;
+  final rows = await supabase
       .from('fit_meal_templates')
-      .select('id, name, description, base_price_paise, photo_url, sort_order')
+      .select(
+        'id, name, description, base_price_paise, photo_url, sort_order, veg_available, non_veg_available',
+      )
       .order('sort_order', ascending: true);
-  return List<Map<String, dynamic>>.from(rows);
+  final templates = List<Map<String, dynamic>>.from(rows);
+  if (templates.isEmpty) return templates;
+
+  final templateIds = templates.map((t) => t['id'] as String).toList();
+
+  // Pull the category links for these templates.
+  final links = await supabase
+      .from('fit_meal_template_categories')
+      .select('template_id, category_id, fit_meal_categories!inner(slug)')
+      .inFilter('template_id', templateIds);
+
+  final categoryIds = <String>{};
+  final linksByTemplate = <String, List<Map<String, dynamic>>>{};
+  for (final l in links) {
+    final tid = l['template_id'] as String;
+    final cid = l['category_id'] as String;
+    categoryIds.add(cid);
+    linksByTemplate.putIfAbsent(tid, () => []).add(l);
+  }
+
+  // Fetch the options for those categories.
+  final options = categoryIds.isEmpty
+      ? <Map<String, dynamic>>[]
+      : await supabase
+          .from('fit_meal_options')
+          .select('category_id, dietary_type, is_available, is_published')
+          .inFilter('category_id', categoryIds.toList());
+
+  final optionsByCategory = <String, List<Map<String, dynamic>>>{};
+  for (final o in options) {
+    final cid = o['category_id'] as String;
+    optionsByCategory.putIfAbsent(cid, () => []).add(o);
+  }
+
+  for (final t in templates) {
+    final tid = t['id'] as String;
+    final overrideVeg = t['veg_available'] as bool?;
+    final overrideNonVeg = t['non_veg_available'] as bool?;
+
+    bool autoVeg = false;
+    bool autoNonVeg = false;
+    for (final l in linksByTemplate[tid] ?? []) {
+      final cid = l['category_id'] as String;
+      for (final opt in optionsByCategory[cid] ?? []) {
+        if ((opt['is_available'] as bool? ?? true) == false) continue;
+        if ((opt['is_published'] as bool? ?? true) == false) continue;
+        final dt = opt['dietary_type'] as String?;
+        if (dt == 'veg') autoVeg = true;
+        if (dt == 'non_veg') autoNonVeg = true;
+      }
+    }
+
+    t['_showVeg'] = overrideVeg ?? autoVeg;
+    t['_showNonVeg'] = overrideNonVeg ?? autoNonVeg;
+  }
+
+  return templates;
 });

@@ -105,6 +105,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final id = s['id'] as String?;
       if (id == null || _greetedSessionIds.contains(id)) continue;
 
+      // BUG-XXX: don't greet pending sessions. Combos create a pending
+      // session at purchase time and the kid is only welcomed after staff
+      // scans the QR (status becomes active/grace).
+      final status = s['status'] as String?;
+      if (status != 'active' && status != 'grace') continue;
+
       final startedAtStr = s['started_at'] as String?;
       if (startedAtStr == null) continue;
       final startedAt = DateTime.tryParse(startedAtStr);
@@ -174,51 +180,69 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(homeStateProvider);
-    final activeSessions =
-        ref.watch(activeSessionsProvider).valueOrNull ?? const [];
+    final activeSessionsAsync = ref.watch(activeSessionsProvider);
 
-    // Trigger welcome overlay for freshly-started sessions.
-    if (_welcomingSessionId == null) {
-      final freshList = _freshSessionsToGreet(activeSessions);
-      if (freshList.isNotEmpty) {
-        // Start with the first, queue the rest.
-        final first = freshList.first;
-        final rest = freshList.skip(1).toList();
-        _welcomeQueue.addAll(rest);
-        setState(() {
-          _welcomingSessionId = first.sessionId;
-          _welcomeChildName = first.childName;
-          _welcomeFavouriteHero = first.favouriteHero;
-        });
-      }
-    }
-
-    Widget body = state.when(
-      data: (s) {
-        if (activeSessions.isNotEmpty) {
-          return const MultiSessionHomeView();
-        }
-        return switch (s) {
-          HomeStateIdle() => const IdleHomeView(),
-          HomeStateInSession() => const MultiSessionHomeView(),
-          HomeStatePostSession(:final session) =>
-            PostSessionHomeView(session: session),
-        };
-      },
-      loading: () {
-        return const _RefreshableFill(
-          child: SkeletonList(itemCount: 4),
-        );
-      },
+    // Wait for both providers so we don't flash IdleHomeView while active
+    // sessions are still loading, or show an empty MultiSessionHomeView.
+    Widget body = activeSessionsAsync.when(
+      loading: () => const _RefreshableFill(child: SkeletonList(itemCount: 4)),
       error: (e, st) {
-        debugPrint('[E-HOME] homeStateProvider error: $e');
-        debugPrint('[E-HOME] stack: $st');
+        debugPrint('[E-HOME] activeSessionsProvider error: $e');
         return _RefreshableFill(
           child: FriendlyErrorScreen(
             code: 'E-HOME',
             userMessage: "Couldn't load home",
             technicalDetails: e.toString(),
+            onRetry: () => ref.invalidate(activeSessionsProvider),
           ),
+        );
+      },
+      data: (activeSessions) {
+        // Trigger welcome overlay for freshly-started sessions.
+        if (_welcomingSessionId == null) {
+          final freshList = _freshSessionsToGreet(activeSessions);
+          if (freshList.isNotEmpty) {
+            // Start with the first, queue the rest.
+            final first = freshList.first;
+            final rest = freshList.skip(1).toList();
+            _welcomeQueue.addAll(rest);
+            setState(() {
+              _welcomingSessionId = first.sessionId;
+              _welcomeChildName = first.childName;
+              _welcomeFavouriteHero = first.favouriteHero;
+            });
+          }
+        }
+
+        return state.when(
+          data: (s) {
+            if (activeSessions.isNotEmpty) {
+              return MultiSessionHomeView(sessions: activeSessions);
+            }
+            return switch (s) {
+              HomeStateIdle() => const IdleHomeView(),
+              HomeStateInSession() => MultiSessionHomeView(sessions: activeSessions),
+              HomeStatePostSession(:final session) =>
+                PostSessionHomeView(session: session),
+            };
+          },
+          loading: () {
+            return const _RefreshableFill(
+              child: SkeletonList(itemCount: 4),
+            );
+          },
+          error: (e, st) {
+            debugPrint('[E-HOME] homeStateProvider error: $e');
+            debugPrint('[E-HOME] stack: $st');
+            return _RefreshableFill(
+              child: FriendlyErrorScreen(
+                code: 'E-HOME',
+                userMessage: "Couldn't load home",
+                technicalDetails: e.toString(),
+                onRetry: () => ref.invalidate(homeStateProvider),
+              ),
+            );
+          },
         );
       },
     );

@@ -20,6 +20,41 @@ import '../../core/widgets/skeleton_card.dart';
 import 'providers/birthday_packages_provider.dart';
 import 'providers/reservation_providers.dart';
 
+Color? _parseHexColor(String hex) {
+  final buffer = StringBuffer();
+  if (hex.length == 4) {
+    final r = hex[1];
+    final g = hex[2];
+    final b = hex[3];
+    buffer.write('FF$r$r$g$g$b$b');
+  } else if (hex.length == 7) {
+    buffer.write('FF${hex.substring(1)}');
+  } else if (hex.length == 9) {
+    buffer.write(hex.substring(1));
+  } else {
+    return null;
+  }
+  final value = int.tryParse(buffer.toString(), radix: 16);
+  if (value == null) return null;
+  return Color(value);
+}
+
+Color _staticAccentColor(String name) => switch (name) {
+      'Happy Tales' => AppColors.rafiCoral,
+      'Grand' => AppColors.navy,
+      'Magical' => AppColors.gold,
+      _ => AppColors.fitGreen,
+    };
+
+Color _resolveAccentColor(Map<String, dynamic> package) {
+  final hex = (package['accent_color_hex'] as String?)?.trim();
+  if (hex != null && hex.isNotEmpty) {
+    final parsed = _parseHexColor(hex);
+    if (parsed != null) return parsed;
+  }
+  return _staticAccentColor((package['name'] as String?) ?? '');
+}
+
 const _venueId = Venues.kondapurId;
 
 /// Package detail + reserve interest screen — the conversion screen.
@@ -312,6 +347,24 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
     final hallName = (package['hall_name'] as String?) ?? '';
     final minGuests = (package['min_guests'] as int?) ?? 0;
     final maxGuests = (package['max_guests'] as int?) ?? 200;
+    final accentColor = _resolveAccentColor(package);
+
+    final inclusionLines = <String>[
+      ...((package['inclusions'] as List?) ?? const [])
+          .whereType<String>(),
+      ...((package['experience_inclusions'] as List?)
+              ?? const [])
+          .whereType<String>(),
+      ...?((package['non_food_offerings'] as List?)
+          ?.whereType<Map<String, dynamic>>()
+          .map((m) {
+            final label = (m['label'] as String?) ?? '';
+            final detail = (m['detail'] as String?) ?? '';
+            final line = '$label: $detail'.trim();
+            return line == ':' ? '' : line;
+          })
+          .where((s) => s.isNotEmpty)),
+    ];
 
     // Seed the stepper to this package's minimum on first build.
     if (_guestCount < 0) _guestCount = minGuests > 0 ? minGuests : 25;
@@ -338,7 +391,7 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
         ListView(
           padding: const EdgeInsets.only(bottom: 120),
           children: [
-            _Carousel(images: gallery),
+            if (gallery.isNotEmpty) _Carousel(images: gallery),
             _PriceBar(
               priceVegPaise: priceVeg,
               priceNonVegPaise: priceNonVeg,
@@ -347,20 +400,14 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
               maxGuests: maxGuests,
             ),
             const SizedBox(height: 16),
-            const _SectionHeader(text: 'Menu'),
-            _Inclusions(raw: package['inclusions']),
-            if (((package['experience_inclusions'] as List?) ?? const [])
-                .isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _ExperienceBlockDetail(
-                  lines: (package['experience_inclusions'] as List)
-                      .whereType<String>()
-                      .toList(),
-                ),
-              ),
-            ],
+            _SectionHeader(
+              text: "What's included",
+              color: accentColor,
+            ),
+            _Inclusions(
+              lines: inclusionLines,
+              iconColor: accentColor,
+            ),
             const SizedBox(height: 16),
             // PDF download — always shown so customers know one exists; if
             // the admin hasn't uploaded it yet for this package the button
@@ -484,16 +531,7 @@ class _CarouselState extends State<_Carousel> {
   @override
   Widget build(BuildContext context) {
     if (widget.images.isEmpty) {
-      return Container(
-        height: 220,
-        color: AppColors.gold.withValues(alpha: 0.20),
-        alignment: Alignment.center,
-        child: const Icon(
-          PhosphorIconsFill.cake,
-          color: AppColors.gold,
-          size: 64,
-        ),
-      );
+      return const SizedBox.shrink();
     }
     return SizedBox(
       height: 240,
@@ -624,46 +662,30 @@ class _PriceChip extends StatelessWidget {
 
 class _SectionHeader extends StatelessWidget {
   final String text;
-  const _SectionHeader({required this.text});
+  final Color? color;
+  const _SectionHeader({required this.text, this.color});
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       child: Text(
         text,
-        style: AppTextStyles.h3(context),
+        style: AppTextStyles.h3(context).copyWith(color: color),
       ),
     );
   }
 }
 
 class _Inclusions extends StatelessWidget {
-  // Accepts either:
-  //   * List<String> — the new shape ([1 Welcome Drink, 2 Starters, ...])
-  //   * Map<String, dynamic> — legacy shape (key:value pairs we humanise)
-  final dynamic raw;
-  const _Inclusions({required this.raw});
+  final List<String> lines;
+  final Color iconColor;
+  const _Inclusions({
+    required this.lines,
+    this.iconColor = AppColors.activeGreen,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final lines = <String>[];
-    if (raw is List) {
-      for (final item in raw as List) {
-        if (item == null) continue;
-        final s = item.toString().trim();
-        if (s.isNotEmpty) lines.add(s);
-      }
-    } else if (raw is Map) {
-      (raw as Map).forEach((key, value) {
-        if (value == null) return;
-        final label = key.toString()
-            .replaceAll('_', ' ')
-            .split(' ')
-            .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
-            .join(' ');
-        lines.add('$label: $value');
-      });
-    }
     if (lines.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -692,12 +714,12 @@ class _Inclusions extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 3),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
                         child: Icon(
                           PhosphorIconsFill.checkCircle,
                           size: 18,
-                          color: AppColors.activeGreen,
+                          color: iconColor,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -710,54 +732,6 @@ class _Inclusions extends StatelessWidget {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-/// Per-package experience block on the detail screen. Sourced from
-/// birthday_packages.experience_inclusions so admin can edit per
-/// package without code changes.
-class _ExperienceBlockDetail extends StatelessWidget {
-  final List<String> lines;
-  const _ExperienceBlockDetail({required this.lines});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.lightBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.lightBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'EXPERIENCE',
-            style: AppTextStyles.caption(
-              context, color: AppColors.lightTextSecondary,
-            ).copyWith(letterSpacing: 0.8, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            children: [
-              for (final label in lines)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(PhosphorIconsRegular.checkCircle,
-                        size: 16, color: AppColors.navy),
-                    const SizedBox(width: 6),
-                    Text(label, style: AppTextStyles.body(context)),
-                  ],
-                ),
-            ],
-          ),
-        ],
       ),
     );
   }

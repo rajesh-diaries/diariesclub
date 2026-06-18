@@ -1,13 +1,12 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../utils/admin_image_picker.dart';
 import '../widgets/admin_buttons.dart';
 
 const _bannerTypes = ['promo', 'info', 'urgent'];
@@ -110,33 +109,15 @@ class _HomeBannerEditScreenState extends ConsumerState<HomeBannerEditScreen> {
   Future<void> _pickAndUploadImage() async {
     setState(() => _uploading = true);
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
-        withData: true,
+      final compressed = await pickAndCompressImage(maxDimension: 1600);
+      if (compressed == null || !mounted) return;
+
+      final url = await uploadImageBytes(
+        bytes: compressed,
+        bucket: 'home-banners',
+        folder: '',
+        timeoutSeconds: 30,
       );
-      if (result == null || result.files.isEmpty) return;
-
-      final file = result.files.first;
-      final bytes = file.bytes;
-      if (bytes == null || bytes.isEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not read file.')),
-        );
-        return;
-      }
-
-      final ext = (file.extension ?? 'png').toLowerCase();
-      final filename = '${const Uuid().v4()}.$ext';
-
-      await Supabase.instance.client.storage
-          .from('home-banners')
-          .uploadBinary(filename, bytes);
-
-      final url = Supabase.instance.client.storage
-          .from('home-banners')
-          .getPublicUrl(filename);
 
       if (!mounted) return;
       setState(() => _imageUrl = url);

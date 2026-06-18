@@ -140,7 +140,15 @@ class ComboCard extends ConsumerWidget {
                       text: 'Loading items…',
                     ),
                   ],
-                  error: (_, __) => const [],
+                  error: (_, __) => [
+                    GestureDetector(
+                      onTap: () => ref.invalidate(comboMenuItemsProvider(menuItemIds)),
+                      child: const _IncludedRow(
+                        icon: PhosphorIconsRegular.warning,
+                        text: 'Tap to reload items',
+                      ),
+                    ),
+                  ],
                 ),
                 if (marketing != null && marketing.isNotEmpty) ...[
                   const SizedBox(height: 6),
@@ -153,11 +161,31 @@ class ComboCard extends ConsumerWidget {
                   ),
                 ],
                 const SizedBox(height: 16),
-                if (sessionMinutes != null)
-                  // Session combos must go through the modal sheet so the
-                  // kid picker is unmissable. Cart-add is BLOCKED for these
-                  // — without a kid pick, no session_create fires and the
-                  // customer pays for play they never receive.
+                if (fitTemplateId != null)
+                  // FIT combos (with or without bundled play) must go through
+                  // the FIT builder. The builder collects meal selections and,
+                  // for session combos, also handles the kid picker before
+                  // calling order_place directly.
+                  FilledButton.icon(
+                    onPressed: () => _addComboWithFitBuilder(
+                      context,
+                      ref,
+                      fitTemplateId: fitTemplateId,
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.navy,
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: const Icon(PhosphorIconsRegular.bowlFood),
+                    label: Text(
+                      sessionMinutes != null
+                          ? 'Customise meal · Pick a kid'
+                          : 'Customise your meal · Add',
+                    ),
+                  )
+                else if (sessionMinutes != null)
+                  // Non-FIT session combos: kid picker is required before
+                  // order_place creates the session.
                   FilledButton.icon(
                     onPressed: () => _openSheet(context),
                     style: FilledButton.styleFrom(
@@ -174,22 +202,6 @@ class ComboCard extends ConsumerWidget {
                         .removeLineById('combo:$id'),
                     icon: const Icon(PhosphorIconsRegular.minusCircle),
                     label: const Text('Remove from bag'),
-                  )
-                else if (fitTemplateId != null)
-                  // Option B path: open the FIT builder, await selections,
-                  // then add a ComboLine with the linked FIT meal payload.
-                  FilledButton.icon(
-                    onPressed: () => _addComboWithFitBuilder(
-                      context,
-                      ref,
-                      fitTemplateId: fitTemplateId,
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.navy,
-                      foregroundColor: Colors.white,
-                    ),
-                    icon: const Icon(PhosphorIconsRegular.bowlFood),
-                    label: const Text('Customise your meal · Add'),
                   )
                 else
                   FilledButton.icon(

@@ -122,6 +122,31 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
     }
   }
 
+  /// Client-side upcharge so the sticky total updates instantly while the
+  /// user is still filling required categories. The server still has the
+  /// final say when the order/cart action is submitted.
+  int _computeClientUpcharge(List<_LinkedCategory> linkedCategories) {
+    var total = 0;
+    for (final lc in linkedCategories) {
+      final catId = lc.category['id'] as String;
+      final sel = _selections[catId];
+      if (sel == null) continue;
+      final selectedIds = <String>{};
+      if (sel is String) {
+        selectedIds.add(sel);
+      } else if (sel is List) {
+        selectedIds.addAll(sel.whereType<String>());
+      }
+      for (final opt in lc.options) {
+        final id = opt['id'] as String?;
+        if (id != null && selectedIds.contains(id)) {
+          total += (opt['upcharge_paise'] as int?) ?? 0;
+        }
+      }
+    }
+    return total;
+  }
+
   Future<void> _addToCart(_BuilderData data, int finalPrice) async {
     setState(() {
       _busy = true;
@@ -518,49 +543,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                             style: AppTextStyles.body(context),
                           ),
                         ),
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 20),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.fitGreen.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: AppColors.fitGreen.withValues(alpha: 0.30),
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(
-                              PhosphorIconsFill.checkCircle,
-                              size: 18,
-                              color: AppColors.fitGreen,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Included with every meal',
-                                    style: AppTextStyles.caption(
-                                      context, color: AppColors.fitGreen,
-                                    ).copyWith(
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.6,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Sauteed veggies · Garden salad',
-                                    style: AppTextStyles.body(context),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _IncludedSidesBanner(template: tpl),
                       for (final lc in data.linkedCategories)
                         _CategorySection(
                           category: lc.category,
@@ -576,6 +559,12 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                               } else {
                                 _selections[catId] = sel;
                               }
+                              // Update the live total immediately; the server
+                              // RPC may still complain about missing required
+                              // categories, but we don't want to hide upgrades.
+                              _upcharge = _computeClientUpcharge(
+                                data.linkedCategories,
+                              );
                             });
                             _refreshPrice(context);
                           },
@@ -620,7 +609,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Combo + extras',
+                                'Combo + upgrades',
                                 style: AppTextStyles.caption(
                                   context,
                                   color: AppColors.lightTextSecondary,
@@ -639,7 +628,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                               if (_upcharge > 0)
                                 Text(
                                   '${Money.fromPaise(widget.comboContext!.comboPricePaise)} '
-                                  'combo + ${Money.fromPaise(_upcharge)} extras',
+                                  'combo + ${Money.fromPaise(_upcharge)} upgrades',
                                   style: AppTextStyles.caption(
                                     context,
                                     color: AppColors.lightTextSecondary,
@@ -647,7 +636,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                                 )
                               else
                                 Text(
-                                  'No extras — combo covers everything.',
+                                  'No upgrades — combo covers everything.',
                                   style: AppTextStyles.caption(
                                     context,
                                     color: AppColors.lightTextSecondary,
@@ -699,6 +688,69 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
   }
 }
 
+
+class _IncludedSidesBanner extends StatelessWidget {
+  final Map<String, dynamic> template;
+  const _IncludedSidesBanner({required this.template});
+
+  @override
+  Widget build(BuildContext context) {
+    final configuredSides = (template['included_sides'] as List<dynamic>?)
+            ?.map((s) => s.toString())
+            .where((s) => s.isNotEmpty)
+            .toList() ??
+        const <String>[];
+    // Show the admin-configured sides if present; otherwise fall back to the
+    // standard FIT promise so every template always communicates value.
+    final sides = configuredSides.isEmpty
+        ? const <String>['Sautéed veggies', 'Salad']
+        : configuredSides;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.fitGreen.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: AppColors.fitGreen.withValues(alpha: 0.30),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            PhosphorIconsFill.checkCircle,
+            size: 18,
+            color: AppColors.fitGreen,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Included with every meal',
+                  style: AppTextStyles.caption(
+                    context, color: AppColors.fitGreen,
+                  ).copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  sides.join(' · '),
+                  style: AppTextStyles.body(context),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 class _CategorySection extends StatelessWidget {
   final Map<String, dynamic> category;
   final Map<String, dynamic> linker;

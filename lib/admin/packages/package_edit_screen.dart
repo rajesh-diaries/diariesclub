@@ -1,16 +1,16 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../utils/admin_image_picker.dart';
 import '../widgets/admin_app_bar.dart';
 import '../widgets/admin_buttons.dart';
 import 'packages_list_screen.dart' show packagesAdminListProvider;
@@ -102,12 +102,16 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
   // no longer exposes it.
   final _experienceCtrl = TextEditingController();
   final _tierCtrl = TextEditingController();
+  final _accentColorCtrl = TextEditingController();
+  final _badgeTextCtrl = TextEditingController();
+  final _taglineCtrl = TextEditingController();
   String _category = 'birthday';
   Uint8List? _photoBytes;
   String? _existingCoverUrl;
   bool _isActive = true;
   bool _busy = false;
   bool _loading = true;
+  bool _photoLoading = false;
   String? _errorText;
 
   bool get _isEditing => widget.packageId != null;
@@ -144,6 +148,9 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
     _priceNonVegCtrl.dispose();
     _experienceCtrl.dispose();
     _tierCtrl.dispose();
+    _accentColorCtrl.dispose();
+    _badgeTextCtrl.dispose();
+    _taglineCtrl.dispose();
     super.dispose();
   }
 
@@ -176,6 +183,9 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
         _maxAdultsCtrl.text = (row['max_adults'] as int?)?.toString() ?? '';
         _sortCtrl.text = (row['sort_order'] as int?)?.toString() ?? '0';
         _tierCtrl.text = (row['tier'] as String?) ?? '';
+        _accentColorCtrl.text = (row['accent_color_hex'] as String?) ?? '';
+        _badgeTextCtrl.text = (row['badge_text'] as String?) ?? '';
+        _taglineCtrl.text = (row['tagline'] as String?) ?? '';
         _category = (row['category'] as String?) ?? 'birthday';
         _existingCoverUrl = row['cover_image_url'] as String?;
         _isActive = (row['is_active'] as bool?) ?? true;
@@ -219,32 +229,31 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
   }
 
   Future<void> _pickPhoto() async {
+    if (_busy || _photoLoading) return;
+    setState(() {
+      _photoLoading = true;
+      _errorText = null;
+    });
     try {
-      final picked = await ImagePicker().pickImage(
-        source: ImageSource.gallery, maxWidth: 2000, maxHeight: 2000,
-      );
-      if (picked == null) return;
-      final raw = await picked.readAsBytes();
+      final compressed = await pickAndCompressImage(maxDimension: 1200);
+      if (compressed == null || !mounted) return;
+      setState(() => _photoBytes = compressed);
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _photoBytes = raw);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _errorText = "Couldn't load that image.");
+      setState(() => _errorText = "Couldn't load image: $e");
+    } finally {
+      if (mounted) setState(() => _photoLoading = false);
     }
   }
 
   Future<String?> _uploadPhotoIfNew() async {
     if (_photoBytes == null) return _existingCoverUrl;
-    final fileName = '${const Uuid().v4()}.jpg';
-    final path = 'packages/$fileName';
-    await Supabase.instance.client.storage
-        .from('package-photos')
-        .uploadBinary(path, _photoBytes!,
-            fileOptions: const FileOptions(
-              contentType: 'image/jpeg', upsert: false,
-            ));
-    return Supabase.instance.client.storage
-        .from('package-photos').getPublicUrl(path);
+    return uploadImageBytes(
+      bytes: _photoBytes!,
+      bucket: 'package-photos',
+      folder: 'packages',
+      timeoutSeconds: 30,
+    );
   }
 
   Future<void> _submit() async {
@@ -270,6 +279,13 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
     }
     if (_hallNameCtrl.text.trim().isEmpty) {
       setState(() => _errorText = 'Hall name is required.');
+      return;
+    }
+    final accentHex = _accentColorCtrl.text.trim();
+    if (accentHex.isNotEmpty &&
+        !RegExp(r'^#([0-9A-Fa-f]{3}){1,2}$').hasMatch(accentHex)) {
+      setState(() => _errorText =
+          'Accent color must be a hex code like #FF7A6E.');
       return;
     }
     // Legacy flat price stays optional but if present must be a positive int.
@@ -350,6 +366,13 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
             .map((s) => s.trim())
             .where((s) => s.isNotEmpty)
             .toList(),
+        'p_accent_color_hex': accentHex.isEmpty ? null : accentHex,
+        'p_badge_text': _badgeTextCtrl.text.trim().isEmpty
+            ? null
+            : _badgeTextCtrl.text.trim(),
+        'p_tagline': _taglineCtrl.text.trim().isEmpty
+            ? null
+            : _taglineCtrl.text.trim(),
       };
 
       String? id = widget.packageId;
@@ -387,6 +410,13 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
         )),
       );
       context.go('/admin/packages');
+    } on TimeoutException catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _errorText =
+            'Photo upload timed out. Please check your network and try again.';
+      });
     } on PostgrestException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -516,6 +546,61 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
                         context, color: AppColors.lightTextSecondary,
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    const Divider(),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'Card styling',
+                        style: AppTextStyles.caption(
+                          context,
+                          color: AppColors.lightTextSecondary,
+                        ).copyWith(letterSpacing: 0.6, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    TextField(
+                      controller: _taglineCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Tagline',
+                        hintText: 'Our most loved package',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _badgeTextCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Badge text (optional)',
+                              hintText: 'Most Booked',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _accentColorCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Accent color hex',
+                              hintText: '#FF7A6E',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Hex only, e.g. #FF7A6E. Used for the top bar, price chips, badge and tagline.',
+                      style: AppTextStyles.caption(
+                        context, color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Divider(),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -667,7 +752,7 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
     final hasNew = _photoBytes != null;
     final hasExisting = _existingCoverUrl != null && _existingCoverUrl!.isNotEmpty;
     return InkWell(
-      onTap: _busy ? null : _pickPhoto,
+      onTap: (_busy || _photoLoading) ? null : _pickPhoto,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         height: 220,
@@ -681,24 +766,26 @@ class _PackageEditScreenState extends ConsumerState<PackageEditScreen> {
                   ? DecorationImage(image: NetworkImage(_existingCoverUrl!), fit: BoxFit.cover)
                   : null,
         ),
-        child: hasNew || hasExisting
-            ? null
-            : Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(PhosphorIconsRegular.image,
-                        size: 36, color: AppColors.lightTextSecondary),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Tap to add cover photo',
-                      style: AppTextStyles.caption(
-                        context, color: AppColors.lightTextSecondary,
-                      ),
+        child: _photoLoading
+            ? const Center(child: CircularProgressIndicator())
+            : hasNew || hasExisting
+                ? null
+                : Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(PhosphorIconsRegular.image,
+                            size: 36, color: AppColors.lightTextSecondary),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Tap to add cover photo',
+                          style: AppTextStyles.caption(
+                            context, color: AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
       ),
     );
   }

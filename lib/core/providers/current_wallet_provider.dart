@@ -28,9 +28,37 @@ final currentWalletProvider =
   }
 });
 
-/// Convenience selector — paise as int, or `null` if the wallet hasn't
-/// loaded yet.
-final walletBalancePaiseProvider = Provider<int?>((ref) {
-  final w = ref.watch(currentWalletProvider).valueOrNull;
-  return w == null ? null : (w['balance_paise'] as int);
+/// Live sum of `wallet_transactions.amount_paise` for the current family.
+///
+/// Several backend RPCs (e.g. `play_pass_purchase`) use the transaction ledger
+/// as the source of truth, so the UI must match that ledger. A stale
+/// `wallets.balance_paise` row can show money the user doesn't actually have.
+final _walletTransactionsBalanceProvider = StreamProvider<int?>((ref) async* {
+  final familyId = ref.watch(currentFamilyIdProvider);
+  if (familyId == null) {
+    yield null;
+    return;
+  }
+
+  final stream = Supabase.instance.client
+      .from('wallet_transactions')
+      .stream(primaryKey: ['id'])
+      .eq('family_id', familyId);
+
+  await for (final rows in stream) {
+    var sum = 0;
+    for (final r in rows) {
+      final amount = (r['amount_paise'] as num?)?.toInt() ?? 0;
+      sum += amount;
+    }
+    yield sum;
+  }
 });
+
+/// Convenience selector — paise as int, or `null` if the wallet hasn't
+/// loaded yet. Uses the transaction ledger as the source of truth.
+final walletBalancePaiseProvider = Provider<int?>((ref) {
+  return ref.watch(_walletTransactionsBalanceProvider).valueOrNull;
+});
+
+

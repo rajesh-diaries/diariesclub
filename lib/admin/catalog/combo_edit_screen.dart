@@ -1,15 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
+import '../utils/admin_image_picker.dart';
 import '../widgets/admin_app_bar.dart';
 import '../widgets/admin_buttons.dart';
 import 'combos_list_screen.dart' show combosAdminListProvider;
@@ -55,6 +56,7 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
 
   bool _busy = false;
   bool _loading = true;
+  bool _photoLoading = false;
   String? _errorText;
 
   bool get _isEditing => widget.comboId != null;
@@ -138,35 +140,31 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
   }
 
   Future<void> _pickPhoto() async {
+    if (_busy || _photoLoading) return;
+    setState(() {
+      _photoLoading = true;
+      _errorText = null;
+    });
     try {
-      final picked = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1200, maxHeight: 1200,
-      );
-      if (picked == null) return;
-      final raw = await picked.readAsBytes();
+      final compressed = await pickAndCompressImage(maxDimension: 1024);
+      if (compressed == null || !mounted) return;
+      setState(() => _photoBytes = compressed);
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _photoBytes = raw);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _errorText = "Couldn't load that image.");
+      setState(() => _errorText = "Couldn't load image: $e");
+    } finally {
+      if (mounted) setState(() => _photoLoading = false);
     }
   }
 
   Future<String?> _uploadPhotoIfNew() async {
     if (_photoBytes == null) return _existingPhotoUrl;
-    final fileName = '${const Uuid().v4()}.jpg';
-    final path = 'combos/$fileName';
-    await Supabase.instance.client.storage
-        .from('menu-photos')
-        .uploadBinary(
-          path, _photoBytes!,
-          fileOptions: const FileOptions(
-            contentType: 'image/jpeg', upsert: false,
-          ),
-        );
-    return Supabase.instance.client.storage
-        .from('menu-photos').getPublicUrl(path);
+    return uploadImageBytes(
+      bytes: _photoBytes!,
+      bucket: 'menu-photos',
+      folder: 'combos',
+      timeoutSeconds: 30,
+    );
   }
 
   Future<void> _submit() async {
@@ -235,6 +233,13 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
         SnackBar(content: Text(_isEditing ? 'Saved' : 'Created')),
       );
       context.go('/admin/catalog/combos');
+    } on TimeoutException catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _errorText =
+            'Photo upload timed out. Please check your network and try again.';
+      });
     } on PostgrestException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -255,6 +260,18 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
   @override
   Widget build(BuildContext context) {
     final menuAsync = ref.watch(_allMenuItemsProvider);
+    final fitAsync = ref.watch(fitTemplatesAdminListProvider);
+    final configAsync = ref.watch(_venueConfigProvider);
+
+    final items = menuAsync.valueOrNull ?? const <Map<String, dynamic>>[];
+    final templates = fitAsync.valueOrNull ?? const <Map<String, dynamic>>[];
+    final config = configAsync.valueOrNull;
+
+    final sumPaise = _sumOfSelectedPaise(items) +
+        _fitBasePaise(templates) +
+        _sessionPaise(config);
+    final breakdown = _breakdownLabel(items, templates, config);
+
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
       appBar: AdminAppBar(title: _isEditing ? 'Edit combo' : 'New combo'),
@@ -430,8 +447,9 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
                     ),
                     const SizedBox(height: 16),
                     _SavingsIndicator(
-                      sumPaise: _sumOfSelectedPaise(menuAsync.valueOrNull ?? const []),
+                      sumPaise: sumPaise,
                       comboPaise: (int.tryParse(_priceCtrl.text.trim()) ?? 0) * 100,
+                      breakdown: breakdown,
                     ),
                     if (_errorText != null) ...[
                       const SizedBox(height: 12),
@@ -475,17 +493,57 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
         (i) => i['id'] == entry.key,
         orElse: () => const <String, dynamic>{},
       );
+      // When a FIT template is linked, its base price already covers the
+      // meal side — don't double-count any FIT items that might still be
+      // lingering in the selection.
+      if (_fitTemplateId != null &&
+          (item['brand'] as String?) == 'fit') {
+        continue;
+      }
       final price = (item['price_paise'] as int?) ?? 0;
       total += price * entry.value;
     }
     return total;
   }
 
+  int _fitBasePaise(List<Map<String, dynamic>> templates) {
+    if (_fitTemplateId == null) return 0;
+    final tpl = templates.firstWhere(
+      (t) => t['id'] == _fitTemplateId,
+      orElse: () => const <String, dynamic>{},
+    );
+    return (tpl['base_price_paise'] as int?) ?? 0;
+  }
+
+  int _sessionPaise(Map<String, dynamic>? config) {
+    if (_sessionMinutes == null || config == null) return 0;
+    final key = _sessionMinutes == 120
+        ? 'session_2hr_price_paise'
+        : 'session_1hr_price_paise';
+    return (config[key] as int?) ?? 0;
+  }
+
+  String _breakdownLabel(
+    List<Map<String, dynamic>> items,
+    List<Map<String, dynamic>> templates,
+    Map<String, dynamic>? config,
+  ) {
+    final parts = <String>[];
+    final itemSum = _sumOfSelectedPaise(items);
+    if (itemSum > 0) parts.add('items ${Money.fromPaise(itemSum)}');
+    final fitSum = _fitBasePaise(templates);
+    if (fitSum > 0) parts.add('FIT base ${Money.fromPaise(fitSum)}');
+    final sessionSum = _sessionPaise(config);
+    if (sessionSum > 0) parts.add('session ${Money.fromPaise(sessionSum)}');
+    if (parts.isEmpty) return 'Nothing selected yet';
+    return parts.join('  ·  ');
+  }
+
   Widget _photoPicker() {
     final hasNew = _photoBytes != null;
     final hasExisting = _existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty;
     return InkWell(
-      onTap: _busy ? null : _pickPhoto,
+      onTap: (_busy || _photoLoading) ? null : _pickPhoto,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         height: 180,
@@ -503,24 +561,26 @@ class _ComboEditScreenState extends ConsumerState<ComboEditScreen> {
                     )
                   : null,
         ),
-        child: hasNew || hasExisting
-            ? null
-            : Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(PhosphorIconsRegular.image,
-                        size: 36, color: AppColors.lightTextSecondary),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Tap to add photo',
-                      style: AppTextStyles.caption(
-                        context, color: AppColors.lightTextSecondary,
-                      ),
+        child: _photoLoading
+            ? const Center(child: CircularProgressIndicator())
+            : hasNew || hasExisting
+                ? null
+                : Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(PhosphorIconsRegular.image,
+                            size: 36, color: AppColors.lightTextSecondary),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Tap to add photo',
+                          style: AppTextStyles.caption(
+                            context, color: AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
       ),
     );
   }
@@ -677,7 +737,12 @@ class _ItemRow extends StatelessWidget {
 class _SavingsIndicator extends StatelessWidget {
   final int sumPaise;
   final int comboPaise;
-  const _SavingsIndicator({required this.sumPaise, required this.comboPaise});
+  final String breakdown;
+  const _SavingsIndicator({
+    required this.sumPaise,
+    required this.comboPaise,
+    required this.breakdown,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -697,6 +762,7 @@ class _SavingsIndicator extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
             saves > 0 ? PhosphorIconsRegular.checkCircle
@@ -707,28 +773,40 @@ class _SavingsIndicator extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
                   TextSpan(
-                    text: 'Sum of items: ${Money.fromPaise(sumPaise)}  ·  ',
-                    style: AppTextStyles.caption(
-                      context, color: AppColors.lightTextSecondary,
-                    ),
+                    children: [
+                      TextSpan(
+                        text: 'À la carte total: ${Money.fromPaise(sumPaise)}  ·  ',
+                        style: AppTextStyles.caption(
+                          context, color: AppColors.lightTextSecondary,
+                        ),
+                      ),
+                      TextSpan(
+                        text: 'Combo: ${Money.fromPaise(comboPaise)}  ·  ',
+                        style: AppTextStyles.caption(
+                          context, color: AppColors.lightTextSecondary,
+                        ),
+                      ),
+                      TextSpan(
+                        text: label,
+                        style: AppTextStyles.body(context, color: color)
+                            .copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    ],
                   ),
-                  TextSpan(
-                    text: 'Combo: ${Money.fromPaise(comboPaise)}  ·  ',
-                    style: AppTextStyles.caption(
-                      context, color: AppColors.lightTextSecondary,
-                    ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  breakdown,
+                  style: AppTextStyles.caption(
+                    context, color: AppColors.lightTextSecondary,
                   ),
-                  TextSpan(
-                    text: label,
-                    style: AppTextStyles.body(context, color: color)
-                        .copyWith(fontWeight: FontWeight.w800),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -736,6 +814,19 @@ class _SavingsIndicator extends StatelessWidget {
     );
   }
 }
+
+/// Venue pricing config for the single Kondapur venue. Used to put a real
+/// session price into the combo savings math when a bundled play session is
+/// selected.
+final _venueConfigProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
+  final row = await Supabase.instance.client
+      .from('venue_config')
+      .select('session_1hr_price_paise, session_2hr_price_paise')
+      .eq('venue_id', _kondapurVenueId)
+      .maybeSingle();
+  return row == null ? null : Map<String, dynamic>.from(row);
+});
 
 /// All menu_items joined to menus (for brand). Includes only active items.
 final _allMenuItemsProvider =

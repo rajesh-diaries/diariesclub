@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../utils/admin_image_picker.dart';
 import '../widgets/admin_app_bar.dart';
 import '../widgets/admin_buttons.dart';
 import 'fit_categories_screen.dart' show fitCategoriesAdminProvider;
@@ -34,6 +35,7 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
   final _descCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
   final _sortCtrl = TextEditingController(text: '0');
+  final _includedSidesCtrl = TextEditingController();
 
   Uint8List? _photoBytes;
   String? _existingPhotoUrl;
@@ -41,11 +43,16 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
   bool _isAvailable = true;
   bool _isSubscribable = false;
 
+  // NULL = auto-detect from protein options; TRUE = force show; FALSE = force hide.
+  bool? _vegOverride;
+  bool? _nonVegOverride;
+
   // Linked categories: map category_id → {is_required, selection_type_override, display_order}.
   Map<String, _LinkSpec> _links = {};
 
   bool _busy = false;
   bool _loading = true;
+  bool _photoLoading = false;
   String? _errorText;
 
   bool get _isEditing => widget.templateId != null;
@@ -66,6 +73,7 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
     _descCtrl.dispose();
     _priceCtrl.dispose();
     _sortCtrl.dispose();
+    _includedSidesCtrl.dispose();
     super.dispose();
   }
 
@@ -101,7 +109,15 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
         _isPublished = (tpl['is_published'] as bool?) ?? true;
         _isAvailable = (tpl['is_available'] as bool?) ?? true;
         _isSubscribable = (tpl['is_subscribable'] as bool?) ?? false;
+        _vegOverride = tpl['veg_available'] as bool?;
+        _nonVegOverride = tpl['non_veg_available'] as bool?;
         _existingPhotoUrl = tpl['photo_url'] as String?;
+        final sides = (tpl['included_sides'] as List<dynamic>?)
+                ?.map((s) => s.toString())
+                .where((s) => s.isNotEmpty)
+                .toList() ??
+            [];
+        _includedSidesCtrl.text = sides.join(', ');
         for (final l in links) {
           final cid = l['category_id'] as String;
           _links[cid] = _LinkSpec(
@@ -122,39 +138,31 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
   }
 
   Future<void> _pickPhoto() async {
+    if (_busy || _photoLoading) return;
+    setState(() {
+      _photoLoading = true;
+      _errorText = null;
+    });
     try {
-      final picked = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1200,
-        maxHeight: 1200,
-      );
-      if (picked == null) return;
-      final raw = await picked.readAsBytes();
+      final compressed = await pickAndCompressImage(maxDimension: 1024);
+      if (compressed == null || !mounted) return;
+      setState(() => _photoBytes = compressed);
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _photoBytes = raw);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _errorText = "Couldn't load that image.");
+      setState(() => _errorText = "Couldn't load image: $e");
+    } finally {
+      if (mounted) setState(() => _photoLoading = false);
     }
   }
 
   Future<String?> _uploadPhotoIfNew() async {
     if (_photoBytes == null) return _existingPhotoUrl;
-    final fileName = '${const Uuid().v4()}.jpg';
-    final path = 'fit/$fileName';
-    await Supabase.instance.client.storage
-        .from('menu-photos')
-        .uploadBinary(
-          path,
-          _photoBytes!,
-          fileOptions: const FileOptions(
-            contentType: 'image/jpeg',
-            upsert: false,
-          ),
-        );
-    return Supabase.instance.client.storage
-        .from('menu-photos')
-        .getPublicUrl(path);
+    return uploadImageBytes(
+      bytes: _photoBytes!,
+      bucket: 'menu-photos',
+      folder: 'fit',
+      timeoutSeconds: 30,
+    );
   }
 
   String? _validate() {
@@ -180,6 +188,11 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
       final photoUrl = await _uploadPhotoIfNew();
       final basePricePaise = (int.parse(_priceCtrl.text.trim())) * 100;
       final sortOrder = int.tryParse(_sortCtrl.text.trim()) ?? 0;
+      final includedSides = _includedSidesCtrl.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
 
       if (_isEditing) {
         await Supabase.instance.client.rpc<dynamic>(
@@ -196,6 +209,9 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
             'p_is_published': _isPublished,
             'p_is_available': _isAvailable,
             'p_sort_order': sortOrder,
+            'p_included_sides': includedSides,
+            'p_veg_available': _vegOverride,
+            'p_non_veg_available': _nonVegOverride,
           },
         );
       } else {
@@ -211,6 +227,9 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
             'p_is_subscribable': _isSubscribable,
             'p_subscription_meta': null,
             'p_sort_order': sortOrder,
+            'p_included_sides': includedSides,
+            'p_veg_available': _vegOverride,
+            'p_non_veg_available': _nonVegOverride,
           },
         );
         templateId = res['template_id'] as String?;
@@ -258,6 +277,13 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
         SnackBar(content: Text(_isEditing ? 'Saved' : 'Created')),
       );
       context.go('/admin/catalog/fit');
+    } on TimeoutException catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _errorText =
+            'Photo upload timed out. Please check your network and try again.';
+      });
     } on PostgrestException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -305,6 +331,15 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
                       maxLines: 3,
                       decoration: const InputDecoration(
                         labelText: 'Description (optional)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _includedSidesCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Included with every meal (comma separated)',
+                        hintText: 'Sauteed veggies, Garden salad',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -369,6 +404,48 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
                             : (v) => setState(() => _isPublished = v),
                       ),
                     ],
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<bool?>(
+                            value: _vegOverride,
+                            decoration: const InputDecoration(
+                              labelText: 'Veg badge',
+                              helperText: 'Auto = detect from options',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: null, child: Text('Auto')),
+                              DropdownMenuItem(value: true, child: Text('Show')),
+                              DropdownMenuItem(value: false, child: Text('Hide')),
+                            ],
+                            onChanged: _busy
+                                ? null
+                                : (v) => setState(() => _vegOverride = v),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<bool?>(
+                            value: _nonVegOverride,
+                            decoration: const InputDecoration(
+                              labelText: 'Non-Veg badge',
+                              helperText: 'Auto = detect from options',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: null, child: Text('Auto')),
+                              DropdownMenuItem(value: true, child: Text('Show')),
+                              DropdownMenuItem(value: false, child: Text('Hide')),
+                            ],
+                            onChanged: _busy
+                                ? null
+                                : (v) => setState(() => _nonVegOverride = v),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 24),
                     Text('Linked categories', style: AppTextStyles.h3(context)),
                     const SizedBox(height: 8),
@@ -429,7 +506,7 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
     final hasNew = _photoBytes != null;
     final hasExisting = _existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty;
     return InkWell(
-      onTap: _busy ? null : _pickPhoto,
+      onTap: (_busy || _photoLoading) ? null : _pickPhoto,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         height: 180,
@@ -449,28 +526,30 @@ class _FitTemplateEditScreenState extends ConsumerState<FitTemplateEditScreen> {
                     )
                   : null,
         ),
-        child: hasNew || hasExisting
-            ? null
-            : Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      PhosphorIconsRegular.image,
-                      size: 36,
-                      color: AppColors.lightTextSecondary,
+        child: _photoLoading
+            ? const Center(child: CircularProgressIndicator())
+            : hasNew || hasExisting
+                ? null
+                : Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          PhosphorIconsRegular.image,
+                          size: 36,
+                          color: AppColors.lightTextSecondary,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Tap to add photo',
+                          style: AppTextStyles.caption(
+                            context,
+                            color: AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Tap to add photo',
-                      style: AppTextStyles.caption(
-                        context,
-                        color: AppColors.lightTextSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                  ),
       ),
     );
   }

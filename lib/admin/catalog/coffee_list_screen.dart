@@ -48,7 +48,9 @@ class CoffeeListScreen extends ConsumerWidget {
               if (!context.mounted) return;
               if (menuId == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Coffee menu missing — seed first.')),
+                  const SnackBar(
+                    content: Text('Coffee menu missing — seed first.'),
+                  ),
                 );
                 return;
               }
@@ -69,7 +71,12 @@ class CoffeeListScreen extends ConsumerWidget {
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (rows) => _Table(rows: rows, ref: ref),
+        data: (rows) => Consumer(
+          builder: (context, ref, _) => _Table(
+            rows: rows,
+            onRefresh: () => ref.invalidate(coffeeMenuItemsProvider),
+          ),
+        ),
       ),
     );
   }
@@ -77,8 +84,9 @@ class CoffeeListScreen extends ConsumerWidget {
 
 class _Table extends StatefulWidget {
   final List<Map<String, dynamic>> rows;
-  final WidgetRef ref;
-  const _Table({required this.rows, required this.ref});
+  final VoidCallback onRefresh;
+
+  const _Table({required this.rows, required this.onRefresh});
 
   @override
   State<_Table> createState() => _TableState();
@@ -88,7 +96,7 @@ class _TableState extends State<_Table> {
   final Set<String> _selected = <String>{};
 
   List<Map<String, dynamic>> get rows => widget.rows;
-  WidgetRef get ref => widget.ref;
+  VoidCallback get onRefresh => widget.onRefresh;
 
   void _toggleSelected(String id, bool? on) {
     setState(() {
@@ -112,8 +120,10 @@ class _TableState extends State<_Table> {
     });
   }
 
-  Future<void> _bulkSet(BuildContext context, {
-    bool? available, bool? published,
+  Future<void> _bulkSet(
+    BuildContext context, {
+    bool? available,
+    bool? published,
   }) async {
     if (_selected.isEmpty) return;
     try {
@@ -127,12 +137,12 @@ class _TableState extends State<_Table> {
       );
       if (!context.mounted) return;
       setState(() => _selected.clear());
-      ref.invalidate(coffeeMenuItemsProvider);
+      onRefresh();
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Bulk update failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Bulk update failed: $e')));
     }
   }
 
@@ -164,8 +174,7 @@ class _TableState extends State<_Table> {
           const SizedBox(width: 8),
           AdminPrimaryButton(
             label: 'Save',
-            onPressed: () =>
-                Navigator.pop(c, int.tryParse(ctrl.text.trim())),
+            onPressed: () => Navigator.pop(c, int.tryParse(ctrl.text.trim())),
           ),
         ],
       ),
@@ -175,18 +184,15 @@ class _TableState extends State<_Table> {
     try {
       await Supabase.instance.client.rpc<dynamic>(
         'admin_menu_item_set_price',
-        params: {
-          'p_id': r['id'],
-          'p_price_paise': newRupees * 100,
-        },
+        params: {'p_id': r['id'], 'p_price_paise': newRupees * 100},
       );
       if (!context.mounted) return;
-      ref.invalidate(coffeeMenuItemsProvider);
+      onRefresh();
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update price: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not update price: $e')));
     }
   }
 
@@ -197,12 +203,12 @@ class _TableState extends State<_Table> {
         params: {'p_id': id, 'p_available': to},
       );
       if (!context.mounted) return;
-      ref.invalidate(coffeeMenuItemsProvider);
+      onRefresh();
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not toggle: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not toggle: $e')));
     }
   }
 
@@ -213,12 +219,12 @@ class _TableState extends State<_Table> {
         params: {'p_id': id, 'p_direction': dir},
       );
       if (!context.mounted) return;
-      ref.invalidate(coffeeMenuItemsProvider);
+      onRefresh();
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not reorder: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not reorder: $e')));
     }
   }
 
@@ -249,22 +255,21 @@ class _TableState extends State<_Table> {
         params: {'p_id': id},
       );
       if (!context.mounted) return;
-      ref.invalidate(coffeeMenuItemsProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Item hidden')),
-      );
+      onRefresh();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Item hidden')));
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not hide: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not hide: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final allSelected = rows.isNotEmpty &&
-        _selected.length == rows.length;
+    final allSelected = rows.isNotEmpty && _selected.length == rows.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -283,133 +288,143 @@ class _TableState extends State<_Table> {
           ),
         Expanded(
           child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.lightSurface,
-            border: Border.all(color: AppColors.lightBorder),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.vertical,
+            decoration: BoxDecoration(
+              color: AppColors.lightSurface,
+              border: Border.all(color: AppColors.lightBorder),
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                showCheckboxColumn: false,
-                columns: [
-                  DataColumn(
-                    label: Checkbox(
-                      value: allSelected,
-                      tristate: true,
-                      onChanged: _toggleAll,
+              scrollDirection: Axis.vertical,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  showCheckboxColumn: false,
+                  columns: [
+                    DataColumn(
+                      label: Checkbox(
+                        value: allSelected,
+                        tristate: true,
+                        onChanged: _toggleAll,
+                      ),
                     ),
-                  ),
-                  const DataColumn(label: Text('')),
-                  const DataColumn(label: Text('Name')),
-                  const DataColumn(label: Text('Category')),
-                  const DataColumn(label: Text('Price'), numeric: true),
-                  const DataColumn(label: Text('Available')),
-                  const DataColumn(label: Text('Status')),
-                  const DataColumn(label: Text('Actions')),
-                ],
-                rows: [
-                  for (final r in rows)
-                    DataRow(cells: [
-                      DataCell(Checkbox(
-                        value: _selected.contains(r['id']),
-                        onChanged: (v) =>
-                            _toggleSelected(r['id'] as String, v),
-                      )),
-                      DataCell(_thumb(r['image_url'] as String?)),
-                      DataCell(Text(
-                        (r['name'] as String?) ?? '—',
-                        style: TextStyle(
-                          decoration: (r['is_published'] as bool? ?? true)
-                              ? null
-                              : TextDecoration.lineThrough,
-                          color: (r['is_published'] as bool? ?? true)
-                              ? null
-                              : AppColors.lightTextSecondary,
-                        ),
-                      )),
-                      DataCell(Text(
-                        (r['category'] as String?) ?? '—',
-                        style: AppTextStyles.caption(
-                          context,
-                          color: AppColors.lightTextSecondary,
-                        ),
-                      )),
-                      DataCell(
-                        InkWell(
-                          onTap: () => _editPrice(context, r),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                Money.fromPaise((r['price_paise'] as int?) ?? 0),
+                    const DataColumn(label: Text('')),
+                    const DataColumn(label: Text('Name')),
+                    const DataColumn(label: Text('Category')),
+                    const DataColumn(label: Text('Badges')),
+                    const DataColumn(label: Text('Price'), numeric: true),
+                    const DataColumn(label: Text('Available')),
+                    const DataColumn(label: Text('Status')),
+                    const DataColumn(label: Text('Actions')),
+                  ],
+                  rows: [
+                    for (final r in rows)
+                      DataRow(
+                        cells: [
+                          DataCell(
+                            Checkbox(
+                              value: _selected.contains(r['id']),
+                              onChanged: (v) =>
+                                  _toggleSelected(r['id'] as String, v),
+                            ),
+                          ),
+                          DataCell(_thumb(r['image_url'] as String?)),
+                          DataCell(
+                            Text(
+                              (r['name'] as String?) ?? '—',
+                              style: TextStyle(
+                                decoration: (r['is_published'] as bool? ?? true)
+                                    ? null
+                                    : TextDecoration.lineThrough,
+                                color: (r['is_published'] as bool? ?? true)
+                                    ? null
+                                    : AppColors.lightTextSecondary,
                               ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                PhosphorIconsRegular.pencilSimple,
-                                size: 12,
+                            ),
+                          ),
+                          DataCell(
+                            Text(
+                              (r['category'] as String?) ?? '—',
+                              style: AppTextStyles.caption(
+                                context,
                                 color: AppColors.lightTextSecondary,
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
-                  DataCell(Switch(
-                    value: (r['is_available'] as bool?) ?? true,
-                    onChanged: (r['is_published'] as bool? ?? true)
-                        ? (v) => _toggle(context, r['id'] as String, v)
-                        : null,
-                  )),
-                  DataCell(_StatusBadge(
-                    isPublished: (r['is_published'] as bool?) ?? true,
-                    isAvailable: (r['is_available'] as bool?) ?? true,
-                  )),
-                  DataCell(Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AdminIconButton(
-                        tooltip: 'Move up',
-                        icon: PhosphorIconsRegular.arrowUp,
-                        size: 16,
-                        onPressed: () =>
-                            _reorder(context, r['id'] as String, 'up'),
-                      ),
-                      AdminIconButton(
-                        tooltip: 'Move down',
-                        icon: PhosphorIconsRegular.arrowDown,
-                        size: 16,
-                        onPressed: () =>
-                            _reorder(context, r['id'] as String, 'down'),
-                      ),
-                      AdminIconButton(
-                        tooltip: 'Edit',
-                        icon: PhosphorIconsRegular.pencilSimple,
-                        size: 16,
-                        onPressed: () => context.go(
-                          '/admin/catalog/coffee/${r['id']}/edit',
-                        ),
-                      ),
-                      if (r['is_published'] as bool? ?? true)
-                        AdminIconButton(
-                          tooltip: 'Hide',
-                          icon: PhosphorIconsRegular.eyeSlash,
-                          size: 16,
-                          color: AppColors.adminRed,
-                          onPressed: () => _hide(
-                            context,
-                            r['id'] as String,
-                            (r['name'] as String?) ?? 'this item',
+                          DataCell(_BadgesCell(row: r)),
+                          DataCell(
+                            InkWell(
+                              onTap: () => _editPrice(context, r),
+                              child: _PriceCell(row: r),
+                            ),
                           ),
-                        ),
-                    ],
-                  )),
-                ]),
-                ],
+                          DataCell(
+                            Switch(
+                              value: (r['is_available'] as bool?) ?? true,
+                              onChanged: (r['is_published'] as bool? ?? true)
+                                  ? (v) =>
+                                        _toggle(context, r['id'] as String, v)
+                                  : null,
+                            ),
+                          ),
+                          DataCell(
+                            _StatusBadge(
+                              isPublished: (r['is_published'] as bool?) ?? true,
+                              isAvailable: (r['is_available'] as bool?) ?? true,
+                            ),
+                          ),
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AdminIconButton(
+                                  tooltip: 'Move up',
+                                  icon: PhosphorIconsRegular.arrowUp,
+                                  size: 16,
+                                  onPressed: () => _reorder(
+                                    context,
+                                    r['id'] as String,
+                                    'up',
+                                  ),
+                                ),
+                                AdminIconButton(
+                                  tooltip: 'Move down',
+                                  icon: PhosphorIconsRegular.arrowDown,
+                                  size: 16,
+                                  onPressed: () => _reorder(
+                                    context,
+                                    r['id'] as String,
+                                    'down',
+                                  ),
+                                ),
+                                AdminIconButton(
+                                  tooltip: 'Edit',
+                                  icon: PhosphorIconsRegular.pencilSimple,
+                                  size: 16,
+                                  onPressed: () => context.go(
+                                    '/admin/catalog/coffee/${r['id']}/edit',
+                                  ),
+                                ),
+                                if (r['is_published'] as bool? ?? true)
+                                  AdminIconButton(
+                                    tooltip: 'Hide',
+                                    icon: PhosphorIconsRegular.eyeSlash,
+                                    size: 16,
+                                    color: AppColors.adminRed,
+                                    onPressed: () => _hide(
+                                      context,
+                                      r['id'] as String,
+                                      (r['name'] as String?) ?? 'this item',
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
           ),
         ),
       ],
@@ -439,12 +454,220 @@ class _TableState extends State<_Table> {
         width: 32,
         height: 32,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
-          width: 32,
-          height: 32,
-          color: AppColors.lightBackground,
-        ),
+        errorBuilder: (_, __, ___) =>
+            Container(width: 32, height: 32, color: AppColors.lightBackground),
       ),
+    );
+  }
+}
+
+class _PriceCell extends StatelessWidget {
+  final Map<String, dynamic> row;
+
+  const _PriceCell({required this.row});
+
+  @override
+  Widget build(BuildContext context) {
+    final pricePaise = (row['price_paise'] as int?) ?? 0;
+    final offerPaise = row['offer_price_paise'] as int?;
+    final offerLabel = (row['offer_label'] as String?) ?? '';
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (offerPaise != null && offerPaise > 0) ...[
+          Text(
+            Money.fromPaise(pricePaise),
+            style: const TextStyle(
+              color: AppColors.lightTextSecondary,
+              decoration: TextDecoration.lineThrough,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            Money.fromPaise(offerPaise),
+            style: const TextStyle(
+              color: AppColors.adminRed,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (offerLabel.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.adminRed.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                offerLabel,
+                style: const TextStyle(
+                  color: AppColors.adminRed,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ] else ...[
+          Text(Money.fromPaise(pricePaise)),
+        ],
+        const SizedBox(width: 4),
+        const Icon(
+          PhosphorIconsRegular.pencilSimple,
+          size: 12,
+          color: AppColors.lightTextSecondary,
+        ),
+      ],
+    );
+  }
+}
+
+class _BadgesCell extends StatelessWidget {
+  final Map<String, dynamic> row;
+
+  const _BadgesCell({required this.row});
+
+  List<String> _listOfStrings(dynamic value) {
+    if (value == null) return const [];
+    if (value is List) return value.whereType<String>().toList();
+    return const [];
+  }
+
+  IconData _iconFor(String symbol) {
+    return switch (symbol) {
+      'chilli' => PhosphorIconsRegular.pepper,
+      'leaf' => PhosphorIconsRegular.leaf,
+      'star' => PhosphorIconsRegular.star,
+      'flame' => PhosphorIconsRegular.fire,
+      'heart' => PhosphorIconsRegular.heart,
+      'timer' => PhosphorIconsRegular.timer,
+      _ => PhosphorIconsRegular.circle,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tags = _listOfStrings(row['tags']);
+    final symbols = _listOfStrings(row['symbols']);
+    final prepTime = row['prep_time_minutes'] as int?;
+    final dietaryType = row['dietary_type'] as String?;
+
+    if (tags.isEmpty &&
+        symbols.isEmpty &&
+        prepTime == null &&
+        (dietaryType == null || dietaryType.isEmpty)) {
+      return const Text('—');
+    }
+
+    final (dietaryColor, dietaryLabel) = switch (dietaryType?.toLowerCase()) {
+      'veg' => (Colors.green, 'Veg'),
+      'non_veg' => (Colors.red, 'Non-veg'),
+      'egg' => (Colors.amber, 'Egg'),
+      'customizable' => (Colors.blue, 'Customizable'),
+      _ => (null, null),
+    };
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        if (dietaryColor != null && dietaryLabel != null)
+          _Badge(
+            label: dietaryLabel,
+            backgroundColor: dietaryColor.withValues(alpha: 0.12),
+            foregroundColor: dietaryColor,
+          ),
+        ...tags.map(
+          (tag) => _Badge(
+            label: tag,
+            backgroundColor: AppColors.navy.withValues(alpha: 0.08),
+            foregroundColor: AppColors.navy,
+          ),
+        ),
+        ...symbols.map(
+          (symbol) => _IconBadge(
+            icon: _iconFor(symbol),
+            backgroundColor: AppColors.gold.withValues(alpha: 0.15),
+            foregroundColor: AppColors.coffeeBrownDeep,
+          ),
+        ),
+        if (prepTime != null)
+          _Badge(
+            label: '$prepTime min',
+            icon: PhosphorIconsRegular.timer,
+            backgroundColor: AppColors.lightBorder,
+            foregroundColor: AppColors.lightTextSecondary,
+          ),
+      ],
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final Color backgroundColor;
+  final Color foregroundColor;
+
+  const _Badge({
+    required this.label,
+    this.icon,
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: foregroundColor),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              color: foregroundColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IconBadge extends StatelessWidget {
+  final IconData icon;
+  final Color backgroundColor;
+  final Color foregroundColor;
+
+  const _IconBadge({
+    required this.icon,
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, size: 14, color: foregroundColor),
     );
   }
 }
@@ -461,33 +684,35 @@ class _StatusBadge extends StatelessWidget {
   }
 
   Widget _badge(String label, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(color: color, fontWeight: FontWeight.w700),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(color: color, fontWeight: FontWeight.w700),
+    ),
+  );
 }
 
 /// All coffee items (published + hidden), ordered by category then sort.
 final coffeeMenuItemsProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final rows = await Supabase.instance.client
-      .from('menu_items')
-      .select(
-        'id, name, description, price_paise, image_url, category, '
-        'is_available, is_published, sort_order, menu_id, '
-        'menu:menus!inner(brand)',
-      )
-      .eq('menu.brand', 'coffee')
-      .order('category', ascending: true)
-      .order('sort_order', ascending: true);
-  return List<Map<String, dynamic>>.from(rows);
-});
+      final rows = await Supabase.instance.client
+          .from('menu_items')
+          .select(
+            'id, name, description, price_paise, image_url, category, '
+            'is_available, is_published, sort_order, menu_id, '
+            'tags, symbols, offer_price_paise, offer_label, prep_time_minutes, '
+            'dietary_type, '
+            'menu:menus!inner(brand)',
+          )
+          .eq('menu.brand', 'coffee')
+          .order('category', ascending: true)
+          .order('sort_order', ascending: true);
+      return List<Map<String, dynamic>>.from(rows);
+    });
 
 /// Helper: resolve the coffee menu's id (one row per venue).
 Future<String?> coffeeMenuId() async {
@@ -530,10 +755,9 @@ class _BulkBar extends StatelessWidget {
         children: [
           Text(
             '$count selected',
-            style: AppTextStyles.body(context).copyWith(
-              fontWeight: FontWeight.w800,
-              color: AppColors.navy,
-            ),
+            style: AppTextStyles.body(
+              context,
+            ).copyWith(fontWeight: FontWeight.w800, color: AppColors.navy),
           ),
           const SizedBox(width: 16),
           AdminSecondaryButton(
@@ -615,10 +839,17 @@ class _CategoriesDialog extends StatefulWidget {
 }
 
 class _CategoriesDialogState extends State<_CategoriesDialog> {
+  late List<String> _categories;
   String? _editing;
   final _newNameCtrl = TextEditingController();
   bool _busy = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _categories = List<String>.from(widget.categories);
+  }
 
   @override
   void dispose() {
@@ -650,9 +881,9 @@ class _CategoriesDialogState extends State<_CategoriesDialog> {
         _newNameCtrl.clear();
         _busy = false;
         // Update local list to reflect change so dialog can stay open.
-        widget.categories.remove(from);
-        if (!widget.categories.contains(to)) widget.categories.add(to);
-        widget.categories.sort();
+        _categories.remove(from);
+        if (!_categories.contains(to)) _categories.add(to);
+        _categories.sort();
       });
     } catch (e) {
       if (!mounted) return;
@@ -669,88 +900,96 @@ class _CategoriesDialogState extends State<_CategoriesDialog> {
       title: const Text('Manage categories'),
       content: SizedBox(
         width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Renaming a category updates every item in that category. '
-              'If the new name already exists, items merge into it.',
-              style: AppTextStyles.caption(
-                context, color: AppColors.lightTextSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (widget.categories.isEmpty)
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Text(
-                'No categories yet.',
-                style: AppTextStyles.body(
-                  context, color: AppColors.lightTextSecondary,
-                ),
-              )
-            else
-              for (final c in widget.categories)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: _editing == c
-                      ? Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _newNameCtrl,
-                                autofocus: true,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                ),
-                                onSubmitted: (_) => _rename(),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            AdminPrimaryButton(
-                              label: 'Save',
-                              busy: _busy,
-                              onPressed: _busy ? null : _rename,
-                            ),
-                            AdminIconButton(
-                              tooltip: 'Cancel',
-                              icon: PhosphorIconsRegular.x,
-                              size: 16,
-                              onPressed: () => setState(() {
-                                _editing = null;
-                                _newNameCtrl.clear();
-                                _error = null;
-                              }),
-                            ),
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            Expanded(
-                              child: Text(c, style: AppTextStyles.body(context)),
-                            ),
-                            AdminIconButton(
-                              tooltip: 'Rename',
-                              icon: PhosphorIconsRegular.pencilSimple,
-                              size: 16,
-                              onPressed: () => setState(() {
-                                _editing = c;
-                                _newNameCtrl.text = c;
-                              }),
-                            ),
-                          ],
-                        ),
-                ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _error!,
+                'Renaming a category updates every item in that category. '
+                'If the new name already exists, items merge into it.',
                 style: AppTextStyles.caption(
-                  context, color: AppColors.adminRed,
+                  context,
+                  color: AppColors.lightTextSecondary,
                 ),
               ),
+              const SizedBox(height: 12),
+              if (_categories.isEmpty)
+                Text(
+                  'No categories yet.',
+                  style: AppTextStyles.body(
+                    context,
+                    color: AppColors.lightTextSecondary,
+                  ),
+                )
+              else
+                for (final c in _categories)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: _editing == c
+                        ? Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _newNameCtrl,
+                                  autofocus: true,
+                                  decoration: const InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                  onSubmitted: (_) => _rename(),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              AdminPrimaryButton(
+                                label: 'Save',
+                                busy: _busy,
+                                onPressed: _busy ? null : _rename,
+                              ),
+                              AdminIconButton(
+                                tooltip: 'Cancel',
+                                icon: PhosphorIconsRegular.x,
+                                size: 16,
+                                onPressed: () => setState(() {
+                                  _editing = null;
+                                  _newNameCtrl.clear();
+                                  _error = null;
+                                }),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  c,
+                                  style: AppTextStyles.body(context),
+                                ),
+                              ),
+                              AdminIconButton(
+                                tooltip: 'Rename',
+                                icon: PhosphorIconsRegular.pencilSimple,
+                                size: 16,
+                                onPressed: () => setState(() {
+                                  _editing = c;
+                                  _newNameCtrl.text = c;
+                                }),
+                              ),
+                            ],
+                          ),
+                  ),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.adminRed,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
       actions: [

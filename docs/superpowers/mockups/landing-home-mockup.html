@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Play Diaries — Landing & Home Mockups</title>
+  <style>
+    :root {
+      --navy: #1A2B4C;
+      --gold: #E5B80B;
+      --coral: #F27A6A;
+      --blue: #7DB9E8;
+      --amber: #F2B705;
+      --green: #8FD6A7;
+      --bg: #F7F8FA;
+      --surface: #FFFFFF;
+      --text-secondary: #6B7280;
+      --border: #E5E7EB;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #E9ECEF;
+      padding: 32px 16px;
+    }
+    h1 {
+      text-align: center;
+      color: var(--navy);
+      margin-bottom: 8px;
+      font-size: 24px;
+    }
+    .subtitle {
+      text-align: center;
+      color: var(--text-secondary);
+      margin-bottom: 28px;
+      font-size: 14px;
+    }
+    .gallery {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 28px;
+      justify-content: center;
+    }
+    .card {
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+      max-width: 340px;
+      flex: 1 1 300px;
+    }
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      color: var(--navy);
+    }
+    .phone {
+      width: 280px;
+      height: 560px;
+      border: 10px solid #111;
+      border-radius: 36px;
+      background: var(--bg);
+      margin: 0 auto;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    .phone-notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 22px;
+      background: #111;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+      z-index: 10;
+    }
+    .screen {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    .screen::-webkit-scrollbar { width: 0; }
+
+    /* Landing common */
+    .hero-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    .avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.06);
+    }
+    .avatar.rafi { background: #FFE4E0; }
+    .avatar.ellie { background: #E0F0FA; }
+    .avatar.gerry { background: #FFF4D9; }
+    .avatar.zena { background: #E0F7E8; }
+
+    h3.title {
+      color: var(--navy);
+      font-size: 28px;
+      line-height: 1.15;
+      margin: 0;
+    }
+    .sub {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.4;
+      margin: 0;
+    }
+    .phone-field {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .country {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 10px;
+      font-size: 14px;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .input {
+      flex: 1;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 15px;
+      background: var(--surface);
+      color: var(--text-secondary);
+    }
+    .consent {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.35;
+    }
+    .checkbox {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .btn {
+      width: 100%;
+      background: var(--navy);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .btn:disabled {
+      opacity: 0.5;
+    }
+    .help {
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 13px;
+      margin-top: auto;
+    }
+
+    /* Option A specific */
+    .option-a .screen {
+      padding-top: 28px;
+    }
+    .option-a .title-wrap {
+      text-align: center;
+      margin-top: 22px;
+    }
+
+    /* Option B specific */
+    .option-b .screen {
+      justify-content: flex-end;
+      padding-top: 24px;
+    }
+    .option-b .form-card {
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.05);
+      margin-top: 14px;
+    }
+
+    /* Home screen */
+    .home-screen {
+      background: white;
+    }
+    .status-bar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .pill {
+      background: rgba(229,184,11,0.18);
+      border: 1px solid rgba(229,184,11,0.5);
+      color: var(--navy);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .greeting {
+      color: var(--navy);
+      font-size: 26px;
+      font-weight: 800;
+      margin: 0;
+    }
+    .tagline {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin: 4px 0 0;
+    }
+    .banner {
+      width: 100%;
+      height: 120px;
+      background: linear-gradient(135deg, #E8D5B7, #D6C0A0);
+      border-radius: 16px;
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      padding: 16px;
+      gap: 12px;
+      color: var(--navy);
+    }
+    .banner-img {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #fff;
+      opacity: 0.8;
+      display: grid;
+      place-items: center;
+      font-size: 36px;
+    }
+    .banner-text h4 { margin: 0; font-size: 16px; }
+    .banner-text p { margin: 4px 0 0; font-size: 12px; opacity: 0.8; }
+    .cta-card {
+      background: linear-gradient(135deg, #F9D26A, #F2B075);
+      border-radius: 16px;
+      padding: 16px;
+      color: white;
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .cta-card h4 { margin: 0; font-size: 18px; }
+    .cta-card p { margin: 4px 0 0; font-size: 12px; opacity: 0.95; }
+    .cta-btn {
+      background: white;
+      color: var(--coral);
+      border: none;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-weight: 800;
+      font-size: 13px;
+    }
+    .section-card {
+      background: #FFF9ED;
+      border: 1px solid #F3E6D0;
+      border-radius: 14px;
+      padding: 14px;
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .section-card h4 { margin: 0; color: var(--navy); font-size: 15px; }
+    .section-card p { margin: 2px 0 0; color: var(--text-secondary); font-size: 12px; }
+    .section-btn {
+      background: #D4B28F;
+      color: white;
+      border: none;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .section-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: #FFE4B3;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      margin-right: 10px;
+    }
+
+    .label {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      color: white;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .notes {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+    .notes strong { color: var(--navy); }
+  </style>
+</head>
+<body>
+  <h1>Play Diaries — UI Refresh Mockups</h1>
+  <p class="subtitle">Two landing-page directions + before/after for the home-tab top spacing</p>
+
+  <div class="gallery">
+    <!-- Landing Option A -->
+    <div class="card">
+      <h2>Auth landing — Option A: Compact & centered</h2>
+      <div class="phone option-a">
+        <div class="phone-notch"></div>
+        <div class="screen">
+          <div class="hero-row">
+            <div class="avatar rafi">🦁</div>
+            <div class="avatar ellie">🐘</div>
+            <div class="avatar gerry">🦒</div>
+            <div class="avatar zena">🦎</div>
+          </div>
+          <div class="title-wrap">
+            <h3 class="title">Welcome to<br>Play Diaries</h3>
+          </div>
+          <p class="sub" style="text-align:center; margin-top:8px;">Enter your phone number to get started.</p>
+
+          <div style="margin-top:28px;">
+            <div class="phone-field">
+              <div class="country">🇮🇳 +91</div>
+              <div class="input">98765 43210</div>
+            </div>
+          </div>
+
+          <div class="consent" style="margin-top:18px;">
+            <div class="checkbox"></div>
+            <span>I am 18+ and a parent or guardian. I agree to the <u>Privacy Policy</u> and <u>Terms</u>.</span>
+          </div>
+
+          <button class="btn" style="margin-top:22px;" disabled>Send code</button>
+
+          <p class="help">Need help?</p>
+        </div>
+      </div>
+      <div class="notes">
+        <strong>What changes:</strong> Heroes sit higher; headline is centered as a single block; less dead space between visual and copy; CTA remains full-width and familiar.
+      </div>
+    </div>
+
+    <!-- Landing Option B -->
+    <div class="card">
+      <h2>Auth landing — Option B: Bottom form card</h2>
+      <div class="phone option-b">
+        <div class="phone-notch"></div>
+        <div class="screen">
+          <div style="text-align:center; margin-top:18px;">
+            <div class="hero-row" style="gap:14px;">
+              <div class="avatar rafi" style="width:64px;height:64px;font-size:32px;">🦁</div>
+              <div class="avatar ellie" style="width:64px;height:64px;font-size:32px;">🐘</div>
+              <div class="avatar gerry" style="width:64px;height:64px;font-size:32px;">🦒</div>
+              <div class="avatar zena" style="width:64px;height:64px;font-size:32px;">🦎</div>
+            </div>
+            <h3 class="title" style="margin-top:18px; text-align:center;">Welcome to<br>Play Diaries</h3>
+            <p class="sub" style="text-align:center; margin-top:6px;">Enter your phone number to get started.</p>
+          </div>
+
+          <div class="form-card" style="margin-top:auto; margin-bottom:8px;">
+            <div class="phone-field">
+              <div class="country">🇮🇳 +91</div>
+              <div class="input">98765 43210</div>
+            </div>
+            <div class="consent" style="margin-top:14px;">
+              <div class="checkbox"></div>
+              <span>I am 18+ and a parent or guardian. I agree to the <u>Privacy Policy</u> and <u>Terms</u>.</span>
+            </div>
+            <button class="btn" style="margin-top:16px;" disabled>Send code</button>
+          </div>
+
+          <p class="help" style="margin-bottom:4px;">Need help?</p>
+        </div>
+      </div>
+      <div class="notes">
+        <strong>What changes:</strong> Form + consent + button are grouped in a rounded bottom card; illustration and greeting breathe at the top; feels more like a modern bottom-sheet login.
+      </div>
+    </div>
+
+    <!-- Home Before/After -->
+    <div class="card" style="max-width: 620px;">
+      <h2>Home tab top spacing — before vs after</h2>
+      <div style="display:flex; gap:16px; flex-wrap:wrap; justify-content:center;">
+        <div class="phone home-screen" style="width:260px; height:520px;">
+          <div class="phone-notch"></div>
+          <div class="screen">
+            <div class="status-bar">
+              <div class="pill">⭐ ₹4,250</div>
+              <div style="font-size:18px;">🔔</div>
+            </div>
+            <div style="height:36px;"></div> <!-- current dead space -->
+            <h3 class="greeting">Hey Ed!</h3>
+            <p class="tagline">Let's get the kids playing!</p>
+            <div class="banner">
+              <div class="banner-img">🍛</div>
+              <div class="banner-text">
+                <h4>Rice Bowl</h4>
+                <p>Black rice with palak chicken</p>
+              </div>
+            </div>
+            <div class="cta-card">
+              <div>
+                <h4>Let's Play!</h4>
+                <p>Tap to start a session</p>
+              </div>
+              <button class="cta-btn">PLAY! 🚀</button>
+            </div>
+            <div class="section-card">
+              <div style="display:flex;align-items:center;">
+                <div class="section-icon">🎫</div>
+                <div>
+                  <h4>4 Play Passes ready</h4>
+                  <p>1 pass = 1 hour for any kid</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="label">BEFORE</div>
+        </div>
+
+        <div class="phone home-screen" style="width:260px; height:520px;">
+          <div class="phone-notch"></div>
+          <div class="screen">
+            <div class="status-bar">
+              <div class="pill">⭐ ₹4,250</div>
+              <div style="font-size:18px;">🔔</div>
+            </div>
+            <!-- reduced top gap -->
+            <h3 class="greeting" style="margin-top:4px;">Hey Ed!</h3>
+            <p class="tagline">Let's get the kids playing!</p>
+            <div class="banner">
+              <div class="banner-img">🍛</div>
+              <div class="banner-text">
+                <h4>Rice Bowl</h4>
+                <p>Black rice with palak chicken</p>
+              </div>
+            </div>
+            <div class="cta-card">
+              <div>
+                <h4>Let's Play!</h4>
+                <p>Tap to start a session</p>
+              </div>
+              <button class="cta-btn">PLAY! 🚀</button>
+            </div>
+            <div class="section-card">
+              <div style="display:flex;align-items:center;">
+                <div class="section-icon">🎫</div>
+                <div>
+                  <h4>4 Play Passes ready</h4>
+                  <p>1 pass = 1 hour for any kid</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="label">AFTER</div>
+        </div>
+      </div>
+      <div class="notes">
+        <strong>What changes:</strong> Trim the home top padding from ~36 px to ~4 px and reduce the gap below the greeting so the content starts earlier. No new widgets, just tighter vertical rhythm.
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -12,7 +12,6 @@ import '../../../core/providers/urgent_home_prompts_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/session_timer.dart';
-import '../../../core/widgets/skeleton_card.dart';
 import '../../club/widgets/while_you_wait_card.dart';
 import '../../sessions/widgets/extend_session_sheet.dart';
 import '../widgets/birthday_card.dart';
@@ -136,11 +135,12 @@ class _DominantLayout extends StatelessWidget {
         expiresStr == null ? null : DateTime.tryParse(expiresStr);
     if (expiresAt == null) {
       // Briefly null between session_create and the next stream tick.
-      // Render a non-crashing placeholder; the realtime stream will
-      // refresh the row within a second and this rebuilds correctly.
+      // Show a compact branded loader instead of a full skeleton flash.
       return const Padding(
-        padding: EdgeInsets.all(20),
-        child: SkeletonList(itemCount: 4),
+        padding: EdgeInsets.all(32),
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.navy),
+        ),
       );
     }
     return Column(
@@ -221,8 +221,10 @@ class _CompactLayout extends StatelessWidget {
         expiresStr == null ? null : DateTime.tryParse(expiresStr);
     if (expiresAt == null) {
       return const Padding(
-        padding: EdgeInsets.all(20),
-        child: SkeletonList(itemCount: 4),
+        padding: EdgeInsets.all(32),
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.navy),
+        ),
       );
     }
     return Column(

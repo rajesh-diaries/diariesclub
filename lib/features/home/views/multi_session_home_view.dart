@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/providers/active_sessions_provider.dart';
 import '../../../core/providers/family_children_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../widgets/active_session_card.dart';
@@ -21,11 +20,12 @@ import '../widgets/start_session_card.dart';
 /// playing for siblings, birthday, etc.) — so any sibling without a
 /// session can start one anytime.
 class MultiSessionHomeView extends ConsumerWidget {
-  const MultiSessionHomeView({super.key});
+  final List<Map<String, dynamic>> sessions;
+
+  const MultiSessionHomeView({super.key, this.sessions = const []});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessions = ref.watch(activeSessionsProvider).valueOrNull ?? const [];
     final children = ref.watch(familyChildrenProvider).valueOrNull ?? const [];
 
     final childrenInSession = sessions
