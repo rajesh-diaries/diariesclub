@@ -18,6 +18,7 @@ import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../core/widgets/skeleton_card.dart';
 import 'providers/cart_provider.dart';
+import 'widgets/order_confirm_sheet.dart';
 
 const _venueId = Venues.kondapurId;
 
@@ -249,12 +250,41 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
     }
   }
 
+  /// Open the tax-aware confirmation sheet before placing a Play + FIT order.
+  void _showConfirmSheet() {
+    final idem = const Uuid().v4();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => OrderConfirmSheet(
+        title: widget.comboContext!.comboName,
+        subtitle: '1 item · Play + FIT meal',
+        items: [
+          {
+            'type': 'combo',
+            'combo_id': widget.comboContext!.comboId,
+            'quantity': 1,
+            'fit_selections': _selections,
+          }
+        ],
+        childId: _selectedChildId,
+        onConfirm: () => _placeOrderDirectly(idem),
+      ),
+    ).whenComplete(() {
+      if (mounted) setState(() => _busy = false);
+    });
+  }
+
   /// Place an order directly from the FIT builder when the combo bundles
   /// a play session (Play + FIT). Mirrors [ComboPurchaseSheet] — combo +
   /// fit_selections + child_id sent in one [order_place] call. Server
   /// creates the session row automatically. Bypasses the cart so the
   /// flow matches Play + Coffee.
-  Future<void> _placeOrderDirectly() async {
+  Future<void> _placeOrderDirectly(String idempotencyKey) async {
     final familyId = ref.read(currentFamilyIdProvider);
     if (familyId == null || _selectedChildId == null) return;
     setState(() {
@@ -278,7 +308,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
         'p_payment_method': 'wallet',
         'p_combo_id': null,
         'p_child_id': _selectedChildId,
-        'p_idempotency_key': const Uuid().v4(),
+        'p_idempotency_key': idempotencyKey,
         'p_customer_gstin': null,
       });
       final orderId = result['order_id'] as String?;
@@ -668,13 +698,13 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                     width: 200,
                     child: PrimaryButton(
                       label: sessionCombo
-                          ? 'Place order · ${Money.fromPaise(widget.comboContext!.comboPricePaise + _upcharge)}'
+                          ? 'Review order · ${Money.fromPaise(widget.comboContext!.comboPricePaise + _upcharge)}'
                           : (isCombo ? 'Confirm meal' : 'Add to cart'),
                       loading: _busy,
                       onPressed: !ctaEnabled
                           ? null
                           : (sessionCombo
-                              ? _placeOrderDirectly
+                              ? _showConfirmSheet
                               : () => _addToCart(data, final_)),
                     ),
                   ),

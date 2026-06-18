@@ -21,6 +21,7 @@ import '../../sessions/widgets/insufficient_balance_sheet.dart';
 import 'quantity_stepper.dart';
 import '../providers/active_orders_provider.dart';
 import '../providers/cart_provider.dart';
+import 'order_confirm_sheet.dart';
 
 const _venueId = Venues.kondapurId;
 
@@ -42,23 +43,11 @@ class _CartSheetState extends ConsumerState<CartSheet> {
   bool _celebrate = false;
   bool _orderPlaced = false;
 
-  Future<void> _placeOrder() async {
-    final cart = ref.read(cartProvider);
-    if (cart.isEmpty) return;
-    final familyId = ref.read(currentFamilyIdProvider);
-    if (familyId == null) return;
-    final fulfillment = ref.read(cartFulfillmentProvider);
-    final payment = ref.read(cartPaymentMethodProvider);
-
-    setState(() {
-      _busy = true;
-      _errorText = null;
-    });
-
-    // Build heterogeneous p_lines payload — each entry tagged with type.
-    // The order_place RPC (extended in 0039) walks this and emits the
-    // right downstream rows per type.
+  /// Build the heterogeneous p_items payload used by both order_preview
+  /// and order_place.
+  List<Map<String, dynamic>> _buildOrderBody() {
     final body = <Map<String, dynamic>>[];
+    final cart = ref.read(cartProvider);
     for (final l in cart.lines) {
       switch (l) {
         case MenuItemLine m:
@@ -73,9 +62,6 @@ class _CartSheetState extends ConsumerState<CartSheet> {
             'combo_id': c.comboId,
             'quantity': c.quantity,
           };
-          // Option B: when the combo carries a built FIT meal, forward
-          // the template_id + selections so the server can create the
-          // matching fit_meal_orders row and revalidate the upcharge.
           if (c.hasLinkedFitMeal) {
             entry['fit_template_id'] = c.linkedFitTemplateId;
             entry['fit_selections'] = c.linkedFitSelections;
@@ -90,7 +76,50 @@ class _CartSheetState extends ConsumerState<CartSheet> {
           });
       }
     }
+    return body;
+  }
+
+  /// Show the tax-aware confirmation sheet. The actual order_place call
+  /// only happens after the user taps "Place order" inside the sheet.
+  void _showConfirmSheet() {
+    final cart = ref.read(cartProvider);
+    if (cart.isEmpty) return;
+    final familyId = ref.read(currentFamilyIdProvider);
+    if (familyId == null) return;
+    final body = _buildOrderBody();
     final idem = const Uuid().v4();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => OrderConfirmSheet(
+        title: '${cart.totalItemCount} item${cart.totalItemCount == 1 ? '' : 's'}',
+        subtitle: 'Review before placing',
+        items: body,
+        onConfirm: () => _executePlaceOrder(body, idem),
+      ),
+    ).whenComplete(() {
+      if (mounted) setState(() => _busy = false);
+    });
+  }
+
+  Future<void> _executePlaceOrder(
+    List<Map<String, dynamic>> body,
+    String idempotencyKey,
+  ) async {
+    final cart = ref.read(cartProvider);
+    final familyId = ref.read(currentFamilyIdProvider);
+    if (familyId == null) return;
+    final fulfillment = ref.read(cartFulfillmentProvider);
+    final payment = ref.read(cartPaymentMethodProvider);
+
+    setState(() {
+      _busy = true;
+      _errorText = null;
+    });
 
     try {
       final result = await Supabase.instance.client
@@ -101,7 +130,7 @@ class _CartSheetState extends ConsumerState<CartSheet> {
         'p_fulfillment_mode': fulfillment.rpcValue,
         'p_payment_method': payment.rpcValue,
         'p_combo_id': null,
-        'p_idempotency_key': idem,
+        'p_idempotency_key': idempotencyKey,
       });
       final orderId = result['order_id'] as String?;
       if (orderId == null) throw StateError('order_place returned no id');
@@ -112,11 +141,7 @@ class _CartSheetState extends ConsumerState<CartSheet> {
         _orderPlaced = true;
       });
       ref.read(cartProvider.notifier).clear();
-      // Wallet just got debited by order_place — invalidate so the next
-      // purchase sees the fresh balance instead of the pre-order one.
       ref.invalidate(currentWalletProvider);
-      // Force home to re-subscribe to active orders so the LiveOrdersCard
-      // shows the new order immediately.
       ref.invalidate(activeOrdersProvider);
       if (!mounted) return;
       await Future<void>.delayed(const Duration(milliseconds: 1200));
@@ -319,7 +344,7 @@ class _CartSheetState extends ConsumerState<CartSheet> {
                 width: double.infinity,
                 child: PrimaryButton(
                   label: 'Place order · ${Money.fromPaise(total)}',
-                  onPressed: _busy ? null : _placeOrder,
+                  onPressed: _busy ? null : _showConfirmSheet,
                   loading: _busy,
                 ),
               ),
