@@ -150,6 +150,17 @@ class BirthdayPackagesScreen extends ConsumerWidget {
                 for (final p in packages) _PackageCard(package: p),
                 const SizedBox(height: 16),
                 _GrandHallNote(),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'GST applicable',
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.lightTextSecondary,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 24),
               ],
             ),
@@ -351,15 +362,6 @@ class _PackageCardState extends ConsumerState<_PackageCard> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'per guest · 18% GST extra',
-                  style: AppTextStyles.caption(
-                    context,
-                    color: AppColors.lightTextSecondary,
-                  ),
-                ),
-
                 // Top inclusions — always visible so the card has value even
                 // when collapsed.
                 if (topInclusions.isNotEmpty) ...[
