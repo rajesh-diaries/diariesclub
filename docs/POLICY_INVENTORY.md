@@ -37,8 +37,8 @@ Partnership Act, 2008.
 | Co-Designated Partner | Namrata Kamalakar Rao |
 | Registered Office | 4th Floor, PRR Pawan Plaza, SY No. 187 (P), Botanical Garden Road, Serilingampally, Kondapur, Hyderabad — 500084, Telangana, India |
 | Grievance Officer | Venkata Rajesh Kumar Gaddam (Designated Partner) |
-| Grievance Officer Email | rajesh@playcafediaries.in |
-| Support Email | rajesh@playcafediaries.in |
+| Grievance Officer Email | support@playcafediaries.in |
+| Support Email | support@playcafediaries.in |
 | Support Phone / WhatsApp | +91 89780 75757 |
 | Website (policy host) | https://playcafediaries.in |
 
@@ -181,7 +181,7 @@ For every piece of data we collect, the law requires us to state *why* — i.e. 
 - **Verifiable consent floor:** phone OTP + 18+ guardian checkbox is the consent floor we use today. We will strengthen this (e.g. to DigiLocker-backed parental e-KYC) if the DPDP Rules tighten the verifiable-consent definition in future.
 - **Age range:** 0–14 years per child profile, enforced both client-side in the date-picker and server-side in `child_create` / `child_update`. Older siblings who occasionally accompany younger ones can still be played-as via a family-shared profile; we don't auto-archive a child when they age past 14. Parents may remove any child profile at any time via Profile → Edit Child → Remove (calls `child_deactivate`, soft-delete with anonymisation on full account deletion).
 - **Right to erasure:** the `family_anonymise(p_family_id, 'DELETE')` SQL RPC is wired into the in-app Account Deletion flow at Profile → Delete Account (`/profile/delete-account`). Confirmation token is the literal string `DELETE`. Full mechanics are described in §6 below.
-- **Grievance officer for children's data:** any concern about how we handle your child's data may be addressed to the Grievance Officer named in §1 (Venkata Rajesh Kumar Gaddam, rajesh@playcafediaries.in). We will respond within the timelines mandated by DPDP §8(8) once the Rules are finalised; in the interim, target response is within 7 working days.
+- **Grievance officer for children's data:** any concern about how we handle your child's data may be addressed to the Grievance Officer named in §1 (Venkata Rajesh Kumar Gaddam, support@playcafediaries.in). We will respond within the timelines mandated by DPDP §8(8) once the Rules are finalised; in the interim, target response is within 7 working days.
 
 ---
 
@@ -257,7 +257,7 @@ DPDP §14 allows you to nominate another individual to exercise your rights on y
 
 ### 6.5 Right to grievance
 
-Contact the Grievance Officer named in §1 — Venkata Rajesh Kumar Gaddam, rajesh@playcafediaries.in. Target response within 7 working days.
+Contact the Grievance Officer named in §1 — Venkata Rajesh Kumar Gaddam, support@playcafediaries.in. Target response within 7 working days.
 
 ### 6.6 Right to withdraw consent (DPDP §6(4))
 

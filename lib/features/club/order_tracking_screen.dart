@@ -104,9 +104,12 @@ class _Body extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _StatusHero(status: status),
+            _StatusHero(status: status, fulfillment: fulfillment),
             const SizedBox(height: 16),
-            OrderStatusTimeline(currentStatus: status),
+            OrderStatusTimeline(
+              currentStatus: status,
+              fulfillmentMode: fulfillment,
+            ),
             const SizedBox(height: 24),
             if (invoice != null) ...[
               _TaxInvoiceHeader(
@@ -263,10 +266,18 @@ class _Body extends ConsumerWidget {
 
 class _StatusHero extends StatelessWidget {
   final String status;
-  const _StatusHero({required this.status});
+  final String fulfillment;
+  const _StatusHero({required this.status, required this.fulfillment});
+
+  (String, String) _readyText() => switch (fulfillment) {
+        'takeaway' => ('Ready for pickup', 'Come collect at the counter.'),
+        'table_service' => ('Ready to serve', 'Heading to your table.'),
+        _ => ('Ready to serve', 'Your order will be served at your table.'),
+      };
 
   @override
   Widget build(BuildContext context) {
+    final ready = _readyText();
     final (title, subtitle, color, icon) = switch (status) {
       'pending' => (
           'Order received',
@@ -281,8 +292,8 @@ class _StatusHero extends StatelessWidget {
           PhosphorIconsFill.fire,
         ),
       'ready' => (
-          'Ready for pickup',
-          'Come collect at the counter.',
+          ready.$1,
+          ready.$2,
           AppColors.activeGreen,
           PhosphorIconsFill.bell,
         ),

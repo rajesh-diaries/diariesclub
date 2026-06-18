@@ -8,7 +8,12 @@ import '../../../core/theme/app_text_styles.dart';
 /// step gets the spinning/active dot, future steps stay outlined.
 class OrderStatusTimeline extends StatelessWidget {
   final String currentStatus;
-  const OrderStatusTimeline({super.key, required this.currentStatus});
+  final String fulfillmentMode;
+  const OrderStatusTimeline({
+    super.key,
+    required this.currentStatus,
+    this.fulfillmentMode = 'dine_in',
+  });
 
   static const _steps = ['pending', 'preparing', 'ready', 'served'];
 
@@ -54,13 +59,21 @@ class OrderStatusTimeline extends StatelessWidget {
     );
   }
 
-  String _label(String s) => switch (s) {
-        'pending' => 'Order received',
-        'preparing' => 'Preparing your food',
-        'ready' => 'Ready for pickup',
-        'served' => 'Served',
-        _ => s,
+  String _label(String s) {
+    if (s == 'ready') {
+      return switch (fulfillmentMode) {
+        'takeaway' => 'Ready for pickup',
+        'table_service' => 'Ready to serve',
+        _ => 'Ready to serve',
       };
+    }
+    return switch (s) {
+      'pending' => 'Order received',
+      'preparing' => 'Preparing your food',
+      'served' => 'Served',
+      _ => s,
+    };
+  }
 }
 
 class _Step extends StatelessWidget {
