@@ -40,9 +40,18 @@
       margin-bottom: 1vh;
     }
 
+    .logo-wrap {
+      display: inline-block;
+      background: #ffffff;
+      padding: 1vh 2vw;
+      border-radius: 1.5vw;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      margin-bottom: 1vh;
+    }
+
     .logo {
-      max-height: 10vh;
-      max-width: 80vw;
+      max-height: 18vh;
+      max-width: 90vw;
       object-fit: contain;
       display: block;
       margin: 0 auto;
@@ -226,7 +235,9 @@
 <body>
   <div class="page">
     <header>
-      <img class="logo" src="assets/play-diaries/logo.png" alt="Play Diaries" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <div class="logo-wrap">
+        <img class="logo" src="assets/play-diaries/logo.png" alt="Play Diaries" onerror="this.style.display='none'; this.parentElement.nextElementSibling.style.display='block';">
+      </div>
       <h1 class="logo-fallback" style="display:none">🎉 Play Diaries 🎉</h1>
       <p class="subtitle">Live Scoreboard — Today's Celebration</p>
     </header>
