@@ -40,7 +40,15 @@
       margin-bottom: 1vh;
     }
 
-    h1 {
+    .logo {
+      max-height: 10vh;
+      max-width: 80vw;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .logo-fallback {
       margin: 0;
       font-size: clamp(2rem, 5vw, 4rem);
       letter-spacing: -0.02em;
@@ -101,9 +109,10 @@
     }
 
     .team-name {
-      font-size: clamp(1.4rem, 2.5vw, 2.5rem);
+      font-size: clamp(1.1rem, 2vw, 2rem);
       font-weight: 800;
       margin: 0;
+      white-space: nowrap;
     }
 
     .team-trait {
@@ -217,7 +226,8 @@
 <body>
   <div class="page">
     <header>
-      <h1>🎉 Play Diaries 🎉</h1>
+      <img class="logo" src="assets/play-diaries/logo.png" alt="Play Diaries" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <h1 class="logo-fallback" style="display:none">🎉 Play Diaries 🎉</h1>
       <p class="subtitle">Live Scoreboard — Today's Celebration</p>
     </header>
 
@@ -233,7 +243,7 @@
       { id: 'rafi', name: 'Rafi', mascot: 'Lions', trait: 'Brave', color: 'var(--rafi)', emoji: '🦁', photo: 'assets/play-diaries/rafi.png' },
       { id: 'ellie', name: 'Ellie', mascot: 'Elephants', trait: 'Kind', color: 'var(--ellie)', emoji: '🐘', photo: 'assets/play-diaries/ellie.png' },
       { id: 'gerry', name: 'Gerry', mascot: 'Giraffes', trait: 'Curious', color: 'var(--gerry)', emoji: '🦒', photo: 'assets/play-diaries/gerry.png' },
-      { id: 'zena', name: 'Zena', mascot: 'Chameleons', trait: 'Curious', color: 'var(--zena)', emoji: '🦎', photo: 'assets/play-diaries/zena.png' }
+      { id: 'zena', name: 'Zena', mascot: 'Chameleons', trait: 'Creative', color: 'var(--zena)', emoji: '🦎', photo: 'assets/play-diaries/zena.png' }
     ];
 
     const gameCount = 8;
