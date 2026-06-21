@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Play Diaries — Live Scoreboard</title>
+  <style>
+    :root {
+      --bg: #fff7ed;
+      --text: #1f2937;
+      --card-bg: #ffffff;
+      --rafi: #7c3aed;
+      --ellie: #2563eb;
+      --gerry: #d97706;
+      --zena: #059669;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    .page {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 1.5vh 2vw;
+    }
+
+    header {
+      text-align: center;
+      flex: 0 0 auto;
+      margin-bottom: 1vh;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 4rem);
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      margin: 0.3rem 0 0;
+      font-size: clamp(1rem, 2vw, 1.5rem);
+      color: #6b7280;
+    }
+
+    .teams {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.5vw;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+
+    .team-card {
+      background: var(--card-bg);
+      border-radius: 2vw;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-top: 1.2vh solid var(--team-color);
+    }
+
+    .team-header {
+      text-align: center;
+      padding: 1.5vh 1vw;
+      background: color-mix(in srgb, var(--team-color) 10%, white);
+    }
+
+    .photo {
+      width: clamp(60px, 8vw, 120px);
+      height: clamp(60px, 8vw, 120px);
+      object-fit: cover;
+      border-radius: 50%;
+      border: 4px solid var(--team-color);
+      background: white;
+      margin: 0 auto 1vh;
+      display: block;
+    }
+
+    .photo-fallback {
+      width: clamp(60px, 8vw, 120px);
+      height: clamp(60px, 8vw, 120px);
+      border-radius: 50%;
+      border: 4px solid var(--team-color);
+      background: white;
+      margin: 0 auto 1vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(2rem, 4vw, 4rem);
+    }
+
+    .team-name {
+      font-size: clamp(1.4rem, 2.5vw, 2.5rem);
+      font-weight: 800;
+      margin: 0;
+    }
+
+    .team-trait {
+      font-size: clamp(0.8rem, 1.2vw, 1.1rem);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--team-color);
+      font-weight: 700;
+      margin: 0.3rem 0 0;
+    }
+
+    .total {
+      text-align: center;
+      padding: 2vh 0;
+    }
+
+    .total-label {
+      font-size: clamp(0.8rem, 1.2vw, 1rem);
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .total-value {
+      font-size: clamp(3rem, 7vw, 7rem);
+      font-weight: 900;
+      line-height: 1;
+      color: var(--team-color);
+    }
+
+    .games {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.6vw;
+      padding: 0 1vw 1.5vh;
+      flex: 1;
+      align-content: start;
+    }
+
+    .game {
+      text-align: center;
+      background: #f9fafb;
+      border-radius: 1vw;
+      padding: 1vh 0.3vw;
+    }
+
+    .game-number {
+      font-size: clamp(0.6rem, 1vw, 0.85rem);
+      color: #9ca3af;
+      margin-bottom: 0.3vh;
+    }
+
+    .score {
+      font-size: clamp(1.2rem, 2.2vw, 2.2rem);
+      font-weight: 800;
+      color: var(--text);
+      min-width: 2ch;
+      outline: none;
+      border-bottom: 2px dashed #d1d5db;
+      display: inline-block;
+      padding: 0 0.3em;
+    }
+
+    .score:focus {
+      border-bottom-color: var(--team-color);
+      background: #fff;
+    }
+
+    .game-names {
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 0.6vw;
+      padding: 1.5vh 0;
+      margin-top: 1vh;
+      background: #fff;
+      border-radius: 1vw;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .game-name {
+      text-align: center;
+      font-size: clamp(0.75rem, 1.3vw, 1.1rem);
+      font-weight: 700;
+      color: #4b5563;
+      outline: none;
+      border-bottom: 2px dashed #d1d5db;
+      padding: 0.5vh 0.3vw;
+      margin: 0 0.5vw;
+    }
+
+    .game-name:focus {
+      border-bottom-color: #f59e0b;
+      background: #fffbeb;
+    }
+
+    .hint {
+      flex: 0 0 auto;
+      text-align: center;
+      font-size: clamp(0.65rem, 1vw, 0.9rem);
+      color: #9ca3af;
+      margin-top: 0.8vh;
+    }
+
+    @media (max-width: 900px) {
+      .teams { grid-template-columns: repeat(2, 1fr); }
+      .games { grid-template-columns: repeat(4, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>🎉 Play Diaries 🎉</h1>
+      <p class="subtitle">Live Scoreboard — Today's Celebration</p>
+    </header>
+
+    <main class="teams" id="teams"></main>
+
+    <div class="game-names" id="gameNames"></div>
+
+    <p class="hint">Click any game name or score to edit. Each game scores 0–5 points.</p>
+  </div>
+
+  <script>
+    const teams = [
+      { id: 'rafi', name: 'Rafi', mascot: 'Lions', trait: 'Brave', color: 'var(--rafi)', emoji: '🦁', photo: 'assets/play-diaries/rafi.png' },
+      { id: 'ellie', name: 'Ellie', mascot: 'Elephants', trait: 'Kind', color: 'var(--ellie)', emoji: '🐘', photo: 'assets/play-diaries/ellie.png' },
+      { id: 'gerry', name: 'Gerry', mascot: 'Giraffes', trait: 'Curious', color: 'var(--gerry)', emoji: '🦒', photo: 'assets/play-diaries/gerry.png' },
+      { id: 'zena', name: 'Zena', mascot: 'Chameleons', trait: 'Curious', color: 'var(--zena)', emoji: '🦎', photo: 'assets/play-diaries/zena.png' }
+    ];
+
+    const gameCount = 8;
+
+    function clampScore(value) {
+      const num = parseInt(value, 10);
+      if (Number.isNaN(num)) return 0;
+      return Math.max(0, Math.min(5, num));
+    }
+
+    function updateTotal(teamId) {
+      const cells = document.querySelectorAll(`.score[data-team="${teamId}"]`);
+      let total = 0;
+      cells.forEach(cell => {
+        total += clampScore(cell.textContent);
+      });
+      const totalEl = document.querySelector(`.total-value[data-team="${teamId}"]`);
+      if (totalEl) totalEl.textContent = total;
+    }
+
+    function createTeams() {
+      const container = document.getElementById('teams');
+      teams.forEach(team => {
+        const card = document.createElement('article');
+        card.className = 'team-card';
+        card.style.setProperty('--team-color', team.color);
+
+        const imgHtml = `<img class="photo" src="${team.photo}" alt="${team.name} ${team.mascot}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                         <div class="photo-fallback" style="display:none">${team.emoji}</div>`;
+
+        let gamesHtml = '';
+        for (let i = 1; i <= gameCount; i++) {
+          gamesHtml += `
+            <div class="game">
+              <div class="game-number">G${i}</div>
+              <span class="score" contenteditable="true" data-team="${team.id}" data-game="${i}" inputmode="numeric">0</span>
+            </div>`;
+        }
+
+        card.innerHTML = `
+          <div class="team-header">
+            ${imgHtml}
+            <h2 class="team-name">${team.name} ${team.mascot}</h2>
+            <p class="team-trait">${team.trait}</p>
+          </div>
+          <div class="total">
+            <div class="total-label">Total</div>
+            <div class="total-value" data-team="${team.id}">0</div>
+          </div>
+          <div class="games">${gamesHtml}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function createGameNames() {
+      const container = document.getElementById('gameNames');
+      for (let i = 1; i <= gameCount; i++) {
+        const span = document.createElement('span');
+        span.className = 'game-name';
+        span.contentEditable = 'true';
+        span.dataset.game = i;
+        span.textContent = `Game ${i}`;
+        container.appendChild(span);
+      }
+    }
+
+    function attachListeners() {
+      document.getElementById('teams').addEventListener('input', (e) => {
+        if (e.target.classList.contains('score')) {
+          const raw = e.target.textContent.replace(/[^0-9]/g, '');
+          const clean = clampScore(raw);
+          if (e.target.textContent !== String(clean)) {
+            e.target.textContent = clean;
+            placeCaretAtEnd(e.target);
+          }
+          updateTotal(e.target.dataset.team);
+        }
+      });
+
+      document.getElementById('teams').addEventListener('blur', (e) => {
+        if (e.target.classList.contains('score')) {
+          e.target.textContent = clampScore(e.target.textContent);
+          updateTotal(e.target.dataset.team);
+        }
+      }, true);
+
+      document.getElementById('teams').addEventListener('keydown', (e) => {
+        if (e.target.classList.contains('score')) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.target.blur();
+          }
+          // Allow only digits, backspace, arrows, tab
+          if (!/[0-9]|Backspace|ArrowLeft|ArrowRight|Tab|Delete/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+          }
+        }
+      });
+    }
+
+    function placeCaretAtEnd(el) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    createTeams();
+    createGameNames();
+    attachListeners();
+  </script>
+</body>
+</html>
