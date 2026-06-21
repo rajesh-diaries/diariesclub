@@ -135,18 +135,18 @@
 
     .total {
       text-align: center;
-      padding: 2vh 0;
+      padding: 1vh 0;
     }
 
     .total-label {
-      font-size: clamp(0.8rem, 1.2vw, 1rem);
+      font-size: clamp(0.7rem, 1vw, 0.9rem);
       color: #6b7280;
       text-transform: uppercase;
       letter-spacing: 0.1em;
     }
 
     .total-value {
-      font-size: clamp(3rem, 7vw, 7rem);
+      font-size: clamp(2.2rem, 5vw, 5rem);
       font-weight: 900;
       line-height: 1;
       color: var(--team-color);
@@ -155,34 +155,37 @@
     .games {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 0.6vw;
-      padding: 0 1vw 1.5vh;
+      grid-template-rows: repeat(2, 1fr);
+      gap: 0.5vw;
+      padding: 0 0.8vw 1vh;
       flex: 1;
       align-content: start;
+      min-height: 0;
     }
 
     .game {
       text-align: center;
       background: #f9fafb;
-      border-radius: 1vw;
-      padding: 1vh 0.3vw;
+      border-radius: 0.8vw;
+      padding: 0.6vh 0.2vw;
+      min-width: 0;
     }
 
     .game-number {
-      font-size: clamp(0.6rem, 1vw, 0.85rem);
+      font-size: clamp(0.55rem, 0.9vw, 0.75rem);
       color: #9ca3af;
-      margin-bottom: 0.3vh;
+      margin-bottom: 0.2vh;
     }
 
     .score {
-      font-size: clamp(1.2rem, 2.2vw, 2.2rem);
+      font-size: clamp(1rem, 1.8vw, 1.8rem);
       font-weight: 800;
       color: var(--text);
       min-width: 2ch;
       outline: none;
       border-bottom: 2px dashed #d1d5db;
       display: inline-block;
-      padding: 0 0.3em;
+      padding: 0 0.2em;
     }
 
     .score:focus {
