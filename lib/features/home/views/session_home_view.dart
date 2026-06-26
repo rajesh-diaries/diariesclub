@@ -289,13 +289,15 @@ class _GraceCtaPair extends ConsumerWidget {
   const _GraceCtaPair({required this.onExtend, required this.sessionId});
 
   Future<void> _wrapUp(BuildContext context, WidgetRef ref) async {
+    final sessionIds = [sessionId];
+
     // Bind action callbacks to the dialog's own context (`dialogCtx`)
     // so Navigator.pop targets the dialog's Navigator directly.
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
         title: const Text('Wrap up the session?'),
-        content: const Text('We\'ll mark this play session complete.'),
+        content: const Text("We'll mark this play session complete."),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx, false),
@@ -312,9 +314,10 @@ class _GraceCtaPair extends ConsumerWidget {
       return;
     }
     try {
-      await Supabase.instance.client.rpc<dynamic>('session_complete', params: {
-        'p_session_id': sessionId,
-      });
+      final result =
+          await Supabase.instance.client.rpc<dynamic>('session_complete_batch', params: {
+        'p_session_ids': sessionIds,
+      }) as Map<String, dynamic>;
       if (!context.mounted) {
         return;
       }
@@ -326,15 +329,24 @@ class _GraceCtaPair extends ConsumerWidget {
       // exactly the symptom reported. Manual invalidation refetches
       // directly so the UI matches the success message.
       ref.invalidate(activeSessionsProvider);
+      final completedCount = (result['completed_count'] as num?)?.toInt() ?? 1;
+      final names = (result['child_names'] as List<dynamic>?)
+              ?.map((n) => n.toString())
+              .where((n) => n.isNotEmpty)
+              .toList() ??
+          const <String>[];
+      final snackText = completedCount > 1 && names.isNotEmpty
+          ? 'Sessions complete for ${names.join(", ")}! Thanks for visiting.'
+          : 'Session complete! Thanks for visiting.';
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final messenger = ScaffoldMessenger.maybeOf(context);
         if (messenger == null) {
           return;
         }
         messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Session complete! Thanks for visiting.'),
-            duration: Duration(seconds: 4),
+          SnackBar(
+            content: Text(snackText),
+            duration: const Duration(seconds: 4),
           ),
         );
       });

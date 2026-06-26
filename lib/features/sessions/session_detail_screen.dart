@@ -58,6 +58,8 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
   void _goToOrderFood() => context.go('/club');
 
   Future<void> _confirmWrapUp(String sessionId) async {
+    final sessionIds = [sessionId];
+
     final ok = await showDialog<bool>(
       context: context,
       useRootNavigator: true,
@@ -78,10 +80,11 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
     );
     if (ok != true || !mounted) return;
     try {
-      await Supabase.instance.client.rpc<dynamic>(
-        'session_complete',
-        params: {'p_session_id': sessionId},
-      );
+      final result =
+          await Supabase.instance.client.rpc<dynamic>(
+            'session_complete_batch',
+            params: {'p_session_ids': sessionIds},
+          ) as Map<String, dynamic>;
       if (!mounted) return;
       // Force-invalidate the active-sessions stream so the home view
       // rebuilds without this kid's "Wrapping up" card immediately.
@@ -92,10 +95,19 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
       // directly so the UI matches the success message. Mirrors the
       // single-session wrap-up handler in session_home_view.dart.
       ref.invalidate(activeSessionsProvider);
+      final completedCount = (result['completed_count'] as num?)?.toInt() ?? 1;
+      final names = (result['child_names'] as List<dynamic>?)
+              ?.map((n) => n.toString())
+              .where((n) => n.isNotEmpty)
+              .toList() ??
+          const <String>[];
+      final snackText = completedCount > 1 && names.isNotEmpty
+          ? 'Sessions complete for ${names.join(", ")}! Thanks for visiting.'
+          : 'Session complete! Thanks for visiting.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Session complete! Thanks for visiting.'),
-          duration: Duration(seconds: 4),
+        SnackBar(
+          content: Text(snackText),
+          duration: const Duration(seconds: 4),
         ),
       );
       context.go('/home');
