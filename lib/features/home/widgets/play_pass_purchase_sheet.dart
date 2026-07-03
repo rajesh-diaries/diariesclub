@@ -16,33 +16,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/utils/haptics.dart';
 import 'top_up_sheet.dart';
-
-const _passOptions = <Map<String, dynamic>>[
-  {
-    'type': '5',
-    'total': 5,
-    'price_paise': 350000,
-    'days': 30,
-    'label': 'Starter Pack',
-    'tag': 'Most popular',
-  },
-  {
-    'type': '10',
-    'total': 10,
-    'price_paise': 650000,
-    'days': 45,
-    'label': 'Value Pack',
-    'tag': 'Best value',
-  },
-  {
-    'type': '15',
-    'total': 15,
-    'price_paise': 900000,
-    'days': 60,
-    'label': 'Family Pack',
-    'tag': 'Biggest savings',
-  },
-];
+import '../../../core/providers/play_pass_plans_provider.dart';
 
 /// Bottom sheet for purchasing Play Passes. Deducts from wallet balance;
 /// if insufficient, routes through the top-up sheet first.
@@ -57,6 +31,35 @@ class PlayPassPurchaseSheet extends ConsumerStatefulWidget {
 class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
   String? _buyingType; // null = idle, otherwise the pass_type being bought
   String? _errorText;
+
+  Future<void> _confirmAndBuy(Map<String, dynamic> option) async {
+    final label = option['label'] as String;
+    final total = option['total'] as int;
+    final price = option['price_paise'] as int;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Buy $label?'),
+        content: Text(
+          'This will deduct ${Money.fromPaise(price)} from your wallet and '
+          'add $total Play Passes to your account.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Buy now'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await _buy(option);
+    }
+  }
 
   Future<void> _buy(Map<String, dynamic> option) async {
     final type = option['type'] as String;
@@ -154,6 +157,7 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final plansAsync = ref.watch(playPassPlansProvider);
     return SafeArea(
       child: Container(
         decoration: const BoxDecoration(
@@ -194,17 +198,50 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
               ),
             ),
             const SizedBox(height: 20),
-            for (final opt in _passOptions) ...[
-              _PassOptionCard(
-                option: opt,
-                busy: _buyingType == opt['type'],
-                onTap: () {
-                  AppHaptics.light();
-                  _buy(opt);
-                },
+            plansAsync.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.navy),
+                ),
               ),
-              const SizedBox(height: 12),
-            ],
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  children: [
+                    Text(
+                      "Couldn't load Play Passes.",
+                      style: AppTextStyles.body(
+                        context,
+                        color: AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => ref.invalidate(playPassPlansProvider),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+              data: (plans) => Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final opt in plans) ...[
+                    _PassOptionCard(
+                      option: opt,
+                      busy: _buyingType == opt['type'],
+                      onTap: () {
+                        AppHaptics.light();
+                        _confirmAndBuy(opt);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ],
+              ),
+            ),
             if (_errorText != null) ...[
               const SizedBox(height: 4),
               Text(
