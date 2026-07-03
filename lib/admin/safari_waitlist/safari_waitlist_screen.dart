@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SafariWaitlistScreen extends StatefulWidget {
@@ -49,16 +50,23 @@ class _SafariWaitlistScreenState extends State<SafariWaitlistScreen> {
                   itemCount: _entries.length,
                   itemBuilder: (context, index) {
                     final e = _entries[index];
+                    final dob = e['child_dob'] as String?;
+                    final age = e['child_age'];
+                    final ageLabel = age != null ? '$age yrs' : null;
+                    final dobText = dob != null && dob.isNotEmpty
+                        ? DateFormat('dd MMM yyyy').format(DateTime.parse(dob))
+                        : '—';
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: ListTile(
-                        title: Text('${e['parent_name']} — ${e['child_name']} (${e['child_age']})'),
+                        title: Text('${e['parent_name']} — ${e['child_name']}'),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('Phone: ${e['phone']}'),
+                            Text('DOB: $dobText${ageLabel != null ? ' · $ageLabel' : ''}'),
                             Text('Status: ${e['status']}'),
-                            Text('Date: ${e['created_at']}'),
+                            Text('Submitted: ${e['created_at']}'),
                           ],
                         ),
                         isThreeLine: true,

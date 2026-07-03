@@ -33,7 +33,7 @@ final currentWalletProvider =
 /// Several backend RPCs (e.g. `play_pass_purchase`) use the transaction ledger
 /// as the source of truth, so the UI must match that ledger. A stale
 /// `wallets.balance_paise` row can show money the user doesn't actually have.
-final _walletTransactionsBalanceProvider = StreamProvider<int?>((ref) async* {
+final walletTransactionsBalanceProvider = StreamProvider<int?>((ref) async* {
   final familyId = ref.watch(currentFamilyIdProvider);
   if (familyId == null) {
     yield null;
@@ -56,9 +56,12 @@ final _walletTransactionsBalanceProvider = StreamProvider<int?>((ref) async* {
 });
 
 /// Convenience selector — paise as int, or `null` if the wallet hasn't
-/// loaded yet. Uses the transaction ledger as the source of truth.
+/// loaded yet. Uses the wallet row's `balance_paise` as the source of truth
+/// so the UI never shows a stale transaction-sum during realtime races.
 final walletBalancePaiseProvider = Provider<int?>((ref) {
-  return ref.watch(_walletTransactionsBalanceProvider).valueOrNull;
+  final wallet = ref.watch(currentWalletProvider).valueOrNull;
+  if (wallet == null) return null;
+  return (wallet['balance_paise'] as num?)?.toInt();
 });
 
 

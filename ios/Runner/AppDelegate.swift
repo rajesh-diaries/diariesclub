@@ -1,3 +1,4 @@
+import AVFoundation
 import Flutter
 import UIKit
 import FirebaseMessaging
@@ -16,6 +17,16 @@ import UserNotifications
       UNUserNotificationCenter.current().delegate = self
     }
     application.registerForRemoteNotifications()
+
+    // Configure the audio session so welcome clips can be heard in normal
+    // (non-silent) mode while still respecting the hardware ringer switch.
+    do {
+      try AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+      try AVAudioSession.sharedInstance().setActive(true)
+    } catch {
+      debugPrint("Failed to configure audio session: \(error)")
+    }
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -60,6 +71,18 @@ import UserNotifications
     } else {
       completionHandler([.alert, .badge, .sound])
     }
+  }
+
+  // Forward tapped notifications to Firebase so Dart-side FCM handlers
+  // (including deep links) run when the app is backgrounded or killed.
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    let userInfo = response.notification.request.content.userInfo
+    Messaging.messaging().appDidReceiveMessage(userInfo)
+    completionHandler()
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {

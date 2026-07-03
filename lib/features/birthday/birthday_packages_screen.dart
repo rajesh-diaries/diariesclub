@@ -154,7 +154,7 @@ class BirthdayPackagesScreen extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text(
-                    'GST applicable',
+                    '5% GST extra',
                     style: AppTextStyles.caption(
                       context,
                       color: AppColors.lightTextSecondary,

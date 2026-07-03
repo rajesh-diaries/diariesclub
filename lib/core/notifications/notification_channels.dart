@@ -26,7 +26,8 @@ class NotificationChannels {
         type == 'hydration_nudge' ||
         type == 'recap_ready' ||
         type == 'reflection_prompt' ||
-        type == 'reflection_auto_split') {
+        type == 'reflection_auto_split' ||
+        type == 'reflection_summary') {
       return sessionChannelId;
     }
     if (type.startsWith('birthday_')) {

@@ -1,0 +1,13 @@
+[custom_lint] 2026-07-03T15:57:44.254634 Loading dynamic library failed: dlopen(/private/var/folders/1w/k0w8zjg12sngpyxl6sqbx__h0000gp/T/custom_lint_clientEYhMRj/lib/custom_lint_client.dart, 0x0001): tried: '/private/var/folders/1w/k0w8zjg12sngpyxl6sqbx__h0000gp/T/custom_lint_clientEYhMRj/lib/custom_lint_client.dart' (slice is not valid mach-o file), '/System/Volumes/Preboot/Cryptexes/OS/private/var/folders/1w/k0w8zjg12sngpyxl6sqbx__h0000gp/T/custom_lint_clientEYhMRj/lib/custom_lint_client.dart' (no such file), '/private/var/folders/1w/k0w8zjg12sngpyxl6sqbx__h0000gp/T/custom_lint_clientEYhMRj/lib/custom_lint_client.dart' (slice is not valid mach-o file)
+[custom_lint] 2026-07-03T15:57:44.254634 lib/custom_lint_client.dart is not an AOT snapshot, it cannot be run with 'dartaotruntime'
+[custom_lint] 2026-07-03T15:57:44.254634
+[custom_lint] 2026-07-03T15:57:44.254634
+Failed to start pluginsThe request analysis.setContextRoots failed with the following error:
+RequestErrorCode.PLUGIN_ERROR
+Bad state: Failed to start the plugins.
+at:
+#0      SocketCustomLintServerToClientChannel._checkInitializationFail.<anonymous closure> (package:custom_lint/src/v2/server_to_client_channel.dart:223)
+<asynchronous suspension>
+#1      Future.any.onValue (dart:async/future.dart:637)
+<asynchronous suspension>
+

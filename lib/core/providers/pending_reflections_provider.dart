@@ -3,8 +3,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_provider.dart';
 
-/// Streams sessions awaiting reflection within the reflection window
-/// (default 24h, sourced from venue_config.reflection_window_hours).
+/// Streams sessions awaiting reflection that were completed within the
+/// last hour. These urgent prompts live on the Home tab immediately after
+/// a session ends; after one hour they move to the Adventure tab's pending
+/// recaps banner and remain there until the 24h reflection window closes
+/// (at which point reflection_auto_split awards the XP equally).
 ///
 /// A reflection card stays on the home tab for each session in this
 /// list. The card disappears when:
@@ -35,13 +38,10 @@ final pendingReflectionsProvider =
       if (completedAtStr == null) continue;
       final completedAt = DateTime.tryParse(completedAtStr);
       if (completedAt == null) continue;
-      // Show for the reflection window — fall back to 24h if no deadline.
-      final deadlineStr = s['reflection_deadline'] as String?;
-      final deadline = deadlineStr != null
-          ? DateTime.tryParse(deadlineStr) ??
-              completedAt.add(const Duration(hours: 24))
-          : completedAt.add(const Duration(hours: 24));
-      if (now.isAfter(deadline)) continue;
+      // Home tab prompt: show only for the first hour after completion.
+      // After that the prompt lives in Adventure until the 24h deadline.
+      final homeCutoff = completedAt.add(const Duration(hours: 1));
+      if (now.isAfter(homeCutoff)) continue;
       filtered.add(s);
     }
 

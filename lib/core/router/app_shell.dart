@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
-/// Bottom-nav shell hosting the 4 main tabs. Backed by StatefulShellRoute so
+/// Bottom-nav shell hosting the 5 main tabs. Backed by StatefulShellRoute so
 /// each branch preserves its own Navigator stack.
 class AppShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;

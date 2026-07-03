@@ -10,6 +10,10 @@
 -keep class com.google.firebase.** { *; }
 -dontwarn com.google.firebase.**
 
+# Play Core / deferred components (referenced by Flutter engine when
+# deferred-components are enabled, but the classes are provided by the Play Store)
+-dontwarn com.google.android.play.core.**
+
 # Razorpay
 -keepattributes *Annotation*
 -dontwarn com.razorpay.**
