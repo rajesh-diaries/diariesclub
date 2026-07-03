@@ -11,6 +11,7 @@ import '../../core/providers/family_children_provider.dart';
 import '../../core/providers/home_state_provider.dart';
 import '../../core/providers/play_passes_provider.dart';
 import '../../core/providers/recent_activity_provider.dart';
+import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/error_screen.dart';
 import '../../core/widgets/skeleton_card.dart';
@@ -21,6 +22,7 @@ import 'views/idle_home_view.dart';
 import 'views/multi_session_home_view.dart';
 import 'views/post_session_home_view.dart';
 import 'widgets/announcements_feed.dart';
+import 'widgets/healthy_bite_celebration_overlay.dart';
 import 'widgets/session_welcome_overlay.dart';
 
 /// Tab 1 — Home. The single source of truth for which sub-view to render
@@ -59,6 +61,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _welcomingSessionId;
   String _welcomeChildName = '';
   String? _welcomeFavouriteHero;
+
+  // Healthy Bite celebration: fires once per session when staff hands the
+  // complimentary bite over (healthy_bite_claimed_at flips non-null).
+  final _celebratedHbSessionIds = <String>{};
+  String? _celebratingHbSessionId;
+  String _hbChildName = '';
+  int _hbXp = 0;
 
   @override
   void initState() {
@@ -138,6 +147,60 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return result;
   }
 
+  /// Detects a session whose complimentary Healthy Bite was just handed over
+  /// by staff (healthy_bite_claimed_at flipped non-null within the last ~90s)
+  /// and hasn't been celebrated yet. Returns the child + XP to celebrate.
+  ({String sessionId, String childName, int xp})? _freshHealthyBiteToCelebrate(
+    List<Map<String, dynamic>> sessions,
+  ) {
+    final now = DateTime.now();
+    final children =
+        ref.read(familyChildrenProvider).valueOrNull ?? const [];
+    final xp = (ref.read(venueConfigProvider).valueOrNull?['xp_healthy_bite']
+                as num?)
+            ?.toInt() ??
+        0;
+
+    for (final s in sessions) {
+      final id = s['id'] as String?;
+      if (id == null || _celebratedHbSessionIds.contains(id)) continue;
+
+      final claimedStr = s['healthy_bite_claimed_at'] as String?;
+      if (claimedStr == null) continue;
+      final claimedAt = DateTime.tryParse(claimedStr);
+      if (claimedAt == null) continue;
+
+      // Only celebrate a just-happened claim so we don't replay an old one on
+      // cold start. Realtime delivers the flip within a second or two.
+      if (now.difference(claimedAt).inSeconds > 90) {
+        _celebratedHbSessionIds.add(id); // seen — never trigger later
+        continue;
+      }
+
+      final childId = s['child_id'] as String?;
+      final child = children.cast<Map<String, dynamic>?>().firstWhere(
+            (c) => c?['id'] == childId,
+            orElse: () => null,
+          );
+      return (
+        sessionId: id,
+        childName: child?['name'] as String? ?? 'Your kid',
+        xp: xp,
+      );
+    }
+    return null;
+  }
+
+  void _onHbCelebrationDismissed() {
+    final id = _celebratingHbSessionId;
+    if (id != null) _celebratedHbSessionIds.add(id);
+    setState(() {
+      _celebratingHbSessionId = null;
+      _hbChildName = '';
+      _hbXp = 0;
+    });
+  }
+
   void _onWelcomeDismissed() {
     final id = _welcomingSessionId;
     if (id != null) _greetedSessionIds.add(id);
@@ -198,18 +261,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         );
       },
       data: (activeSessions) {
-        // Trigger welcome overlay for freshly-started sessions.
-        if (_welcomingSessionId == null) {
+        // Trigger welcome overlay for freshly-started sessions. Suppressed
+        // while a Healthy Bite celebration is showing so the two overlays
+        // never stack.
+        if (_welcomingSessionId == null && _celebratingHbSessionId == null) {
           final freshList = _freshSessionsToGreet(activeSessions);
           if (freshList.isNotEmpty) {
             // Start with the first, queue the rest.
             final first = freshList.first;
             final rest = freshList.skip(1).toList();
             _welcomeQueue.addAll(rest);
-            setState(() {
-              _welcomingSessionId = first.sessionId;
-              _welcomeChildName = first.childName;
-              _welcomeFavouriteHero = first.favouriteHero;
+            _welcomingSessionId = first.sessionId;
+            _welcomeChildName = first.childName;
+            _welcomeFavouriteHero = first.favouriteHero;
+            // Mutations above must not call setState during build.
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) setState(() {});
+            });
+          }
+        }
+
+        // Trigger the Healthy Bite celebration when staff hands the bite over
+        // (only when no welcome overlay is active, to avoid stacking).
+        if (_welcomingSessionId == null && _celebratingHbSessionId == null) {
+          final hb = _freshHealthyBiteToCelebrate(activeSessions);
+          if (hb != null) {
+            _celebratingHbSessionId = hb.sessionId;
+            _hbChildName = hb.childName;
+            _hbXp = hb.xp;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) setState(() {});
             });
           }
         }
@@ -265,6 +346,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               childName: _welcomeChildName,
               favouriteHero: _welcomeFavouriteHero,
               onDismissed: _onWelcomeDismissed,
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Layer the Healthy Bite celebration when staff just handed the bite over.
+    if (_celebratingHbSessionId != null) {
+      body = Stack(
+        children: [
+          body,
+          Positioned.fill(
+            child: HealthyBiteCelebrationOverlay(
+              key: ValueKey('hb_$_celebratingHbSessionId'),
+              childName: _hbChildName,
+              xpEarned: _hbXp,
+              onDismissed: _onHbCelebrationDismissed,
             ),
           ),
         ],
