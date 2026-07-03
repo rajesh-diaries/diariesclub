@@ -56,7 +56,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   String? _couponError;
 
   // First-session welcome treatment (mutually exclusive):
-  //   {'type':'discount','code':'WELCOME100', ...}  → auto-apply ₹100 off
+  //   {'type':'discount','code':'ELLIE', ...}  → auto-apply ₹100 off
   //   {'type':'referral','credit_paise':...}         → "friend gifted you ₹100"
   //   {'type':'none'} / null                         → nothing
   // Resolved server-side by welcome_offer_for_session.
@@ -90,7 +90,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     }
   }
 
-  /// Auto-applies WELCOME100 once, for a non-referred first-timer, as soon as a
+  /// Auto-applies ELLIE (welcome coupon) once, for a non-referred first-timer, as soon as a
   /// duration is picked and no other coupon is in play. Runs at most once so a
   /// cleared or overridden (e.g. sibling) coupon is never silently re-added.
   Future<void> _maybeAutoApplyWelcome() async {
@@ -1212,7 +1212,7 @@ class _CouponSection extends StatelessWidget {
           textCapitalization: TextCapitalization.characters,
           textInputAction: TextInputAction.done,
           decoration: InputDecoration(
-            hintText: enabled ? 'e.g. WELCOME100' : 'Pick a duration first',
+            hintText: enabled ? 'Enter coupon code' : 'Pick a duration first',
             border: const OutlineInputBorder(),
             isDense: true,
             errorText: error,

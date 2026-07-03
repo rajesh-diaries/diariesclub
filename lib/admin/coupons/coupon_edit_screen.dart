@@ -242,7 +242,7 @@ class _CouponEditScreenState extends ConsumerState<CouponEditScreen> {
                             ],
                             decoration: const InputDecoration(
                               border: OutlineInputBorder(),
-                              hintText: 'e.g. WELCOME50',
+                              hintText: 'e.g. SUMMER25',
                             ),
                           ),
                         ),
