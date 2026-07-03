@@ -100,7 +100,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     if (_selectedDurationMinutes == null) return;
 
     _welcomeAutoApplyDone = true;
-    final code = (_welcomeOffer?['code'] as String?) ?? 'WELCOME100';
+    final code = (_welcomeOffer?['code'] as String?) ?? 'ELLIE';
     final cfg = ref.read(venueConfigProvider).valueOrNull;
     final amount = _priceFor(_selectedDurationMinutes, cfg);
     try {
@@ -156,17 +156,17 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   // Fallback map used when the admin has not configured sibling_coupon_codes
   // in venue_config (or while the config row is still loading).
   static const _fallbackSiblingCodes = {
-    '2': '2KIDS',
-    '3': '3KIDS',
-    '4': '4KIDS',
-    '5': '5KIDS',
+    '2': 'ZENA',
+    '3': 'RAFI',
+    '4': 'GERRY',
+    '5': 'WILDPACK',
   };
 
   static const _fallbackSiblingDiscounts = {
-    '2KIDS': 15000,
-    '3KIDS': 25000,
-    '4KIDS': 40000,
-    '5KIDS': 50000,
+    'ZENA': 15000,
+    'RAFI': 25000,
+    'GERRY': 40000,
+    'WILDPACK': 50000,
   };
 
   /// Sibling coupon metadata for the selected kid count.
@@ -1268,10 +1268,10 @@ class _SiblingCouponChips extends StatelessWidget {
   });
 
   static const _fallbackCodes = {
-    '2': '2KIDS',
-    '3': '3KIDS',
-    '4': '4KIDS',
-    '5': '5KIDS',
+    '2': 'ZENA',
+    '3': 'RAFI',
+    '4': 'GERRY',
+    '5': 'WILDPACK',
   };
 
   String? _codeFor(int count, Map<String, dynamic>? cfg) {
