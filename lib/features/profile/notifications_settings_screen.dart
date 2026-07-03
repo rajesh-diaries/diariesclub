@@ -26,7 +26,13 @@ class NotificationsSettingsScreen extends ConsumerStatefulWidget {
 
 class _NotificationsSettingsScreenState
     extends ConsumerState<NotificationsSettingsScreen> {
-  bool _busy = false;
+  // _busy retained (always false) so the per-toggle `onChanged` callbacks stay
+  // enabled; instant feedback now comes from the optimistic overlay below.
+  final bool _busy = false;
+
+  // Optimistic overlay: a tapped switch flips immediately and we reconcile with
+  // the server in the background — so one toggle never freezes the whole list.
+  NotificationPreferences? _optimistic;
 
   Future<void> _toggle({
     required NotificationPreferences current,
@@ -36,7 +42,8 @@ class _NotificationsSettingsScreenState
   }) async {
     final familyId = ref.read(currentFamilyIdProvider);
     if (familyId == null) return;
-    setState(() => _busy = true);
+    final previous = _optimistic;
+    setState(() => _optimistic = updated); // flip instantly
 
     try {
       final patch = <String, dynamic>{
@@ -54,11 +61,10 @@ class _NotificationsSettingsScreenState
       ref.invalidate(currentFamilyProvider);
     } catch (_) {
       if (!mounted) return;
+      setState(() => _optimistic = previous); // revert this toggle on failure
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Couldn't save. Try again.")),
       );
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -84,7 +90,9 @@ class _NotificationsSettingsScreenState
             message: "Couldn't load preferences",
             onRetry: () => ref.invalidate(notificationPreferencesProvider),
           ),
-          data: (prefs) => ListView(
+          data: (prefsFromProvider) {
+            final prefs = _optimistic ?? prefsFromProvider;
+            return ListView(
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
               Padding(
@@ -222,7 +230,8 @@ class _NotificationsSettingsScreenState
                         ),
               ),
             ],
-          ),
+            );
+          },
         ),
       ),
     );

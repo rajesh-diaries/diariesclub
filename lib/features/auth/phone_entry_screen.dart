@@ -80,7 +80,11 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
       context.push('/auth/otp');
     } on FunctionException catch (e) {
       setState(() {
-        _errorText = _mapSendError(e.details?.toString());
+        // e.details is the error body (a Map like {error: rate_limited});
+        // pull the bare code so _mapSendError can match it.
+        final code =
+            e.details is Map ? (e.details as Map)['error']?.toString() : null;
+        _errorText = _mapSendError(code);
         _isLoading = false;
       });
     } catch (_) {

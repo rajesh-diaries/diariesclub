@@ -44,9 +44,9 @@ final pastOrdersProvider =
         .map((r) => Map<String, dynamic>.from(r as Map))
         .toList();
   } catch (_) {
-    // Table may not exist or RLS blocks us — return empty rather than
-    // surface an error to the activity screen.
-    return const [];
+    // Surface the failure so the screen can show its retry state, instead of a
+    // misleading "no orders yet" empty state to a family that has history.
+    rethrow;
   }
 });
 
@@ -120,7 +120,8 @@ final pastWorkshopsProvider =
     }
     return result;
   } catch (_) {
-    return const [];
+    // Surface the failure so the screen shows retry, not a false empty state.
+    rethrow;
   }
 });
 
@@ -141,7 +142,8 @@ final pastBirthdaysProvider =
         .map((r) => Map<String, dynamic>.from(r as Map))
         .toList();
   } catch (_) {
-    return const [];
+    // Surface the failure so the screen shows retry, not a false empty state.
+    rethrow;
   }
 });
 

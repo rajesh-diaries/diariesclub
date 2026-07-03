@@ -18,7 +18,8 @@ final playPassesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) asyn
 
   return (rows as List)
       .map((r) => Map<String, dynamic>.from(r as Map))
-      .where((p) => (p['used_passes'] as int?)! < (p['total_passes'] as int?)!)
+      .where((p) =>
+          ((p['used_passes'] as int?) ?? 0) < ((p['total_passes'] as int?) ?? 0))
       .toList();
 });
 

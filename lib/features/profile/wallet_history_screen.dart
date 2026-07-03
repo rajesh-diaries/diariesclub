@@ -136,7 +136,7 @@ class _WalletHistoryScreenState
             slivers: [
               SliverToBoxAdapter(
                 child: _BalanceBanner(
-                  balancePaise: balance ?? 0,
+                  balancePaise: balance,
                   coinsLifetime: coinsLifetime,
                 ),
               ),
@@ -252,7 +252,7 @@ class _DayGroup {
 }
 
 class _BalanceBanner extends StatelessWidget {
-  final int balancePaise;
+  final int? balancePaise;
   final int coinsLifetime;
   const _BalanceBanner({
     required this.balancePaise,
@@ -276,10 +276,21 @@ class _BalanceBanner extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            Money.fromPaise(balancePaise),
-            style: AppTextStyles.display(context, color: Colors.white),
-          ),
+          if (balancePaise == null)
+            // Placeholder while the balance loads — never show a misleading ₹0.
+            Container(
+              height: 34,
+              width: 130,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            )
+          else
+            Text(
+              Money.fromPaise(balancePaise!),
+              style: AppTextStyles.display(context, color: Colors.white),
+            ),
           const SizedBox(height: 4),
           Text(
             'available',
@@ -350,7 +361,9 @@ class _TransactionDetailSheet extends StatelessWidget {
 
     final parsedCreatedAt =
         createdAt == null ? null : DateTime.tryParse(createdAt)?.toLocal();
-    final iso = parsedCreatedAt == null ? '—' : parsedCreatedAt.toString();
+    final iso = parsedCreatedAt == null
+        ? '—'
+        : DateFormat('d MMM yyyy, h:mm a').format(parsedCreatedAt);
 
     return Container(
       decoration: BoxDecoration(

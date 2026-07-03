@@ -368,7 +368,7 @@ class _CoinsSectionState extends ConsumerState<_CoinsSection> {
       builder: (dialogCtx) => AlertDialog(
         title: const Text('Redeem coins?'),
         content: Text(
-          'Convert $amount Coins → ₹$amount in your wallet.',
+          'Convert $amount Coins → ${Money.fromPaise(amount * 100)} in your wallet.',
         ),
         actions: [
           TextButton(
@@ -390,7 +390,7 @@ class _CoinsSectionState extends ConsumerState<_CoinsSection> {
       ref.invalidate(currentWalletProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Redeemed $amount coins → ₹$amount')),
+        SnackBar(content: Text('Redeemed $amount coins → ${Money.fromPaise(amount * 100)}')),
       );
     } on PostgrestException catch (e) {
       if (!mounted) return;
@@ -478,7 +478,7 @@ class _CoinsSectionState extends ConsumerState<_CoinsSection> {
                     )
                   : Text(
                       canRedeem
-                          ? 'Redeem $coinsBalance coins → ₹$coinsBalance'
+                          ? 'Redeem $coinsBalance coins → ${Money.fromPaise(coinsBalance * 100)}'
                           : 'Redeem coins (min 100)',
                     ),
             ),

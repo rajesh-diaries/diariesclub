@@ -37,6 +37,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   static const _minSplashDuration = Duration(milliseconds: 800);
 
+  bool _errored = false;
+
   @override
   void initState() {
     super.initState();
@@ -44,58 +46,65 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _bootstrap() async {
-    // Let the version check resolve. The router redirect will already kick
-    // us to /update-required if forceUpdate; we still wait so the splash
-    // doesn't flash before the redirect lands.
-    final version = await ref.read(appVersionStatusProvider.future);
-    if (!mounted) return;
-    if (version.status == AppVersionStatus.forceUpdate) {
-      // Router will handle this; just stop here.
-      return;
-    }
+    try {
+      // Let the version check resolve. The router redirect will already kick
+      // us to /update-required if forceUpdate; we still wait so the splash
+      // doesn't flash before the redirect lands.
+      final version = await ref.read(appVersionStatusProvider.future);
+      if (!mounted) return;
+      if (version.status == AppVersionStatus.forceUpdate) {
+        return; // Router will handle this; just stop here.
+      }
 
-    // Splash polish: minimum dwell so the user can see the wordmark.
-    await Future<void>.delayed(_minSplashDuration);
-    if (!mounted) return;
+      // Splash polish: minimum dwell so the user can see the wordmark.
+      await Future<void>.delayed(_minSplashDuration);
+      if (!mounted) return;
 
-    final session = Supabase.instance.client.auth.currentSession;
-    if (session == null) {
-      context.go('/auth/phone');
-      return;
-    }
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) {
+        context.go('/auth/phone');
+        return;
+      }
 
-    // Signed in. Decide route based on family row + saved onboarding step.
-    final family = await ref.read(currentFamilyProvider.future);
-    if (!mounted) return;
+      // Signed in. Decide route based on family row + saved onboarding step.
+      final family = await ref.read(currentFamilyProvider.future);
+      if (!mounted) return;
 
-    if (family == null) {
-      // Auth user exists but family_create hasn't run — fresh OTP, resume
-      // at the saved step (welcome → family-name → add-child → ...).
+      if (family == null) {
+        // Auth user exists but family_create hasn't run — resume saved step.
+        final step = await ref.read(onboardingStepProvider.future);
+        if (!mounted) return;
+        context.go(step.route);
+        return;
+      }
+
+      // Family row exists; onboarding may still be partial.
+      if (family['is_cafe_only'] == true || family['has_children'] == true) {
+        context.go('/home');
+        return;
+      }
+
       final step = await ref.read(onboardingStepProvider.future);
       if (!mounted) return;
-      context.go(step.route);
-      return;
+      if (step == OnboardingStep.familyName ||
+          step == OnboardingStep.complete) {
+        context.go(OnboardingStep.addChild.route);
+      } else {
+        context.go(step.route);
+      }
+    } catch (_) {
+      // A slow or failed cold-start read (e.g. the family fetch timing out)
+      // must not leave the splash spinning forever — show a retry instead.
+      if (mounted) setState(() => _errored = true);
     }
+  }
 
-    // Family row exists. Onboarding may still be partial: cafe-only is
-    // complete; otherwise has_children=false means the user added a name
-    // but not a child yet; otherwise → home.
-    if (family['is_cafe_only'] == true || family['has_children'] == true) {
-      context.go('/home');
-      return;
-    }
-
-    // Family but no child and not cafe-only — resume mid-onboarding.
-    final step = await ref.read(onboardingStepProvider.future);
-    if (!mounted) return;
-    if (step == OnboardingStep.familyName ||
-        step == OnboardingStep.complete) {
-      // Defensive: if family row exists but onboarding step is still 0,
-      // the user has named the family but stopped — push them to add-child.
-      context.go(OnboardingStep.addChild.route);
-    } else {
-      context.go(step.route);
-    }
+  void _retry() {
+    setState(() => _errored = false);
+    ref.invalidate(appVersionStatusProvider);
+    ref.invalidate(currentFamilyProvider);
+    ref.invalidate(onboardingStepProvider);
+    _bootstrap();
   }
 
   @override
@@ -114,16 +123,33 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 fit: BoxFit.contain,
               ),
               const SizedBox(height: 32),
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(
-                    AppColors.navy.withValues(alpha: 0.55),
+              if (_errored) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Text(
+                    "Couldn't connect. Please check your internet and try again.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.navy.withValues(alpha: 0.7),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _retry,
+                  child: const Text('Retry'),
+                ),
+              ] else
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(
+                      AppColors.navy.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

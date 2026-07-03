@@ -51,11 +51,12 @@ class _ChildDetailsScreenState extends ConsumerState<ChildDetailsScreen> {
     try {
       final row = await Supabase.instance.client
           .from('children')
-          .select('name, dob, delivery_address')
+          .select('name, date_of_birth, delivery_address')
           .eq('id', childId)
           .maybeSingle();
       if (row == null || !mounted) return;
-      final prefilledDob = DateTime.tryParse((row['dob'] as String?) ?? '');
+      final prefilledDob =
+          DateTime.tryParse((row['date_of_birth'] as String?) ?? '');
       setState(() {
         _nameController.text = (row['name'] as String?) ?? '';
         _addressController.text = (row['delivery_address'] as String?) ?? '';
