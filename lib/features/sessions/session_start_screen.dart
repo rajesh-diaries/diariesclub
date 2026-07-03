@@ -309,6 +309,10 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     }
 
     final children = _selectedChildIds.toList();
+    // One batch id shared by every session in this group. The backend uses it
+    // to revoke a group coupon (e.g. 2KIDS) if any sibling session is later
+    // cancelled, so the discount can't be kept on a single leftover session.
+    final batchId = const Uuid().v4();
     final sessionIds = <String>[];
     // Track successes so a mid-batch failure can surface a "N of M
     // started" message instead of silently leaving the user wondering
@@ -329,6 +333,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
             'p_duration_minutes': _selectedDurationMinutes,
             'p_payment_method': _paymentMethod,
             'p_idempotency_key': idem,
+            'p_batch_id': batchId,
             if (couponForCall != null) 'p_coupon_code': couponForCall,
           },
         );
