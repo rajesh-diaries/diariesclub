@@ -17,6 +17,7 @@ import '../../../core/utils/currency.dart';
 import '../../../core/utils/haptics.dart';
 import 'top_up_sheet.dart';
 import '../../../core/providers/play_pass_plans_provider.dart';
+import '../../../core/providers/venue_config_provider.dart';
 
 /// Bottom sheet for purchasing Play Passes. Deducts from wallet balance;
 /// if insufficient, routes through the top-up sheet first.
@@ -158,6 +159,10 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
   @override
   Widget build(BuildContext context) {
     final plansAsync = ref.watch(playPassPlansProvider);
+    final oneHourPaise =
+        (ref.watch(venueConfigProvider).valueOrNull?['session_1hr_price_paise']
+            as int?) ??
+        80000;
     return SafeArea(
       child: Container(
         decoration: const BoxDecoration(
@@ -231,6 +236,7 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
                   for (final opt in plans) ...[
                     _PassOptionCard(
                       option: opt,
+                      singleSessionPrice: oneHourPaise,
                       busy: _buyingType == opt['type'],
                       onTap: () {
                         AppHaptics.light();
@@ -274,11 +280,13 @@ class _PassOptionCard extends StatelessWidget {
   final Map<String, dynamic> option;
   final bool busy;
   final VoidCallback onTap;
+  final int singleSessionPrice;
 
   const _PassOptionCard({
     required this.option,
     required this.busy,
     required this.onTap,
+    required this.singleSessionPrice,
   });
 
   @override
@@ -289,7 +297,6 @@ class _PassOptionCard extends StatelessWidget {
     final label = option['label'] as String;
     final tag = option['tag'] as String;
     final perSession = price ~/ total;
-    const singleSessionPrice = 80000; // 1hr price
     final totalSavings = (singleSessionPrice - perSession) * total;
 
     return InkWell(

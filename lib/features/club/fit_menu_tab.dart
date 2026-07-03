@@ -28,13 +28,24 @@ class FitMenuTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ListView(
-      children: const [
-        _SubscriptionBanner(),
-        _FitTemplatesSection(),
-        _AlaCarteSection(),
-        SizedBox(height: 32),
-      ],
+    // Pull-to-refresh: FIT data is read once (not realtime), so let customers
+    // pull to pick up admin changes without reopening the app.
+    return RefreshIndicator(
+      color: AppColors.navy,
+      backgroundColor: Colors.white,
+      onRefresh: () async {
+        ref.invalidate(fitTemplatesCustomerProvider);
+        ref.invalidate(menuItemsByBrandProvider('fit'));
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          _SubscriptionBanner(),
+          _FitTemplatesSection(),
+          _AlaCarteSection(),
+          SizedBox(height: 32),
+        ],
+      ),
     );
   }
 }
@@ -216,8 +227,8 @@ class _TemplateCard extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 6,
                       children: [
-                        if (showVeg) _DietaryBadge(type: 'veg'),
-                        if (showNonVeg) _DietaryBadge(type: 'non_veg'),
+                        if (showVeg) const _DietaryBadge(type: 'veg'),
+                        if (showNonVeg) const _DietaryBadge(type: 'non_veg'),
                       ],
                     ),
                   ],
