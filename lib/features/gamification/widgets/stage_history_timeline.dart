@@ -14,7 +14,12 @@ import '../../../core/widgets/skeleton_card.dart';
 /// nudges parents back into the play loop.
 class StageHistoryTimeline extends ConsumerWidget {
   final String childId;
-  const StageHistoryTimeline({super.key, required this.childId});
+
+  /// When set, only transitions for this trait/hero are shown. Null shows
+  /// every trait (the master timeline on the Adventure dashboard).
+  final String? trait;
+
+  const StageHistoryTimeline({super.key, required this.childId, this.trait});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -32,7 +37,10 @@ class StageHistoryTimeline extends ConsumerWidget {
           onRetry: () => ref.invalidate(childStageHistoryProvider(childId)),
         ),
       ),
-      data: (entries) {
+      data: (all) {
+        final entries = trait == null
+            ? all
+            : all.where((e) => e.trait == trait).toList();
         if (entries.isEmpty) {
           return _Empty();
         }
@@ -122,19 +130,19 @@ class _Row extends StatelessWidget {
   }
 
   static Color _heroColor(String t) => switch (t) {
-        'rafi' => AppColors.rafiCoral,
-        'ellie' => AppColors.ellieBlue,
-        'gerry' => AppColors.gerryAmber,
-        'zena' => AppColors.zenaGreen,
-        _ => AppColors.gold,
-      };
+    'rafi' => AppColors.rafiCoral,
+    'ellie' => AppColors.ellieBlue,
+    'gerry' => AppColors.gerryAmber,
+    'zena' => AppColors.zenaGreen,
+    _ => AppColors.gold,
+  };
   static String _heroName(String t) => switch (t) {
-        'rafi' => 'Rafi',
-        'ellie' => 'Ellie',
-        'gerry' => 'Gerry',
-        'zena' => 'Zena',
-        _ => '?',
-      };
+    'rafi' => 'Rafi',
+    'ellie' => 'Ellie',
+    'gerry' => 'Gerry',
+    'zena' => 'Zena',
+    _ => '?',
+  };
   static String _stageLabel(String s) =>
       s.isEmpty ? '?' : s[0].toUpperCase() + s.substring(1);
 }

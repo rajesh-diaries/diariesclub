@@ -58,6 +58,16 @@ class _ReflectionMoreMomentsSheetState
     });
   }
 
+  /// Confirm/return the selections. Flush any typed-but-not-added custom
+  /// text so tapping Done/Add without first tapping "+" doesn't drop it.
+  void _confirm() {
+    final txt = _customCtrl.text.trim();
+    if (txt.isNotEmpty && txt.length <= 280) {
+      _selected.add(txt);
+    }
+    Navigator.of(context).pop(_selected);
+  }
+
   @override
   Widget build(BuildContext context) {
     final accent = _traitColor(widget.trait);
@@ -144,7 +154,9 @@ class _ReflectionMoreMomentsSheetState
                       accent: accent,
                       onSubmit: _addCustom,
                     ),
-                    if (_selected.where((s) => !pool.contains(s)).isNotEmpty) ...[
+                    if (_selected
+                        .where((s) => !pool.contains(s))
+                        .isNotEmpty) ...[
                       const SizedBox(height: 14),
                       Text(
                         'Your custom moments',
@@ -170,7 +182,7 @@ class _ReflectionMoreMomentsSheetState
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: () => Navigator.of(context).pop(_selected),
+                    onPressed: _confirm,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.navy,
                       foregroundColor: Colors.white,
@@ -180,7 +192,7 @@ class _ReflectionMoreMomentsSheetState
                       _selected.isEmpty
                           ? 'Done'
                           : 'Add ${_selected.length} moment'
-                              '${_selected.length == 1 ? '' : 's'}',
+                                '${_selected.length == 1 ? '' : 's'}',
                     ),
                   ),
                 ),
@@ -216,8 +228,9 @@ class _MultiSelectTile extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color:
-                selected ? accent.withValues(alpha: 0.14) : AppColors.lightSurface,
+            color: selected
+                ? accent.withValues(alpha: 0.14)
+                : AppColors.lightSurface,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: selected ? accent : AppColors.lightBorder,
@@ -239,7 +252,11 @@ class _MultiSelectTile extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: selected
-                    ? const Icon(PhosphorIconsRegular.check, color: Colors.white, size: 14)
+                    ? const Icon(
+                        PhosphorIconsRegular.check,
+                        color: Colors.white,
+                        size: 14,
+                      )
                     : null,
               ),
               const SizedBox(width: 12),
@@ -318,17 +335,17 @@ class _CustomEntry extends StatelessWidget {
 }
 
 String _traitName(String t) => switch (t) {
-      'rafi' => 'Rafi',
-      'ellie' => 'Ellie',
-      'gerry' => 'Gerry',
-      'zena' => 'Zena',
-      _ => '',
-    };
+  'rafi' => 'Rafi',
+  'ellie' => 'Ellie',
+  'gerry' => 'Gerry',
+  'zena' => 'Zena',
+  _ => '',
+};
 
 Color _traitColor(String t) => switch (t) {
-      'rafi' => AppColors.rafiCoral,
-      'ellie' => AppColors.ellieBlue,
-      'gerry' => AppColors.gerryAmber,
-      'zena' => AppColors.zenaGreen,
-      _ => AppColors.navy,
-    };
+  'rafi' => AppColors.rafiCoral,
+  'ellie' => AppColors.ellieBlue,
+  'gerry' => AppColors.gerryAmber,
+  'zena' => AppColors.zenaGreen,
+  _ => AppColors.navy,
+};

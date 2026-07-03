@@ -97,7 +97,10 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
     context.go('/home');
   }
 
-  Future<void> _submit({required String childName, required String childId}) async {
+  Future<void> _submit({
+    required String childName,
+    required String childId,
+  }) async {
     setState(() {
       _submitting = true;
       _errorText = null;
@@ -138,50 +141,65 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
 
     if (!mounted) return;
 
-    final transitionsJson =
-        (result['transitions'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-    final transitions =
-        transitionsJson.map(StageTransition.fromJson).toList();
-    final split = (result['split'] as Map?)?.cast<String, dynamic>() ?? const {};
-    final intSplit = <String, int>{
-      for (final t in const ['rafi', 'ellie', 'gerry', 'zena'])
-        t: (split[t] as int?) ?? 0,
-    };
+    // The RPC already committed server-side. From here a client-side parse
+    // or navigation glitch must never strand the button spinning — wrap the
+    // post-RPC work so _submitting is always reset (finally) and a parse
+    // failure still lands the user somewhere safe (catch).
+    try {
+      final transitionsJson =
+          (result['transitions'] as List?)?.cast<Map<String, dynamic>>() ??
+          const [];
+      final transitions = transitionsJson
+          .map(StageTransition.fromJson)
+          .toList();
+      final split =
+          (result['split'] as Map?)?.cast<String, dynamic>() ?? const {};
+      final intSplit = <String, int>{
+        for (final t in const ['rafi', 'ellie', 'gerry', 'zena'])
+          t: (split[t] as num?)?.round() ?? 0,
+      };
 
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+      final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
-    if (transitions.isNotEmpty && !reduceMotion) {
-      // Push the cinematic as a transparent route. When it completes,
-      // we pop it then show the summary sheet.
-      await Navigator.of(context, rootNavigator: true).push(
-        PageRouteBuilder<void>(
-          opaque: false,
-          barrierDismissible: false,
-          pageBuilder: (_, __, ___) => StageTransitionOverlay(
-            transitions: transitions,
-            childName: childName,
-            onComplete: () =>
-                Navigator.of(context, rootNavigator: true).maybePop(),
+      if (transitions.isNotEmpty && !reduceMotion) {
+        // Push the cinematic as a transparent route. When it completes,
+        // we pop it then show the summary sheet.
+        await Navigator.of(context, rootNavigator: true).push(
+          PageRouteBuilder<void>(
+            opaque: false,
+            barrierDismissible: false,
+            pageBuilder: (_, __, ___) => StageTransitionOverlay(
+              transitions: transitions,
+              childName: childName,
+              onComplete: () =>
+                  Navigator.of(context, rootNavigator: true).maybePop(),
+            ),
+            transitionsBuilder: (_, anim, __, child) =>
+                FadeTransition(opacity: anim, child: child),
           ),
-          transitionsBuilder: (_, anim, __, child) =>
-              FadeTransition(opacity: anim, child: child),
+        );
+      }
+
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        isDismissible: false,
+        enableDrag: false,
+        builder: (_) => SplitSummarySheet(
+          split: intSplit,
+          childName: childName,
+          childId: childId,
         ),
       );
+    } catch (_) {
+      // Reflection is saved; a malformed transitions/split payload
+      // shouldn't trap the user on this screen. Fall back to home.
+      if (mounted) context.go('/home');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
-
-    if (!mounted) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      isDismissible: false,
-      enableDrag: false,
-      builder: (_) => SplitSummarySheet(
-        split: intSplit,
-        childName: childName,
-        childId: childId,
-      ),
-    );
   }
 
   String _mapError(String msg) {
@@ -240,7 +258,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
             }
             final childName =
                 ((recap['children'] as Map?)?['name'] as String?) ?? 'Today';
-            final childId = recap['child_id'] as String;
+            final childId = (recap['child_id'] as String?) ?? '';
             final reflectionStatus =
                 (recap['reflection_status'] as String?) ?? 'pending';
 
@@ -283,10 +301,8 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                 bottomBar: _BottomBar(
                   selectedCount: _totalSelected,
                   submitting: _submitting,
-                  onSubmit: () => _submit(
-                    childName: childName,
-                    childId: childId,
-                  ),
+                  onSubmit: () =>
+                      _submit(childName: childName, childId: childId),
                   onLater: _close,
                 ),
               ),
@@ -347,8 +363,10 @@ class _Body extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('How was $childName today?',
-                          style: AppTextStyles.h1(context)),
+                      Text(
+                        'How was $childName today?',
+                        style: AppTextStyles.h1(context),
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         'Tap moments that felt true. We split XP across the '

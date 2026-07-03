@@ -30,6 +30,9 @@ class SessionDetailScreen extends ConsumerStatefulWidget {
 
 class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
   Timer? _ticker;
+  // In-flight guard so a double-tap on "I'm wrapping up" can't fire
+  // session_complete_batch twice.
+  bool _wrappingUp = false;
 
   @override
   void initState() {
@@ -58,6 +61,7 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
   void _goToOrderFood() => context.go('/club');
 
   Future<void> _confirmWrapUp(String sessionId) async {
+    if (_wrappingUp) return;
     final sessionIds = [sessionId];
 
     final ok = await showDialog<bool>(
@@ -79,12 +83,17 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
       ),
     );
     if (ok != true || !mounted) return;
+    // Guard again after the dialog: two taps can open two dialogs, and
+    // confirming both must still fire the RPC only once.
+    if (_wrappingUp) return;
+    _wrappingUp = true;
     try {
       final result =
           await Supabase.instance.client.rpc<dynamic>(
-            'session_complete_batch',
-            params: {'p_session_ids': sessionIds},
-          ) as Map<String, dynamic>;
+                'session_complete_batch',
+                params: {'p_session_ids': sessionIds},
+              )
+              as Map<String, dynamic>;
       if (!mounted) return;
       // Force-invalidate the active-sessions stream so the home view
       // rebuilds without this kid's "Wrapping up" card immediately.
@@ -96,7 +105,8 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
       // single-session wrap-up handler in session_home_view.dart.
       ref.invalidate(activeSessionsProvider);
       final completedCount = (result['completed_count'] as num?)?.toInt() ?? 1;
-      final names = (result['child_names'] as List<dynamic>?)
+      final names =
+          (result['child_names'] as List<dynamic>?)
               ?.map((n) => n.toString())
               .where((n) => n.isNotEmpty)
               .toList() ??
@@ -113,21 +123,22 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
       context.go('/home');
     } on PostgrestException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Couldn't wrap up: ${e.message}")),
-      );
+      _wrappingUp = false;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Couldn't wrap up: ${e.message}")));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Couldn't wrap up: $e")),
-      );
+      _wrappingUp = false;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Couldn't wrap up: $e")));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final sessions =
-        ref.watch(activeSessionsProvider).valueOrNull ?? const [];
+    final sessions = ref.watch(activeSessionsProvider).valueOrNull ?? const [];
     final session = sessions.firstWhere(
       (s) => s['id'] == widget.sessionId,
       orElse: () => const <String, dynamic>{},
@@ -140,14 +151,11 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
       });
       return const Scaffold(
         backgroundColor: Colors.white,
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.navy),
-        ),
+        body: Center(child: CircularProgressIndicator(color: AppColors.navy)),
       );
     }
 
-    final children =
-        ref.watch(familyChildrenProvider).valueOrNull ?? const [];
+    final children = ref.watch(familyChildrenProvider).valueOrNull ?? const [];
     final childId = session['child_id'] as String?;
     final child = children.firstWhere(
       (c) => c['id'] == childId,
@@ -158,8 +166,9 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
     final expiresAtStr = session['expires_at'] as String?;
     // tryParse so a malformed/transient row from Realtime doesn't blow up
     // the screen — the timer just hides until the next refresh fixes it.
-    final expiresAt =
-        expiresAtStr == null ? null : DateTime.tryParse(expiresAtStr);
+    final expiresAt = expiresAtStr == null
+        ? null
+        : DateTime.tryParse(expiresAtStr);
     final now = DateTime.now();
     final isGrace = expiresAt != null && expiresAt.isBefore(now);
 
@@ -235,17 +244,17 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Session details',
-                        style: AppTextStyles.h3(context)),
+                    Text('Session details', style: AppTextStyles.h3(context)),
                     const SizedBox(height: 8),
                     _DetailRow(
                       label: 'Duration',
-                      value: '${session['duration_minutes']} min',
+                      value: session['duration_minutes'] != null
+                          ? '${session['duration_minutes']} min'
+                          : '—',
                     ),
                     _DetailRow(
                       label: 'Payment',
-                      value:
-                          (session['payment_method'] as String? ?? '—'),
+                      value: (session['payment_method'] as String? ?? '—'),
                     ),
                     _DetailRow(
                       label: 'Status',

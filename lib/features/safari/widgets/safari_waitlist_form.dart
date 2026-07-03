@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -14,15 +16,14 @@ class SafariWaitlistForm extends ConsumerStatefulWidget {
   const SafariWaitlistForm({super.key});
 
   @override
-  ConsumerState<SafariWaitlistForm> createState() =>
-      _SafariWaitlistFormState();
+  ConsumerState<SafariWaitlistForm> createState() => _SafariWaitlistFormState();
 }
 
 class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
   final _parentNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _childNameController = TextEditingController();
-  int? _selectedAge;
+  DateTime? _childDob;
   bool _submitting = false;
   bool _submitted = false;
 
@@ -37,7 +38,12 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
     if (family != null) {
       final phone = family['phone'] as String?;
       if (phone != null && phone.isNotEmpty) {
-        _phoneController.text = phone;
+        // Family phone is stored in E.164 (+91XXXXXXXXXX). The waitlist field
+        // expects a 10-digit Indian mobile number.
+        final digits = phone.replaceAll(RegExp(r'\D'), '');
+        _phoneController.text = digits.length > 10
+            ? digits.substring(digits.length - 10)
+            : digits;
       }
     }
 
@@ -48,26 +54,51 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
       if (childName != null && childName.isNotEmpty) {
         _childNameController.text = childName;
       }
-      final age = _ageFromDob(firstChild['date_of_birth'] as String?);
-      if (age != null && age >= 2 && age <= 4) {
-        _selectedAge = age;
+      final dob = _parseDob(firstChild['date_of_birth'] as String?);
+      if (dob != null) {
+        _childDob = dob;
       }
     }
   }
 
-  int? _ageFromDob(String? dobStr) {
+  DateTime? _parseDob(String? dobStr) {
     if (dobStr == null) return null;
     try {
-      final dob = DateTime.parse(dobStr);
-      final now = DateTime.now();
-      var age = now.year - dob.year;
-      if (now.month < dob.month ||
-          (now.month == dob.month && now.day < dob.day)) {
-        age--;
-      }
-      return age < 0 ? 0 : age;
+      return DateTime.parse(dobStr);
     } catch (_) {
       return null;
+    }
+  }
+
+  int? _ageFromDob(DateTime? dob) {
+    if (dob == null) return null;
+    final now = DateTime.now();
+    var age = now.year - dob.year;
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
+      age--;
+    }
+    return age < 0 ? 0 : age;
+  }
+
+  Future<void> _pickDob() async {
+    final now = DateTime.now();
+    // Program is for ages 2–5, so constrain the picker to eligible birth dates.
+    final firstDate = DateTime(now.year - 6, now.month, now.day);
+    final lastDate = DateTime(now.year - 2, now.month, now.day);
+    final requested = _childDob ?? DateTime(now.year - 3, now.month, now.day);
+    final initial = requested.isBefore(firstDate)
+        ? firstDate
+        : (requested.isAfter(lastDate) ? lastDate : requested);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: 'Select child date of birth',
+    );
+    if (picked != null) {
+      setState(() => _childDob = picked);
     }
   }
 
@@ -83,7 +114,7 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
     return _parentNameController.text.trim().isNotEmpty &&
         _phoneController.text.trim().length >= 10 &&
         _childNameController.text.trim().isNotEmpty &&
-        _selectedAge != null &&
+        _childDob != null &&
         !_submitting;
   }
 
@@ -96,15 +127,20 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
       final familyId =
           ref.read(currentFamilyProvider).valueOrNull?['id'] as String?;
 
+      final dob = _childDob!;
+      final age = _ageFromDob(dob);
+
       await Supabase.instance.client.from('safari_waitlist').insert({
         'family_id': familyId,
         'parent_name': _parentNameController.text.trim(),
         'phone': _phoneController.text.trim(),
         'child_name': _childNameController.text.trim(),
-        'child_age': _selectedAge,
+        'child_dob': DateFormat('yyyy-MM-dd').format(dob),
+        'child_age': age,
         'source': 'app',
       });
 
+      if (!mounted) return;
       setState(() {
         _submitting = false;
         _submitted = true;
@@ -144,20 +180,14 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
             ),
             const SizedBox(height: 16),
             Text(
-              'You\'re on the list!',
-              style: AppTextStyles.h3(
-                context,
-                color: SafariColors.jungleGreen,
-              ),
+              'Thanks for your interest!',
+              style: AppTextStyles.h3(context, color: SafariColors.jungleGreen),
             ),
             const SizedBox(height: 8),
             Text(
-              'We\'ll reach out as soon as Safari Club is ready. Thank you for your interest!',
+              'We’ll reach out when enrollment opens.',
               textAlign: TextAlign.center,
-              style: AppTextStyles.body(
-                context,
-                color: SafariColors.slate,
-              ),
+              style: AppTextStyles.body(context, color: SafariColors.slate),
             ),
           ],
         ),
@@ -170,15 +200,12 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Join the waitlist',
-            style: AppTextStyles.h3(
-              context,
-              color: SafariColors.jungleGreen,
-            ),
+            'Interested?',
+            style: AppTextStyles.h3(context, color: SafariColors.jungleGreen),
           ),
           const SizedBox(height: 8),
           Text(
-            'Be the first to know when Safari Club opens. No commitment required.',
+            'Let us know and we’ll reach out when enrollment opens. No commitment required.',
             style: AppTextStyles.body(
               context,
               color: AppColors.lightTextSecondary,
@@ -201,6 +228,7 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
             controller: _phoneController,
             keyboardType: TextInputType.phone,
             maxLength: 10,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               labelText: 'Phone number',
@@ -223,46 +251,35 @@ class _SafariWaitlistFormState extends ConsumerState<SafariWaitlistForm> {
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            'Child age',
-            style: AppTextStyles.caption(
-              context,
-              color: AppColors.lightTextSecondary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [2, 3, 4].map((age) {
-              final selected = _selectedAge == age;
-              return Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: ChoiceChip(
-                  label: Text('$age years'),
-                  selected: selected,
-                  onSelected: (_) => setState(() => _selectedAge = age),
-                  selectedColor: SafariColors.jungleGreen,
-                  backgroundColor: Colors.white,
-                  side: BorderSide(
-                    color: selected
-                        ? SafariColors.jungleGreen
-                        : AppColors.lightBorder,
-                  ),
-                  labelStyle: AppTextStyles.body(
-                    context,
-                    color: selected ? Colors.white : SafariColors.slate,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+          InkWell(
+            onTap: _pickDob,
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Child date of birth',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              );
-            }).toList(),
+                suffixIcon: const Icon(PhosphorIconsRegular.calendarBlank),
+              ),
+              child: Text(
+                _childDob == null
+                    ? 'Tap to pick a date'
+                    : DateFormat('dd MMM yyyy').format(_childDob!),
+                style: AppTextStyles.body(
+                  context,
+                  color: _childDob == null
+                      ? AppColors.lightTextSecondary
+                      : AppColors.navy,
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             child: PrimaryButton(
-              label: 'Join waitlist',
+              label: "I'm interested",
               onPressed: _canSubmit ? _submit : null,
               loading: _submitting,
             ),

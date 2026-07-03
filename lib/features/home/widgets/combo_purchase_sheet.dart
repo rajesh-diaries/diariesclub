@@ -39,8 +39,7 @@ class ComboPurchaseSheet extends ConsumerStatefulWidget {
   const ComboPurchaseSheet({super.key, required this.combo});
 
   @override
-  ConsumerState<ComboPurchaseSheet> createState() =>
-      _ComboPurchaseSheetState();
+  ConsumerState<ComboPurchaseSheet> createState() => _ComboPurchaseSheetState();
 }
 
 class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
@@ -59,7 +58,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
   Future<void> _loadItemNames() async {
     final inclusions =
         (widget.combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{};
+        const <String, dynamic>{};
     final ids = ((inclusions['menu_item_ids'] as List?) ?? const [])
         .cast<String>();
     if (ids.isEmpty) return;
@@ -74,26 +73,58 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
             .map((r) => Map<String, dynamic>.from(r as Map))
             .toList();
       });
-    } catch (_) {/* names just won't show; not blocking */}
+    } catch (_) {
+      /* names just won't show; not blocking */
+    }
   }
 
   void _addToBag() {
     final combo = widget.combo;
     final notifier = ref.read(cartProvider.notifier);
-    notifier.addCombo(ComboLine.create(
-      comboId: combo['id'] as String,
-      name: (combo['name'] as String?) ?? 'Combo',
-      unitPricePaise: (combo['price_paise'] as int?) ?? 0,
-      quantity: 1,
-      imageUrl: combo['cover_image_url'] as String?,
-      includedItemNames:
-          _itemRows.map((r) => (r['name'] as String?) ?? '').toList(),
-    ));
+    notifier.addCombo(
+      ComboLine.create(
+        comboId: combo['id'] as String,
+        name: (combo['name'] as String?) ?? 'Combo',
+        unitPricePaise: (combo['price_paise'] as int?) ?? 0,
+        quantity: 1,
+        imageUrl: combo['cover_image_url'] as String?,
+        includedItemNames: _itemRows
+            .map((r) => (r['name'] as String?) ?? '')
+            .toList(),
+      ),
+    );
     Navigator.of(context).pop();
     context.go('/club');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${combo['name']} added to your bag')),
     );
+  }
+
+  /// Grand total actually charged for this combo — food subtotal + food
+  /// GST + rounding + (GST-inclusive) session value. Mirrors the build()
+  /// breakdown and the server math in order_place so the wallet pre-check
+  /// gates on the same amount shown on the pay button.
+  int _computeGrandTotal() {
+    final combo = widget.combo;
+    final inclusions =
+        (combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
+    final sessionMinutes = inclusions['session_minutes'] as int?;
+    final hasSession = sessionMinutes != null;
+    final price = (combo['price_paise'] as int?) ?? 0;
+    final cfg = ref.read(venueConfigProvider).valueOrNull ?? const {};
+    final foodGstPct = (cfg['food_gst_percent'] as num?)?.toDouble() ?? 5.0;
+    final session1hr = (cfg['session_1hr_price_paise'] as int?) ?? 80000;
+    final session2hr = (cfg['session_2hr_price_paise'] as int?) ?? 110000;
+    final sessionValue = !hasSession
+        ? 0
+        : (sessionMinutes == 60
+              ? session1hr
+              : (sessionMinutes == 120 ? session2hr : 0));
+    final foodPortion = (price - sessionValue).clamp(0, 1 << 30).toInt();
+    final foodGst = (foodPortion * foodGstPct / 100).round();
+    final rawTotal = foodPortion + foodGst + sessionValue;
+    return ((rawTotal + 50) ~/ 100) * 100;
   }
 
   /// Place the order straight from the sheet (food-only combos OR
@@ -104,20 +135,22 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
     if (familyId == null) return;
     if (withSession && _selectedChildId == null) return;
 
-    final price = (combo['price_paise'] as int?) ?? 0;
+    final grandTotal = _computeGrandTotal();
 
     // Pre-check wallet balance so we surface the sheet before calling
-    // order_place, matching the session-start flow.
+    // order_place, matching the session-start flow. Gate on the grand
+    // total actually charged (price + food GST + rounding), not the raw
+    // combo price shown pre-tax.
     if (_paymentMethod == 'wallet') {
       final balance = ref.read(walletBalancePaiseProvider) ?? 0;
-      if (balance < price) {
+      if (balance < grandTotal) {
         showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
           useRootNavigator: true,
           builder: (_) => InsufficientBalanceSheet(
-            requiredPaise: price,
+            requiredPaise: grandTotal,
             onSwitchToCash: () {
               if (!mounted) return;
               setState(() => _paymentMethod = 'cash');
@@ -141,24 +174,22 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
       // for the full combo price — fixes BUG-050 double-charge where
       // we previously called session_create + order_place separately
       // and the session value was billed twice.
-      final result = await Supabase.instance.client
-          .rpc<Map<String, dynamic>>('order_place', params: {
-        'p_venue_id': _venueId,
-        'p_family_id': familyId,
-        'p_items': [
-          {
-            'type': 'combo',
-            'combo_id': combo['id'],
-            'quantity': 1,
-          }
-        ],
-        'p_fulfillment_mode': 'dine_in',
-        'p_payment_method': _paymentMethod,
-        'p_combo_id': null,
-        if (withSession) 'p_child_id': _selectedChildId,
-        'p_idempotency_key': const Uuid().v4(),
-        'p_customer_gstin': null,
-      });
+      final result = await Supabase.instance.client.rpc<Map<String, dynamic>>(
+        'order_place',
+        params: {
+          'p_venue_id': _venueId,
+          'p_family_id': familyId,
+          'p_items': [
+            {'type': 'combo', 'combo_id': combo['id'], 'quantity': 1},
+          ],
+          'p_fulfillment_mode': 'dine_in',
+          'p_payment_method': _paymentMethod,
+          'p_combo_id': null,
+          if (withSession) 'p_child_id': _selectedChildId,
+          'p_idempotency_key': const Uuid().v4(),
+          'p_customer_gstin': null,
+        },
+      );
       final orderId = result['order_id'] as String?;
 
       if (!mounted) return;
@@ -180,8 +211,10 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
         );
       }
     } on PostgrestException catch (e) {
-      debugPrint('[COMBO_PURCHASE] PostgrestException: code=${e.code} '
-          'message=${e.message} details=${e.details} hint=${e.hint}');
+      debugPrint(
+        '[COMBO_PURCHASE] PostgrestException: code=${e.code} '
+        'message=${e.message} details=${e.details} hint=${e.hint}',
+      );
       if (!mounted) return;
       setState(() {
         _busy = false;
@@ -199,13 +232,12 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final combo = widget.combo;
     final inclusions =
         (combo['inclusions'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{};
+        const <String, dynamic>{};
     final sessionMinutes = inclusions['session_minutes'] as int?;
     final hasSession = sessionMinutes != null;
     final price = (combo['price_paise'] as int?) ?? 0;
@@ -219,15 +251,14 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
     //   food_portion = combo.price - session_value (pre-GST)
     //   add 5% on food, round grand total to nearest rupee
     final cfg = ref.watch(venueConfigProvider).valueOrNull ?? const {};
-    final foodGstPct =
-        (cfg['food_gst_percent'] as num?)?.toDouble() ?? 5.0;
+    final foodGstPct = (cfg['food_gst_percent'] as num?)?.toDouble() ?? 5.0;
     final session1hr = (cfg['session_1hr_price_paise'] as int?) ?? 80000;
     final session2hr = (cfg['session_2hr_price_paise'] as int?) ?? 110000;
     final sessionValue = !hasSession
         ? 0
         : (sessionMinutes == 60
-            ? session1hr
-            : (sessionMinutes == 120 ? session2hr : 0));
+              ? session1hr
+              : (sessionMinutes == 120 ? session2hr : 0));
     final foodPortion = (price - sessionValue).clamp(0, 1 << 30).toInt();
     final foodGst = (foodPortion * foodGstPct / 100).round();
     final rawTotal = foodPortion + foodGst + sessionValue;
@@ -263,8 +294,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
       builder: (_, controller) => Container(
         decoration: const BoxDecoration(
           color: AppColors.lightBackground,
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: ListView(
           controller: controller,
@@ -309,8 +339,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
             ],
             const SizedBox(height: 20),
             if (hasSession) ...[
-              Text("Who's playing?",
-                  style: AppTextStyles.bodyLarge(context)),
+              Text("Who's playing?", style: AppTextStyles.bodyLarge(context)),
               const SizedBox(height: 8),
               if (idleChildren.isEmpty)
                 const BrandedEmptyState(
@@ -327,7 +356,8 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
                         child: c,
                         selected: _selectedChildId == c['id'],
                         onTap: () => setState(
-                            () => _selectedChildId = c['id'] as String),
+                          () => _selectedChildId = c['id'] as String,
+                        ),
                       ),
                   ],
                 ),
@@ -374,8 +404,8 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
                   if (rounding != 0)
                     _BreakdownRow(
                       label: 'Rounding',
-                      value: (rounding > 0 ? '+' : '') +
-                          Money.fromPaise(rounding),
+                      value:
+                          (rounding > 0 ? '+' : '') + Money.fromPaise(rounding),
                       muted: true,
                     ),
                   const Divider(height: 16),
@@ -384,17 +414,14 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
                       Expanded(
                         child: Text(
                           'Total',
-                          style: AppTextStyles.body(context).copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: AppTextStyles.body(
+                            context,
+                          ).copyWith(fontWeight: FontWeight.w800),
                         ),
                       ),
                       Text(
                         Money.fromPaise(grandTotal),
-                        style: AppTextStyles.h3(
-                          context,
-                          color: AppColors.navy,
-                        ),
+                        style: AppTextStyles.h3(context, color: AppColors.navy),
                       ),
                     ],
                   ),
@@ -405,10 +432,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
               const SizedBox(height: 12),
               Text(
                 _errorText!,
-                style: AppTextStyles.body(
-                  context,
-                  color: AppColors.adminRed,
-                ),
+                style: AppTextStyles.body(context, color: AppColors.adminRed),
               ),
             ],
             const SizedBox(height: 20),
@@ -447,10 +471,10 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
               onPressed: _busy
                   ? null
                   : hasSession
-                      ? (idleChildren.isEmpty || _selectedChildId == null
-                          ? null
-                          : () => _placeOrder(withSession: true))
-                      : () => _placeOrder(withSession: false),
+                  ? (idleChildren.isEmpty || _selectedChildId == null
+                        ? null
+                        : () => _placeOrder(withSession: true))
+                  : () => _placeOrder(withSession: false),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.navy,
                 foregroundColor: Colors.white,
@@ -491,8 +515,7 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
             ],
             const SizedBox(height: 4),
             TextButton(
-              onPressed:
-                  _busy ? null : () => Navigator.of(context).pop(),
+              onPressed: _busy ? null : () => Navigator.of(context).pop(),
               child: const Text('Cancel'),
             ),
           ],

@@ -1,3 +1,5 @@
+import 'dart:developer' as dev;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,8 +35,7 @@ class SessionStartScreen extends ConsumerStatefulWidget {
   const SessionStartScreen({super.key});
 
   @override
-  ConsumerState<SessionStartScreen> createState() =>
-      _SessionStartScreenState();
+  ConsumerState<SessionStartScreen> createState() => _SessionStartScreenState();
 }
 
 class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
@@ -51,7 +52,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   bool _validatingCoupon = false;
   int? _couponDiscountPaise; // null = no coupon applied
   String? _appliedCouponCode; // display name (e.g. "Buddy Discount")
-  String? _couponBackendCode; // actual code sent to RPC (e.g. "SIBLING2")
+  String? _couponBackendCode; // actual code sent to RPC (e.g. "2KIDS")
   String? _couponError;
 
   late Future<List<Map<String, dynamic>>> _childrenFuture;
@@ -83,48 +84,110 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
 
   int _priceFor(int? duration, Map<String, dynamic>? cfg) {
     if (duration == null) return 0;
-    // Hardcoded prices — 1hr ₹800, 2hr ₹1100
-    return duration <= 60 ? 80000 : 110000;
+    // Prices from venue_config; standard 1hr ₹800 / 2hr ₹1100 as fallback
+    // when the key is missing or unparseable.
+    final price1hr =
+        (cfg?['session_1hr_price_paise'] as num?)?.toInt() ?? 80000;
+    final price2hr =
+        (cfg?['session_2hr_price_paise'] as num?)?.toInt() ?? 110000;
+    return duration <= 60 ? price1hr : price2hr;
   }
 
-  /// Sibling coupon metadata: backend code, friendly display name, discount.
-  /// Returns null for single kid.
-  Map<String, dynamic>? _siblingCouponFor(int kidCount) {
-    return switch (kidCount) {
-      2 => {
-          'code': 'SIBLING2',
-          'name': 'Buddy Discount',
-          'discount_paise': 15000,
-        },
-      3 => {
-          'code': 'SIBLING3',
-          'name': 'Sibling Saver',
-          'discount_paise': 25000,
-        },
-      4 => {
-          'code': 'SIBLING4',
-          'name': 'Triple Fun',
-          'discount_paise': 40000,
-        },
-      >= 5 => {
-          'code': 'SIBLING5',
-          'name': 'Squad Deal',
-          'discount_paise': 50000,
-        },
-      _ => null,
+  // Fallback map used when the admin has not configured sibling_coupon_codes
+  // in venue_config (or while the config row is still loading).
+  static const _fallbackSiblingCodes = {
+    '2': '2KIDS',
+    '3': '3KIDS',
+    '4': '4KIDS',
+    '5': '5KIDS',
+  };
+
+  static const _fallbackSiblingDiscounts = {
+    '2KIDS': 15000,
+    '3KIDS': 25000,
+    '4KIDS': 40000,
+    '5KIDS': 50000,
+  };
+
+  /// Sibling coupon metadata for the selected kid count.
+  /// Reads the admin-configured `sibling_coupon_codes` map from venue_config,
+  /// falling back to the standard 2KIDS/3KIDS/4KIDS/5KIDS codes.
+  /// Returns null for single kid or when no mapping exists.
+  Map<String, dynamic>? _siblingCouponFor(
+    int kidCount,
+    Map<String, dynamic>? cfg,
+  ) {
+    final configMap =
+        (cfg?['sibling_coupon_codes'] as Map<String, dynamic>?) ?? {};
+    final code =
+        (configMap[kidCount.toString()] ??
+                _fallbackSiblingCodes[kidCount.toString()])
+            as String?;
+    if (code == null) return null;
+    return {
+      'code': code,
+      'discount_paise': _fallbackSiblingDiscounts[code] ?? 0,
     };
   }
 
-  void _applySiblingCoupon() {
-    final coupon = _siblingCouponFor(_selectedChildIds.length);
+  Future<void> _applySiblingCoupon() async {
+    final cfg = ref.read(venueConfigProvider).valueOrNull;
+    final coupon = _siblingCouponFor(_selectedChildIds.length, cfg);
     if (coupon == null) return;
-    AppHaptics.success();
+    if (_selectedDurationMinutes == null) {
+      setState(() => _couponError = 'Pick a duration first.');
+      return;
+    }
+    final code = coupon['code'] as String;
+    // Validate server-side the same way manual codes are (coupon_validate),
+    // so the displayed discount matches what the backend actually deducts.
+    // Fall back to the configured/hardcoded amount only if validation is
+    // unavailable — session_create re-checks server-side regardless.
+    final amount = _priceFor(_selectedDurationMinutes, cfg);
     setState(() {
-      _couponDiscountPaise = coupon['discount_paise'] as int;
-      _appliedCouponCode = coupon['name'] as String;
-      _couponBackendCode = coupon['code'] as String;
+      _validatingCoupon = true;
       _couponError = null;
     });
+    try {
+      final res = await Supabase.instance.client.rpc<Map<String, dynamic>>(
+        'coupon_validate',
+        params: {'p_code': code, 'p_amount_paise': amount},
+      );
+      if (!mounted) return;
+      if (res['valid'] == true) {
+        final returnedCode = (res['code'] as String?) ?? code;
+        AppHaptics.success();
+        setState(() {
+          _validatingCoupon = false;
+          _couponDiscountPaise = res['discount_paise'] as int? ?? 0;
+          _appliedCouponCode = returnedCode;
+          _couponBackendCode = returnedCode;
+          _couponError = null;
+        });
+      } else {
+        AppHaptics.error();
+        setState(() {
+          _validatingCoupon = false;
+          _couponDiscountPaise = null;
+          _appliedCouponCode = null;
+          _couponBackendCode = null;
+          _couponError = (res['message'] as String?) ?? 'Invalid coupon.';
+        });
+      }
+    } catch (e) {
+      // Validation unavailable — fall back to the configured/hardcoded
+      // amount so the chip still works offline.
+      if (!mounted) return;
+      AppHaptics.success();
+      setState(() {
+        _validatingCoupon = false;
+        _couponDiscountPaise = coupon['discount_paise'] as int;
+        _appliedCouponCode = code;
+        _couponBackendCode = code;
+        _couponError = null;
+      });
+      debugPrint('[SIBLING_COUPON_VALIDATE] error: $e');
+    }
   }
 
   Future<void> _applyCoupon() async {
@@ -191,14 +254,14 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   }
 
   Future<void> _start() async {
+    if (_busy) return;
     if (_selectedDurationMinutes == null || _selectedChildIds.isEmpty) return;
     final cfg = ref.read(venueConfigProvider).valueOrNull;
     final perKidPrice = _priceFor(_selectedDurationMinutes, cfg);
     final coupon = _couponDiscountPaise ?? 0;
     // Coupon applies to the first session only (per-family redemption).
     // The remaining N-1 sessions pay full price.
-    final totalAmount =
-        (perKidPrice * _selectedChildIds.length) - coupon;
+    final totalAmount = (perKidPrice * _selectedChildIds.length) - coupon;
 
     setState(() {
       _busy = true;
@@ -257,16 +320,18 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         final idem = const Uuid().v4();
         // Coupon attaches to first session only; remaining run full price.
         final couponForCall = (i == 0) ? _couponBackendCode : null;
-        final result = await Supabase.instance.client
-            .rpc<Map<String, dynamic>>('session_create', params: {
-          'p_venue_id': _venueId,
-          'p_family_id': familyId,
-          'p_child_id': childId,
-          'p_duration_minutes': _selectedDurationMinutes,
-          'p_payment_method': _paymentMethod,
-          'p_idempotency_key': idem,
-          if (couponForCall != null) 'p_coupon_code': couponForCall,
-        });
+        final result = await Supabase.instance.client.rpc<Map<String, dynamic>>(
+          'session_create',
+          params: {
+            'p_venue_id': _venueId,
+            'p_family_id': familyId,
+            'p_child_id': childId,
+            'p_duration_minutes': _selectedDurationMinutes,
+            'p_payment_method': _paymentMethod,
+            'p_idempotency_key': idem,
+            if (couponForCall != null) 'p_coupon_code': couponForCall,
+          },
+        );
         final sid = result['session_id'] as String?;
         if (sid != null) sessionIds.add(sid);
         createdCount[0]++;
@@ -278,6 +343,12 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       // next frame — without this the multi-session stack appears empty
       // until the stream's next 15s tick.
       ref.invalidate(activeSessionsProvider);
+      // Refresh wallet / pass balances so the Home header and pass card
+      // update immediately (the backend may place a hold or consume passes
+      // at creation time; the QR screen refreshes again on scan).
+      ref.invalidate(walletTransactionsBalanceProvider);
+      ref.invalidate(currentWalletProvider);
+      ref.invalidate(playPassesProvider);
       // Always route to QR scanner after session creation — parents need
       // to scan at the venue for every session, including additional kids.
       if (sessionIds.isNotEmpty) {
@@ -289,6 +360,14 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         context.go('/home');
       }
     } on PostgrestException catch (e) {
+      // Money-safety: if any sessions were created before this failure,
+      // cancel them so the parent doesn't end up with a half-started batch
+      // and a confusing mix of holds/consumed passes.
+      if (createdCount[0] > 0) {
+        await _cancelPendingSessions(sessionIds);
+      }
+      if (!mounted) return;
+
       final couponErrors = {
         'coupon_invalid_code': 'That coupon code doesn\'t exist.',
         'coupon_inactive': 'That coupon is no longer active.',
@@ -300,7 +379,6 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       };
       for (final entry in couponErrors.entries) {
         if (e.message.contains(entry.key)) {
-          if (!mounted) return;
           setState(() {
             _busy = false;
             _couponError = entry.value;
@@ -311,39 +389,28 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         }
       }
       if (e.message.contains('child_already_in_session')) {
-        if (!mounted) return;
         // The kid picker filters out already-playing kids, so we only
         // get here if a sibling session was started from another device
         // between picker render and submit. Refresh the picker so it
         // catches up.
         ref.invalidate(activeSessionsProvider);
-        if (createdCount[0] > 0) {
-          _handlePartialOrFullFailure(createdCount[0], children.length);
-          return;
-        }
         AppHaptics.error();
         setState(() {
           _busy = false;
-          _errorText =
-              'One of those kids is already playing. Try again.';
+          _errorText = 'One of those kids is already playing. Try again.';
         });
         return;
       }
       if (e.message.contains('play_pass_1hr_only')) {
-        if (!mounted) return;
         AppHaptics.error();
         setState(() {
           _busy = false;
-          _errorText = 'Play Passes are for 1-hour visits only. Pick 1 hour or switch payment.';
+          _errorText =
+              'Play Passes are for 1-hour visits only. Pick 1 hour or switch payment.';
         });
         return;
       }
       if (e.message.contains('no_active_play_pass')) {
-        if (!mounted) return;
-        if (createdCount[0] > 0) {
-          _handlePartialOrFullFailure(createdCount[0], children.length);
-          return;
-        }
         AppHaptics.error();
         setState(() {
           _busy = false;
@@ -352,15 +419,6 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         return;
       }
       if (e.message.contains('insufficient_balance')) {
-        if (!mounted) return;
-        // If some sessions already started before the wallet drained,
-        // bail to home with the partial-success message — opening the
-        // top-up sheet on a half-charged batch is more confusing than
-        // helpful.
-        if (createdCount[0] > 0) {
-          _handlePartialOrFullFailure(createdCount[0], children.length);
-          return;
-        }
         setState(() => _busy = false);
         showModalBottomSheet<void>(
           context: context,
@@ -377,39 +435,44 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         );
         return;
       }
+      AppHaptics.error();
+      setState(() {
+        _busy = false;
+        _errorText = "Couldn't start session: ${e.message}";
+      });
+    } catch (e, st) {
+      // Same money-safety rollback for non-PostgREST failures.
+      dev.log('[session_start] unexpected error', error: e, stackTrace: st);
+      if (createdCount[0] > 0) {
+        await _cancelPendingSessions(sessionIds);
+      }
       if (!mounted) return;
-      _handlePartialOrFullFailure(createdCount[0], children.length);
-    } catch (_) {
-      if (!mounted) return;
-      _handlePartialOrFullFailure(createdCount[0], children.length);
+      AppHaptics.error();
+      setState(() {
+        _busy = false;
+        _errorText = "Couldn't start session. Please try again.";
+      });
     }
   }
 
-  /// Route after a session_create batch error. If some sessions started
-  /// before the failure, refresh active sessions and route home with a
-  /// snackbar — the user has been charged and needs to see what's live.
-  /// Full failures stay on the screen with the error text so the parent
-  /// can retry without losing their picks.
-  void _handlePartialOrFullFailure(int created, int total) {
-    if (created > 0) {
-      ref.invalidate(activeSessionsProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.warningYellow,
-          content: Text(
-            '$created of $total sessions started. The rest didn\'t go '
-            'through — please ask staff.',
-          ),
-        ),
-      );
-      context.go('/home');
-      return;
+  /// Cancel any pending sessions created so far in a batch. Used for
+  /// all-or-nothing rollback when a later session_create call fails.
+  Future<void> _cancelPendingSessions(List<String> ids) async {
+    for (final id in ids) {
+      try {
+        await Supabase.instance.client.rpc<dynamic>(
+          'session_cancel_pending',
+          params: {'p_session_id': id},
+        );
+      } catch (_) {
+        // Best-effort; server-side cron is the safety net.
+      }
     }
-    AppHaptics.error();
-    setState(() {
-      _busy = false;
-      _errorText = "Couldn't start session. Please try again.";
-    });
+    // Refresh balances so any released holds / passes show immediately.
+    ref.invalidate(activeSessionsProvider);
+    ref.invalidate(walletTransactionsBalanceProvider);
+    ref.invalidate(currentWalletProvider);
+    ref.invalidate(playPassesProvider);
   }
 
   @override
@@ -418,9 +481,12 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     final balance = ref.watch(walletBalancePaiseProvider) ?? 0;
     final remainingPasses = ref.watch(remainingPassesCountProvider);
 
-    // Hardcoded prices — 1hr ₹800, 2hr ₹1100
-    const price1hr = 80000;
-    const price2hr = 110000;
+    // Prices from venue_config; standard 1hr ₹800 / 2hr ₹1100 as fallback
+    // when the key is missing or unparseable.
+    final price1hr =
+        (cfg?['session_1hr_price_paise'] as num?)?.toInt() ?? 80000;
+    final price2hr =
+        (cfg?['session_2hr_price_paise'] as num?)?.toInt() ?? 110000;
     final perKidPrice = _priceFor(_selectedDurationMinutes, cfg);
     final discount = _couponDiscountPaise ?? 0;
     // Sum across selected kids, then subtract the (single-redemption) coupon.
@@ -429,7 +495,8 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     final walletEnough = balance >= finalAmount;
     final passesEnough = remainingPasses >= _selectedChildIds.length;
 
-    final canSubmit = !_busy &&
+    final canSubmit =
+        !_busy &&
         _selectedDurationMinutes != null &&
         _selectedChildIds.isNotEmpty;
 
@@ -502,8 +569,10 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (children.length > 1) ...[
-                          Text('Who\'s playing?',
-                              style: AppTextStyles.bodyLarge(context)),
+                          Text(
+                            'Who\'s playing?',
+                            style: AppTextStyles.bodyLarge(context),
+                          ),
                           const SizedBox(height: 4),
                           Text(
                             'Tap to include each kid. Tally adds up below.',
@@ -523,12 +592,10 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                               itemBuilder: (_, i) {
                                 final c = children[i];
                                 final id = c['id'] as String;
-                                final selected =
-                                    _selectedChildIds.contains(id);
+                                final selected = _selectedChildIds.contains(id);
                                 return _ChildAvatar(
                                   name: c['name'] as String? ?? '—',
-                                  favouriteHero:
-                                      c['favourite_hero'] as String?,
+                                  favouriteHero: c['favourite_hero'] as String?,
                                   selected: selected,
                                   onTap: () {
                                     AppHaptics.light();
@@ -548,15 +615,17 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                         _paymentMethod = 'wallet';
                                       }
                                       // Clearing a sibling coupon if kid
-                                      // count drops below its threshold keeps
-                                      // the tally honest.
-                                      if (_couponBackendCode != null &&
-                                          _couponBackendCode!
-                                              .startsWith('SIBLING')) {
+                                      // count changes so it no longer matches
+                                      // keeps the tally honest.
+                                      if (_couponBackendCode != null) {
+                                        final cfg = ref
+                                            .read(venueConfigProvider)
+                                            .valueOrNull;
                                         final stillValid =
                                             _siblingCouponFor(
-                                                    _selectedChildIds.length)
-                                                ?['code'] ==
+                                              _selectedChildIds.length,
+                                              cfg,
+                                            )?['code'] ==
                                             _couponBackendCode;
                                         if (!stillValid) _clearCoupon();
                                       }
@@ -573,31 +642,29 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                             children: [
                               _ChildAvatar(
                                 name: children.first['name'] as String? ?? '—',
-                                favouriteHero: children.first['favourite_hero']
-                                    as String?,
+                                favouriteHero:
+                                    children.first['favourite_hero'] as String?,
                                 selected: true,
                                 onTap: () {},
                               ),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Playing as',
-                                        style: AppTextStyles.caption(
-                                          context,
-                                          color:
-                                              AppColors.lightTextSecondary,
-                                        )),
+                                    Text(
+                                      'Playing as',
+                                      style: AppTextStyles.caption(
+                                        context,
+                                        color: AppColors.lightTextSecondary,
+                                      ),
+                                    ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      children.first['name'] as String? ??
-                                          '—',
+                                      children.first['name'] as String? ?? '—',
                                       style: AppTextStyles.bodyLarge(
-                                              context)
-                                          .copyWith(
-                                              fontWeight: FontWeight.w800),
+                                        context,
+                                      ).copyWith(fontWeight: FontWeight.w800),
                                     ),
                                   ],
                                 ),
@@ -606,8 +673,10 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                           ),
                           const SizedBox(height: 24),
                         ],
-                        Text('How long?',
-                            style: AppTextStyles.bodyLarge(context)),
+                        Text(
+                          'How long?',
+                          style: AppTextStyles.bodyLarge(context),
+                        ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -681,12 +750,15 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                           _SiblingCouponChips(
                             kidCount: _selectedChildIds.length,
                             appliedCode: _couponBackendCode,
+                            venueConfig: cfg,
                             onApply: _applySiblingCoupon,
                           ),
                           const SizedBox(height: 24),
                         ],
-                        Text('Pay with',
-                            style: AppTextStyles.bodyLarge(context)),
+                        Text(
+                          'Pay with',
+                          style: AppTextStyles.bodyLarge(context),
+                        ),
                         const SizedBox(height: 4),
                         if (passesEnough && _selectedDurationMinutes != 120)
                           SelectableCard<String>(
@@ -709,8 +781,8 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                           value: 'wallet',
                           groupValue: _paymentMethod,
                           title: 'Wallet (${Money.fromPaise(balance)})',
-                          subtitle: !walletEnough &&
-                                  _selectedDurationMinutes != null
+                          subtitle:
+                              !walletEnough && _selectedDurationMinutes != null
                               ? 'Not enough balance'
                               : 'Pay instantly from wallet',
                           leading: const Icon(
@@ -756,17 +828,18 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                   label: _selectedDurationMinutes == null
                       ? 'Pick a duration'
                       : _selectedChildIds.isEmpty
-                          ? 'Pick at least one kid'
-                          : _paymentMethod == 'play_pass'
-                              ? passesEnough
-                                  ? 'Use ${_selectedChildIds.length} '
-                                      'Play Pass${_selectedChildIds.length == 1 ? '' : 'es'}'
-                                  : 'Not enough passes'
-                              : _paymentMethod == 'wallet'
-                                  ? 'Pay ${Money.fromPaise(finalAmount)} '
-                                      'from wallet'
-                                  : 'Continue with cash',
-                  onPressed: canSubmit &&
+                      ? 'Pick at least one kid'
+                      : _paymentMethod == 'play_pass'
+                      ? passesEnough
+                            ? 'Use ${_selectedChildIds.length} '
+                                  'Play Pass${_selectedChildIds.length == 1 ? '' : 'es'}'
+                            : 'Not enough passes'
+                      : _paymentMethod == 'wallet'
+                      ? 'Pay ${Money.fromPaise(finalAmount)} '
+                            'from wallet'
+                      : 'Continue with cash',
+                  onPressed:
+                      canSubmit &&
                           (_paymentMethod != 'play_pass' || passesEnough)
                       ? _start
                       : null,
@@ -895,9 +968,7 @@ class _StickyCta extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
-          border: const Border(
-            top: BorderSide(color: AppColors.lightBorder),
-          ),
+          border: const Border(top: BorderSide(color: AppColors.lightBorder)),
         ),
         child: SizedBox(
           width: double.infinity,
@@ -959,11 +1030,7 @@ class _TallyBox extends StatelessWidget {
           const SizedBox(height: 8),
           const Divider(height: 1),
           const SizedBox(height: 8),
-          _TallyRow(
-            label: 'Total',
-            value: Money.fromPaise(total),
-            bold: true,
-          ),
+          _TallyRow(label: 'Total', value: Money.fromPaise(total), bold: true),
         ],
       ),
     );
@@ -984,16 +1051,13 @@ class _TallyRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = AppTextStyles.body(context).copyWith(
-      fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
-    );
+    final style = AppTextStyles.body(
+      context,
+    ).copyWith(fontWeight: bold ? FontWeight.w800 : FontWeight.w500);
     return Row(
       children: [
         Expanded(child: Text(label, style: style)),
-        Text(
-          value,
-          style: style.copyWith(color: valueColor ?? AppColors.navy),
-        ),
+        Text(value, style: style.copyWith(color: valueColor ?? AppColors.navy)),
       ],
     );
   }
@@ -1030,7 +1094,9 @@ class _CouponSection extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.activeGreen.withValues(alpha: 0.10),
-          border: Border.all(color: AppColors.activeGreen.withValues(alpha: 0.40)),
+          border: Border.all(
+            color: AppColors.activeGreen.withValues(alpha: 0.40),
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -1113,35 +1179,40 @@ class _CouponSection extends StatelessWidget {
   }
 }
 
-/// Manual sibling-coupon chips. Shown below the coupon input when 2+ kids
-/// are selected. Tapping a chip applies the discount; the backend still
-/// receives SIBLING2/SIBLING3/etc. for validation.
+/// Direct-code sibling-coupon chip. Shown below the coupon input when 2+ kids
+/// are selected. The coupon code itself is surfaced (e.g. `2KIDS`) and is
+/// read from the admin-configured `sibling_coupon_codes` map in venue_config.
 class _SiblingCouponChips extends StatelessWidget {
   final int kidCount;
   final String? appliedCode;
+  final Map<String, dynamic>? venueConfig;
   final VoidCallback onApply;
 
   const _SiblingCouponChips({
     required this.kidCount,
     required this.appliedCode,
+    required this.venueConfig,
     required this.onApply,
   });
 
-  Map<String, dynamic>? _couponFor(int count) => switch (count) {
-        2 => {'code': 'SIBLING2', 'name': 'Buddy Discount'},
-        3 => {'code': 'SIBLING3', 'name': 'Sibling Saver'},
-        4 => {'code': 'SIBLING4', 'name': 'Triple Fun'},
-        >= 5 => {'code': 'SIBLING5', 'name': 'Squad Deal'},
-        _ => null,
-      };
+  static const _fallbackCodes = {
+    '2': '2KIDS',
+    '3': '3KIDS',
+    '4': '4KIDS',
+    '5': '5KIDS',
+  };
+
+  String? _codeFor(int count, Map<String, dynamic>? cfg) {
+    final map = (cfg?['sibling_coupon_codes'] as Map<String, dynamic>?) ?? {};
+    return (map[count.toString()] ?? _fallbackCodes[count.toString()])
+        as String?;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final coupon = _couponFor(kidCount);
-    if (coupon == null) return const SizedBox.shrink();
+    final code = _codeFor(kidCount, venueConfig);
+    if (code == null) return const SizedBox.shrink();
 
-    final code = coupon['code'] as String;
-    final name = coupon['name'] as String;
     final isApplied = appliedCode == code;
 
     return Row(
@@ -1178,13 +1249,14 @@ class _SiblingCouponChips extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      isApplied ? '$name applied' : 'Tap to apply $name',
+                      isApplied ? '$code applied' : 'Apply $code',
                       style: AppTextStyles.caption(context).copyWith(
                         color: isApplied
                             ? AppColors.fitGreen
                             : AppColors.lightTextSecondary,
-                        fontWeight:
-                            isApplied ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: isApplied
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                       ),
                     ),
                   ),

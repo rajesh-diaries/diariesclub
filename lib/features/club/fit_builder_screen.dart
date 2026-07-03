@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -96,10 +98,28 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
   // Set in session-combo mode (Play + FIT) when the parent picks a kid.
   String? _selectedChildId;
 
+  // Idempotency key stabilized per order attempt (combo + selections +
+  // child). A retried/re-opened confirm reuses the same key so the server
+  // dedupes; changing the selection or kid mints a fresh key.
+  String? _idempotencyKey;
+  String? _idempotencySig;
+
+  String _stableIdempotencyKey() {
+    final sig = jsonEncode({
+      'combo': widget.comboContext?.comboId,
+      'child': _selectedChildId,
+      'selections': _selections,
+    });
+    if (_idempotencyKey == null || _idempotencySig != sig) {
+      _idempotencyKey = const Uuid().v4();
+      _idempotencySig = sig;
+    }
+    return _idempotencyKey!;
+  }
+
   Future<void> _refreshPrice(BuildContext context) async {
     try {
-      final res = await Supabase.instance.client
-          .rpc<Map<String, dynamic>>(
+      final res = await Supabase.instance.client.rpc<Map<String, dynamic>>(
         'fit_meal_compute_price',
         params: {
           'p_template_id': widget.templateId,
@@ -155,8 +175,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
     });
     try {
       // Server-authoritative price re-validation. Throws on bad selections.
-      final priced = await Supabase.instance.client
-          .rpc<Map<String, dynamic>>(
+      final priced = await Supabase.instance.client.rpc<Map<String, dynamic>>(
         'fit_meal_compute_price',
         params: {
           'p_template_id': widget.templateId,
@@ -175,21 +194,22 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
         if (sel == null) continue;
         if (sel is String) {
           final opt = lc.options.firstWhere(
-            (o) => o['id'] == sel, orElse: () => const {},
+            (o) => o['id'] == sel,
+            orElse: () => const {},
           );
           if (opt.isNotEmpty) summary.add(opt['name'] as String? ?? '');
         } else if (sel is List) {
           for (final id in sel) {
             final opt = lc.options.firstWhere(
-              (o) => o['id'] == id, orElse: () => const {},
+              (o) => o['id'] == id,
+              orElse: () => const {},
             );
             if (opt.isNotEmpty) summary.add(opt['name'] as String? ?? '');
           }
         }
       }
 
-      final templateName =
-          (data.template['name'] as String?) ?? 'FIT meal';
+      final templateName = (data.template['name'] as String?) ?? 'FIT meal';
       final imageUrl = data.template['photo_url'] as String?;
 
       if (widget.comboContext != null) {
@@ -212,7 +232,9 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
       }
 
       // Stand-alone mode: write directly to the cart.
-      ref.read(cartProvider.notifier).addFitMeal(
+      ref
+          .read(cartProvider.notifier)
+          .addFitMeal(
             FitMealLine.create(
               templateId: widget.templateId,
               templateName: templateName,
@@ -228,13 +250,16 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
       final _ = base;
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      // Capture the (root) messenger before we pop so the toast survives the
+      // navigation away from this screen.
+      final messenger = ScaffoldMessenger.of(context);
+      context.pop();
+      messenger.showSnackBar(
         SnackBar(
           backgroundColor: AppColors.activeGreen,
           content: Text('Added to cart · ${Money.fromPaise(unit)}'),
         ),
       );
-      context.pop();
     } on PostgrestException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -252,7 +277,11 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
 
   /// Open the tax-aware confirmation sheet before placing a Play + FIT order.
   void _showConfirmSheet() {
-    final idem = const Uuid().v4();
+    final idem = _stableIdempotencyKey();
+    // NOTE: do not reset _busy in whenComplete — the confirm sheet pops
+    // immediately while _placeOrderDirectly's order_place RPC is still
+    // in-flight. _placeOrderDirectly owns _busy and clears it only when the
+    // async work actually resolves (or on navigation away on success).
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -269,14 +298,12 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
             'combo_id': widget.comboContext!.comboId,
             'quantity': 1,
             'fit_selections': _selections,
-          }
+          },
         ],
         childId: _selectedChildId,
         onConfirm: () => _placeOrderDirectly(idem),
       ),
-    ).whenComplete(() {
-      if (mounted) setState(() => _busy = false);
-    });
+    );
   }
 
   /// Place an order directly from the FIT builder when the combo bundles
@@ -292,34 +319,39 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
       _errorText = null;
     });
     try {
-      final result = await Supabase.instance.client
-          .rpc<Map<String, dynamic>>('order_place', params: {
-        'p_venue_id': _venueId,
-        'p_family_id': familyId,
-        'p_items': [
-          {
-            'type': 'combo',
-            'combo_id': widget.comboContext!.comboId,
-            'quantity': 1,
-            'fit_selections': _selections,
-          }
-        ],
-        'p_fulfillment_mode': 'dine_in',
-        'p_payment_method': 'wallet',
-        'p_combo_id': null,
-        'p_child_id': _selectedChildId,
-        'p_idempotency_key': idempotencyKey,
-        'p_customer_gstin': null,
-      });
+      final result = await Supabase.instance.client.rpc<Map<String, dynamic>>(
+        'order_place',
+        params: {
+          'p_venue_id': _venueId,
+          'p_family_id': familyId,
+          'p_items': [
+            {
+              'type': 'combo',
+              'combo_id': widget.comboContext!.comboId,
+              'quantity': 1,
+              'fit_selections': _selections,
+            },
+          ],
+          'p_fulfillment_mode': 'dine_in',
+          'p_payment_method': 'wallet',
+          'p_combo_id': null,
+          'p_child_id': _selectedChildId,
+          'p_idempotency_key': idempotencyKey,
+          'p_customer_gstin': null,
+        },
+      );
       final orderId = result['order_id'] as String?;
       if (!mounted) return;
       ref.invalidate(activeSessionsProvider);
+      // Capture the (root) messenger before we navigate so the toast survives
+      // the route change.
+      final messenger = ScaffoldMessenger.of(context);
       if (orderId != null) {
         context.go('/club/order/$orderId');
       } else {
         context.go('/club');
       }
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('Session pending — scan at the desk to start.'),
         ),
@@ -358,9 +390,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
     return tpl.when(
       loading: () => const Scaffold(
         body: SafeArea(
-          child: Center(
-            child: SkeletonList(itemCount: 4, itemHeight: 120),
-          ),
+          child: Center(child: SkeletonList(itemCount: 4, itemHeight: 120)),
         ),
       ),
       error: (e, _) => Scaffold(
@@ -406,9 +436,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
 
     // Auto-select the only idle kid for single-kid families. Post-frame so
     // we never setState during build.
-    if (sessionCombo &&
-        _selectedChildId == null &&
-        idleChildren.length == 1) {
+    if (sessionCombo && _selectedChildId == null && idleChildren.length == 1) {
       final onlyId = idleChildren.first['id'] as String;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -418,7 +446,8 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
       });
     }
 
-    final ctaEnabled = allRequiredFilled &&
+    final ctaEnabled =
+        allRequiredFilled &&
         !_busy &&
         (!sessionCombo ||
             (idleChildren.isNotEmpty && _selectedChildId != null));
@@ -426,9 +455,11 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
       appBar: AppBar(
-        title: Text(isCombo
-            ? 'Customise your ${widget.comboContext!.comboName}'
-            : (tpl['name'] as String?) ?? 'Build your meal'),
+        title: Text(
+          isCombo
+              ? 'Customise your ${widget.comboContext!.comboName}'
+              : (tpl['name'] as String?) ?? 'Build your meal',
+        ),
       ),
       // Single Column body — the previous Scaffold.bottomSheet pattern
       // collapsed the body content on Flutter web. Replaced with an
@@ -481,8 +512,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       '${widget.comboContext!.comboName} '
@@ -490,9 +520,9 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                                       'covers the base.',
                                       style: AppTextStyles.body(context)
                                           .copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.navy,
-                                      ),
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.navy,
+                                          ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
@@ -521,22 +551,27 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(PhosphorIconsRegular.playCircle,
-                                  color: AppColors.navy, size: 18),
+                              const Icon(
+                                PhosphorIconsRegular.playCircle,
+                                color: AppColors.navy,
+                                size: 18,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   'Includes a ${widget.comboContext!.sessionMinutes}-minute play session.',
-                                  style: AppTextStyles.body(context).copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                  style: AppTextStyles.body(
+                                    context,
+                                  ).copyWith(fontWeight: FontWeight.w700),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        Text("Who's playing?",
-                            style: AppTextStyles.bodyLarge(context)),
+                        Text(
+                          "Who's playing?",
+                          style: AppTextStyles.bodyLarge(context),
+                        ),
                         const SizedBox(height: 8),
                         if (idleChildren.isEmpty)
                           const Padding(
@@ -558,8 +593,10 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                                   _ComboChildTile(
                                     child: c,
                                     selected: _selectedChildId == c['id'],
-                                    onTap: () => setState(() =>
-                                        _selectedChildId = c['id'] as String),
+                                    onTap: () => setState(
+                                      () =>
+                                          _selectedChildId = c['id'] as String,
+                                    ),
                                   ),
                               ],
                             ),
@@ -583,8 +620,7 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                           onSelectionChange: (sel) {
                             final catId = lc.category['id'] as String;
                             setState(() {
-                              if (sel == null ||
-                                  (sel is List && sel.isEmpty)) {
+                              if (sel == null || (sel is List && sel.isEmpty)) {
                                 _selections.remove(catId);
                               } else {
                                 _selections[catId] = sel;
@@ -612,7 +648,8 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                         Text(
                           _errorText!,
                           style: AppTextStyles.caption(
-                            context, color: AppColors.adminRed,
+                            context,
+                            color: AppColors.adminRed,
                           ),
                         ),
                       ],
@@ -704,8 +741,8 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
                       onPressed: !ctaEnabled
                           ? null
                           : (sessionCombo
-                              ? _showConfirmSheet
-                              : () => _addToCart(data, final_)),
+                                ? _showConfirmSheet
+                                : () => _addToCart(data, final_)),
                     ),
                   ),
                 ],
@@ -718,14 +755,14 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
   }
 }
 
-
 class _IncludedSidesBanner extends StatelessWidget {
   final Map<String, dynamic> template;
   const _IncludedSidesBanner({required this.template});
 
   @override
   Widget build(BuildContext context) {
-    final configuredSides = (template['included_sides'] as List<dynamic>?)
+    final configuredSides =
+        (template['included_sides'] as List<dynamic>?)
             ?.map((s) => s.toString())
             .where((s) => s.isNotEmpty)
             .toList() ??
@@ -742,9 +779,7 @@ class _IncludedSidesBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.fitGreen.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: AppColors.fitGreen.withValues(alpha: 0.30),
-        ),
+        border: Border.all(color: AppColors.fitGreen.withValues(alpha: 0.30)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -762,17 +797,12 @@ class _IncludedSidesBanner extends StatelessWidget {
                 Text(
                   'Included with every meal',
                   style: AppTextStyles.caption(
-                    context, color: AppColors.fitGreen,
-                  ).copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
-                  ),
+                    context,
+                    color: AppColors.fitGreen,
+                  ).copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.6),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  sides.join(' · '),
-                  style: AppTextStyles.body(context),
-                ),
+                Text(sides.join(' · '), style: AppTextStyles.body(context)),
               ],
             ),
           ),
@@ -781,6 +811,7 @@ class _IncludedSidesBanner extends StatelessWidget {
     );
   }
 }
+
 class _CategorySection extends StatelessWidget {
   final Map<String, dynamic> category;
   final Map<String, dynamic> linker;
@@ -807,8 +838,10 @@ class _CategorySection extends StatelessWidget {
         : rawName.replaceAll(RegExp(r'\s*\([^)]*\)\s*$'), '').trim();
     final subtitle = (category['description'] as String?) ?? '';
     final required = (linker['is_required'] as bool?) ?? true;
-    final selType = (linker['selection_type_override'] as String?)
-        ?? (category['selection_type'] as String?) ?? 'single';
+    final selType =
+        (linker['selection_type_override'] as String?) ??
+        (category['selection_type'] as String?) ??
+        'single';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -823,7 +856,8 @@ class _CategorySection extends StatelessWidget {
               if (required)
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 6, vertical: 2,
+                    horizontal: 6,
+                    vertical: 2,
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.adminRed.withValues(alpha: 0.10),
@@ -832,14 +866,16 @@ class _CategorySection extends StatelessWidget {
                   child: Text(
                     'Required',
                     style: AppTextStyles.caption(
-                      context, color: AppColors.adminRed,
+                      context,
+                      color: AppColors.adminRed,
                     ).copyWith(fontWeight: FontWeight.w700),
                   ),
                 )
               else
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 6, vertical: 2,
+                    horizontal: 6,
+                    vertical: 2,
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.lightTextSecondary.withValues(alpha: 0.10),
@@ -848,7 +884,8 @@ class _CategorySection extends StatelessWidget {
                   child: Text(
                     'Optional',
                     style: AppTextStyles.caption(
-                      context, color: AppColors.lightTextSecondary,
+                      context,
+                      color: AppColors.lightTextSecondary,
                     ),
                   ),
                 ),
@@ -859,7 +896,8 @@ class _CategorySection extends StatelessWidget {
             Text(
               subtitle,
               style: AppTextStyles.caption(
-                context, color: AppColors.lightTextSecondary,
+                context,
+                color: AppColors.lightTextSecondary,
               ),
             ),
           ],
@@ -873,7 +911,8 @@ class _CategorySection extends StatelessWidget {
           else
             _MultiSelect(
               options: options,
-              selected: (selection as List<dynamic>?)?.cast<String>() ?? const [],
+              selected:
+                  (selection as List<dynamic>?)?.cast<String>() ?? const [],
               onChange: onSelectionChange,
             ),
         ],
@@ -1014,61 +1053,54 @@ class _ComboChildTile extends StatelessWidget {
 class _BuilderData {
   final Map<String, dynamic> template;
   final List<_LinkedCategory> linkedCategories;
-  const _BuilderData({
-    required this.template,
-    required this.linkedCategories,
-  });
+  const _BuilderData({required this.template, required this.linkedCategories});
 }
 
 /// Loads template + linker rows + categories + options for each linked
 /// category, in display_order. RLS already filters out unpublished /
 /// unavailable templates and options.
-final fitTemplateDetailProvider =
-    FutureProvider.autoDispose.family<_BuilderData, String>(
-  (ref, templateId) async {
-    // Switched from 4 chained PostgREST queries to a single SECURITY
-    // DEFINER RPC (fit_template_detail). The chained version returned
-    // empty sections for the customer despite RLS appearing correct —
-    // the SECURITY DEFINER bypass guarantees a clean read.
-    final raw = await Supabase.instance.client
-        .rpc<dynamic>('fit_template_detail', params: {
-      'p_template_id': templateId,
+final fitTemplateDetailProvider = FutureProvider.autoDispose
+    .family<_BuilderData, String>((ref, templateId) async {
+      // Switched from 4 chained PostgREST queries to a single SECURITY
+      // DEFINER RPC (fit_template_detail). The chained version returned
+      // empty sections for the customer despite RLS appearing correct —
+      // the SECURITY DEFINER bypass guarantees a clean read.
+      final raw = await Supabase.instance.client.rpc<dynamic>(
+        'fit_template_detail',
+        params: {'p_template_id': templateId},
+      );
+      final root = raw is Map
+          ? Map<String, dynamic>.from(raw)
+          : <String, dynamic>{};
+
+      final tpl = root['template'] is Map
+          ? Map<String, dynamic>.from(root['template'] as Map)
+          : <String, dynamic>{};
+
+      final sections =
+          (root['sections'] is List
+                  ? List<dynamic>.from(root['sections'] as List)
+                  : const <dynamic>[])
+              .whereType<Map<dynamic, dynamic>>()
+              .map((s) => Map<String, dynamic>.from(s))
+              .toList();
+
+      final List<_LinkedCategory> linked = [];
+      for (final s in sections) {
+        final cat =
+            (s['category'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
+        if (cat.isEmpty) continue;
+        final linker =
+            (s['linker'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
+        final opts = ((s['options'] as List?) ?? const [])
+            .map((o) => Map<String, dynamic>.from(o as Map))
+            .toList();
+        linked.add(
+          _LinkedCategory(category: cat, linker: linker, options: opts),
+        );
+      }
+
+      return _BuilderData(template: tpl, linkedCategories: linked);
     });
-    final root = raw is Map
-        ? Map<String, dynamic>.from(raw)
-        : <String, dynamic>{};
-
-    final tpl = root['template'] is Map
-        ? Map<String, dynamic>.from(root['template'] as Map)
-        : <String, dynamic>{};
-
-    final sections = (root['sections'] is List
-            ? List<dynamic>.from(root['sections'] as List)
-            : const <dynamic>[])
-        .whereType<Map<dynamic, dynamic>>()
-        .map((s) => Map<String, dynamic>.from(s))
-        .toList();
-
-    final List<_LinkedCategory> linked = [];
-    for (final s in sections) {
-      final cat = (s['category'] as Map?)?.cast<String, dynamic>() ??
-          const <String, dynamic>{};
-      if (cat.isEmpty) continue;
-      final linker = (s['linker'] as Map?)?.cast<String, dynamic>() ??
-          const <String, dynamic>{};
-      final opts = ((s['options'] as List?) ?? const [])
-          .map((o) => Map<String, dynamic>.from(o as Map))
-          .toList();
-      linked.add(_LinkedCategory(
-        category: cat,
-        linker: linker,
-        options: opts,
-      ));
-    }
-
-    return _BuilderData(
-      template: tpl,
-      linkedCategories: linked,
-    );
-  },
-);

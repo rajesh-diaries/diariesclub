@@ -64,7 +64,10 @@ class ClubCartBar extends ConsumerWidget {
                         ).copyWith(fontWeight: FontWeight.w700),
                       ),
                       Text(
-                        'Total ${Money.fromPaise(total)}',
+                        // Pre-GST subtotal — the bag/checkout adds food GST +
+                        // rounding, so this is labelled a subtotal (not the
+                        // final total) to avoid the number jumping at checkout.
+                        'Subtotal ${Money.fromPaise(total)} + tax',
                         style: AppTextStyles.caption(
                           context,
                           color: Colors.white70,

@@ -16,10 +16,7 @@ class SafariHeroBanner extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            SafariColors.jungleGreen,
-            Color(0xFF1E3D2A),
-          ],
+          colors: [SafariColors.jungleGreen, Color(0xFF1E3D2A)],
         ),
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(32),
@@ -63,25 +60,16 @@ class SafariHeroBanner extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    _HeroAvatar(
-                      imagePath: 'assets/hero/rafi.png',
-                      offset: 0,
-                    ),
+                    _HeroAvatar(imagePath: 'assets/hero/rafi.png', offset: 0),
                     SizedBox(width: 4),
                     _HeroAvatar(
                       imagePath: 'assets/hero/gerry.png',
                       offset: -12,
                     ),
                     SizedBox(width: 4),
-                    _HeroAvatar(
-                      imagePath: 'assets/hero/ellie.png',
-                      offset: 0,
-                    ),
+                    _HeroAvatar(imagePath: 'assets/hero/ellie.png', offset: 0),
                     SizedBox(width: 4),
-                    _HeroAvatar(
-                      imagePath: 'assets/hero/zena.png',
-                      offset: -12,
-                    ),
+                    _HeroAvatar(imagePath: 'assets/hero/zena.png', offset: -12),
                   ],
                 ),
               ),
@@ -95,42 +83,51 @@ class SafariHeroBanner extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'A club for little explorers.',
-                style: AppTextStyles.bodyLarge(
-                  context,
-                  color: Colors.white70,
-                ),
+                'A morning club',
+                style: AppTextStyles.bodyLarge(context, color: Colors.white70),
               ),
               const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 6,
                 children: [
-                  const Icon(
-                    PhosphorIconsRegular.users,
-                    color: Colors.white60,
-                    size: 14,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        PhosphorIconsRegular.users,
+                        color: Colors.white60,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Ages 2–5 · Mon–Fri',
+                        style: AppTextStyles.caption(
+                          context,
+                          color: Colors.white60,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Ages 2–5 · Mon–Fri',
-                    style: AppTextStyles.caption(
-                      context,
-                      color: Colors.white60,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Icon(
-                    PhosphorIconsRegular.clock,
-                    color: Colors.white60,
-                    size: 14,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '9:30 AM – 12:30 PM',
-                    style: AppTextStyles.caption(
-                      context,
-                      color: Colors.white60,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        PhosphorIconsRegular.clock,
+                        color: Colors.white60,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '9:30 AM – 12:30 PM',
+                        style: AppTextStyles.caption(
+                          context,
+                          color: Colors.white60,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -163,10 +160,7 @@ class _HeroAvatar extends StatelessWidget {
         padding: const EdgeInsets.all(5),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.asset(
-            imagePath,
-            fit: BoxFit.contain,
-          ),
+          child: Image.asset(imagePath, fit: BoxFit.contain),
         ),
       ),
     );

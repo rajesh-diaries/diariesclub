@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,6 +45,21 @@ class _CartSheetState extends ConsumerState<CartSheet> {
   bool _celebrate = false;
   bool _orderPlaced = false;
 
+  // Idempotency key stabilized per cart contents. Re-opening the confirm
+  // sheet (or a retried tap) reuses the same key so the server dedupes the
+  // order; a genuinely different cart mints a fresh key.
+  String? _idempotencyKey;
+  String? _idempotencyCartSig;
+
+  String _stableIdempotencyKey(List<Map<String, dynamic>> body) {
+    final sig = jsonEncode(body);
+    if (_idempotencyKey == null || _idempotencyCartSig != sig) {
+      _idempotencyKey = const Uuid().v4();
+      _idempotencyCartSig = sig;
+    }
+    return _idempotencyKey!;
+  }
+
   /// Build the heterogeneous p_items payload used by both order_preview
   /// and order_place.
   List<Map<String, dynamic>> _buildOrderBody() {
@@ -87,7 +104,11 @@ class _CartSheetState extends ConsumerState<CartSheet> {
     final familyId = ref.read(currentFamilyIdProvider);
     if (familyId == null) return;
     final body = _buildOrderBody();
-    final idem = const Uuid().v4();
+    final idem = _stableIdempotencyKey(body);
+    // NOTE: do not reset _busy in whenComplete — the confirm sheet pops
+    // immediately while _executePlaceOrder's order_place RPC is still
+    // in-flight. _executePlaceOrder owns _busy and clears it only when the
+    // async work actually resolves (or on navigation away on success).
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -96,14 +117,13 @@ class _CartSheetState extends ConsumerState<CartSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => OrderConfirmSheet(
-        title: '${cart.totalItemCount} item${cart.totalItemCount == 1 ? '' : 's'}',
+        title:
+            '${cart.totalItemCount} item${cart.totalItemCount == 1 ? '' : 's'}',
         subtitle: 'Review before placing',
         items: body,
         onConfirm: () => _executePlaceOrder(body, idem),
       ),
-    ).whenComplete(() {
-      if (mounted) setState(() => _busy = false);
-    });
+    );
   }
 
   Future<void> _executePlaceOrder(
@@ -122,16 +142,18 @@ class _CartSheetState extends ConsumerState<CartSheet> {
     });
 
     try {
-      final result = await Supabase.instance.client
-          .rpc<Map<String, dynamic>>('order_place', params: {
-        'p_venue_id': _venueId,
-        'p_family_id': familyId,
-        'p_items': body,
-        'p_fulfillment_mode': fulfillment.rpcValue,
-        'p_payment_method': payment.rpcValue,
-        'p_combo_id': null,
-        'p_idempotency_key': idempotencyKey,
-      });
+      final result = await Supabase.instance.client.rpc<Map<String, dynamic>>(
+        'order_place',
+        params: {
+          'p_venue_id': _venueId,
+          'p_family_id': familyId,
+          'p_items': body,
+          'p_fulfillment_mode': fulfillment.rpcValue,
+          'p_payment_method': payment.rpcValue,
+          'p_combo_id': null,
+          'p_idempotency_key': idempotencyKey,
+        },
+      );
       final orderId = result['order_id'] as String?;
       if (orderId == null) throw StateError('order_place returned no id');
 
@@ -149,8 +171,10 @@ class _CartSheetState extends ConsumerState<CartSheet> {
       Navigator.of(context).pop();
       context.go('/club/order/$orderId');
     } on PostgrestException catch (e) {
-      debugPrint('[ORDER_PLACE] PostgrestException: code=${e.code} '
-          'message=${e.message} details=${e.details} hint=${e.hint}');
+      debugPrint(
+        '[ORDER_PLACE] PostgrestException: code=${e.code} '
+        'message=${e.message} details=${e.details} hint=${e.hint}',
+      );
       if (!mounted) return;
       AppHaptics.error();
       setState(() => _busy = false);
@@ -169,14 +193,14 @@ class _CartSheetState extends ConsumerState<CartSheet> {
           ),
         );
       } else if (e.message.contains('menu_item_unavailable')) {
-        setState(() => _errorText =
-            'An item just sold out. Please remove it from your bag.');
+        setState(
+          () => _errorText =
+              'An item just sold out. Please remove it from your bag.',
+        );
       } else if (e.message.contains('invalid_combo')) {
-        setState(() =>
-            _errorText = "That combo isn't available right now.");
+        setState(() => _errorText = "That combo isn't available right now.");
       } else {
-        setState(() =>
-            _errorText = "Couldn't place order: ${e.message}");
+        setState(() => _errorText = "Couldn't place order: ${e.message}");
       }
     } catch (e) {
       debugPrint('[ORDER_PLACE] generic error: $e');
@@ -203,15 +227,12 @@ class _CartSheetState extends ConsumerState<CartSheet> {
         child: Container(
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.all(24),
           child: const SafeArea(
             top: false,
-            child: Center(
-              child: _OrderPlacedView(),
-            ),
+            child: Center(child: _OrderPlacedView()),
           ),
         ),
       );
@@ -243,7 +264,6 @@ class _CartSheetState extends ConsumerState<CartSheet> {
     // number.
     final coinsBasePaise = foodPaise + comboPaise;
     final coins = (coinsBasePaise / 100 * cashbackPct / 100).floor();
-    final payment = ref.watch(cartPaymentMethodProvider);
 
     return SuccessCelebration(
       shouldPlay: _celebrate,
@@ -253,106 +273,109 @@ class _CartSheetState extends ConsumerState<CartSheet> {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 12),
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.lightBorder,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: Row(
-              children: [
-                Text('Your bag', style: AppTextStyles.h2(context)),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(PhosphorIconsRegular.x),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.lightBorder,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              cart.totalItemCount == 1
-                  ? '1 item'
-                  : '${cart.totalItemCount} items',
-              style: AppTextStyles.caption(
-                context,
-                color: AppColors.lightTextSecondary,
               ),
             ),
-          ),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Row(
                 children: [
-                  _LineList(lines: cart.lines),
-                  const SizedBox(height: 16),
-                  _Summary(
-                    foodPaise: foodPaise,
-                    foodGstPaise: foodGstPaise,
-                    foodGstPct: foodGstPct,
-                    comboPaise: comboPaise,
-                    roundingPaise: roundingPaise,
-                    totalPaise: total,
-                    coinsEarned: payment == CartPaymentMethod.wallet ? coins : 0,
+                  Text('Your bag', style: AppTextStyles.h2(context)),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(PhosphorIconsRegular.x),
                   ),
-                  const SizedBox(height: 16),
-                  const _FulfillmentSelector(),
-                  const SizedBox(height: 12),
-                  _PaymentSelector(
-                    walletBalance: balance,
-                    requiredPaise: total,
-                  ),
-                  if (_errorText != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      _errorText!,
-                      style: AppTextStyles.caption(
-                        context,
-                        color: AppColors.adminRed,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
-          ),
-          SafeArea(
-            top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                border: const Border(
-                  top: BorderSide(color: AppColors.lightBorder),
-                ),
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                child: PrimaryButton(
-                  label: 'Place order · ${Money.fromPaise(total)}',
-                  onPressed: _busy ? null : _showConfirmSheet,
-                  loading: _busy,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                cart.totalItemCount == 1
+                    ? '1 item'
+                    : '${cart.totalItemCount} items',
+                style: AppTextStyles.caption(
+                  context,
+                  color: AppColors.lightTextSecondary,
                 ),
               ),
             ),
-          ),
-        ],
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Column(
+                  children: [
+                    _LineList(lines: cart.lines),
+                    const SizedBox(height: 16),
+                    _Summary(
+                      foodPaise: foodPaise,
+                      foodGstPaise: foodGstPaise,
+                      foodGstPct: foodGstPct,
+                      comboPaise: comboPaise,
+                      roundingPaise: roundingPaise,
+                      totalPaise: total,
+                      coinsEarned: coins,
+                    ),
+                    const SizedBox(height: 16),
+                    const _FulfillmentSelector(),
+                    const SizedBox(height: 12),
+                    _PaymentSelector(
+                      walletBalance: balance,
+                      requiredPaise: total,
+                    ),
+                    if (_errorText != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _errorText!,
+                        style: AppTextStyles.caption(
+                          context,
+                          color: AppColors.adminRed,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  border: const Border(
+                    top: BorderSide(color: AppColors.lightBorder),
+                  ),
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: PrimaryButton(
+                    label: 'Place order · ${Money.fromPaise(total)}',
+                    onPressed: _busy ? null : _showConfirmSheet,
+                    loading: _busy,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 }
 
@@ -383,31 +406,36 @@ class _LineCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(cartProvider.notifier);
-    final (Color accent, IconData fallbackIcon, String typeLabel, String? imageUrl) = switch (line) {
+    final (
+      Color accent,
+      IconData fallbackIcon,
+      String typeLabel,
+      String? imageUrl,
+    ) = switch (line) {
       MenuItemLine m when m.brand == 'coffee' => (
-          AppColors.coffeeBrown,
-          PhosphorIconsRegular.coffee,
-          'COFFEE',
-          m.imageUrl,
-        ),
+        AppColors.coffeeBrown,
+        PhosphorIconsRegular.coffee,
+        'COFFEE',
+        m.imageUrl,
+      ),
       MenuItemLine m => (
-          AppColors.fitGreen,
-          PhosphorIconsRegular.carrot,
-          'FIT',
-          m.imageUrl,
-        ),
+        AppColors.fitGreen,
+        PhosphorIconsRegular.carrot,
+        'FIT',
+        m.imageUrl,
+      ),
       ComboLine c => (
-          AppColors.gold,
-          PhosphorIconsFill.gift,
-          'COMBO',
-          c.imageUrl,
-        ),
+        AppColors.gold,
+        PhosphorIconsFill.gift,
+        'COMBO',
+        c.imageUrl,
+      ),
       FitMealLine f => (
-          AppColors.fitGreen,
-          PhosphorIconsRegular.bowlFood,
-          'FIT MEAL',
-          f.imageUrl,
-        ),
+        AppColors.fitGreen,
+        PhosphorIconsRegular.bowlFood,
+        'FIT MEAL',
+        f.imageUrl,
+      ),
     };
 
     final card = Container(
@@ -447,19 +475,17 @@ class _LineCard extends ConsumerWidget {
               children: [
                 Text(
                   typeLabel,
-                  style: AppTextStyles.caption(context, color: accent)
-                      .copyWith(
-                    letterSpacing: 1.2,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: AppTextStyles.caption(
+                    context,
+                    color: accent,
+                  ).copyWith(letterSpacing: 1.2, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 2),
                 Text(line.displayName, style: AppTextStyles.body(context)),
                 if (line case ComboLine(
-                      linkedFitSelectionsSummary: final fitSummary,
-                      linkedFitTemplateName: final fitName,
-                    )
-                    when fitSummary.isNotEmpty)
+                  linkedFitSelectionsSummary: final fitSummary,
+                  linkedFitTemplateName: final fitName,
+                ) when fitSummary.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
@@ -472,8 +498,9 @@ class _LineCard extends ConsumerWidget {
                       ),
                     ),
                   )
-                else if (line case ComboLine(includedItemNames: final names)
-                    when names.isNotEmpty)
+                else if (line case ComboLine(
+                  includedItemNames: final names,
+                ) when names.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
@@ -484,8 +511,9 @@ class _LineCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                if (line case FitMealLine(selectionsSummary: final summary)
-                    when summary.isNotEmpty)
+                if (line case FitMealLine(
+                  selectionsSummary: final summary,
+                ) when summary.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
@@ -507,10 +535,7 @@ class _LineCard extends ConsumerWidget {
               ],
             ),
           ),
-          QuantityStepper(
-            lineId: line.id,
-            currentQty: line.quantity,
-          ),
+          QuantityStepper(lineId: line.id, currentQty: line.quantity),
         ],
       ),
     );
@@ -564,10 +589,7 @@ class _Summary extends StatelessWidget {
       child: Column(
         children: [
           if (foodPaise > 0) ...[
-            _SummaryRow(
-              label: 'Subtotal',
-              value: Money.fromPaise(foodPaise),
-            ),
+            _SummaryRow(label: 'Subtotal', value: Money.fromPaise(foodPaise)),
             _SummaryRow(
               label: 'GST $pct%',
               value: Money.fromPaise(foodGstPaise),
@@ -581,7 +603,8 @@ class _Summary extends StatelessWidget {
           if (roundingPaise != 0)
             _SummaryRow(
               label: 'Rounding',
-              value: (roundingPaise > 0 ? '+' : '') +
+              value:
+                  (roundingPaise > 0 ? '+' : '') +
                   Money.fromPaise(roundingPaise),
               muted: true,
             ),
@@ -604,7 +627,10 @@ class _Summary extends StatelessWidget {
                 children: [
                   Text(
                     '+$coinsEarned Coins back',
-                    style: AppTextStyles.caption(context, color: AppColors.gold),
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.gold,
+                    ),
                   ),
                   const Icon(
                     PhosphorIconsFill.star,
@@ -669,7 +695,10 @@ class _FulfillmentSelector extends ConsumerWidget {
         // Customers see only Dine in / Takeaway. The tableService enum
         // value still exists for staff/admin flows and legacy orders, but
         // we don't surface it as a customer-facing pick.
-        for (final m in const [FulfillmentMode.dineIn, FulfillmentMode.takeaway])
+        for (final m in const [
+          FulfillmentMode.dineIn,
+          FulfillmentMode.takeaway,
+        ])
           SelectableCard<FulfillmentMode>(
             value: m,
             groupValue: selected,
@@ -721,7 +750,9 @@ class _PaymentSelector extends ConsumerWidget {
           value: CartPaymentMethod.wallet,
           groupValue: selected,
           title: 'Wallet (${Money.fromPaise(walletBalance)})',
-          subtitle: walletShort ? 'Not enough balance' : 'Pay instantly from wallet',
+          subtitle: walletShort
+              ? 'Not enough balance'
+              : 'Pay instantly from wallet',
           leading: const Icon(
             PhosphorIconsFill.wallet,
             color: AppColors.navy,

@@ -18,16 +18,18 @@ import '../../../features/club/providers/pending_club_tab_provider.dart';
 /// Provider for active home banners ordered by display_order.
 /// Pulls the new scheduling/deep-link fields; visibility filtering happens
 /// client-side against the server clock.
-final homeBannersProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>(
-  (ref) async {
-    final res = await Supabase.instance.client
-        .from('home_banners')
-        .select('id, image_url, target_route, type, visible_from, visible_until, alt_text, display_order')
-        .eq('is_active', true)
-        .order('display_order');
-    return List<Map<String, dynamic>>.from(res);
-  },
-);
+final homeBannersProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((
+  ref,
+) async {
+  final res = await Supabase.instance.client
+      .from('home_banners')
+      .select(
+        'id, image_url, target_route, type, visible_from, visible_until, alt_text, display_order',
+      )
+      .eq('is_active', true)
+      .order('display_order');
+  return List<Map<String, dynamic>>.from(res);
+});
 
 /// Auto-sliding promotional banner carousel for the home screen.
 ///
@@ -145,7 +147,10 @@ class _HomeBannerCarouselState extends ConsumerState<HomeBannerCarousel> {
     final bannersAsync = ref.watch(homeBannersProvider);
 
     return bannersAsync.when(
-      loading: () => const SkeletonCard(height: 140, margin: EdgeInsets.symmetric(horizontal: 24)),
+      loading: () => const SkeletonCard(
+        height: 140,
+        margin: EdgeInsets.symmetric(horizontal: 24),
+      ),
       error: (e, _) => BrandedErrorState(
         message: "Couldn't load banners",
         onRetry: () => ref.invalidate(homeBannersProvider),
@@ -220,20 +225,25 @@ class _HomeBannerCarouselState extends ConsumerState<HomeBannerCarousel> {
 
 /// A computed provider that exposes the same visible banners the UI uses.
 /// Useful for the auto-advance timer and for tests.
-final _visibleBannersProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>(
-  (ref) async {
-    final offset = ref.watch(serverClockProvider);
-    final now = DateTime.now().toUtc().add(offset);
-    final all = await ref.watch(homeBannersProvider.future);
-    return all.where((b) {
-      final from = b['visible_from'] as String?;
-      final until = b['visible_until'] as String?;
-      if (from != null && now.isBefore(DateTime.parse(from))) return false;
-      if (until != null && now.isAfter(DateTime.parse(until))) return false;
-      return true;
-    }).toList();
-  },
-);
+final _visibleBannersProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+      final offset = ref.watch(serverClockProvider);
+      final now = DateTime.now().toUtc().add(offset);
+      final all = await ref.watch(homeBannersProvider.future);
+      return all.where((b) {
+        final from = b['visible_from'] as String?;
+        final until = b['visible_until'] as String?;
+        if (from != null) {
+          final fromDt = DateTime.tryParse(from);
+          if (fromDt != null && now.isBefore(fromDt)) return false;
+        }
+        if (until != null) {
+          final untilDt = DateTime.tryParse(until);
+          if (untilDt != null && now.isAfter(untilDt)) return false;
+        }
+        return true;
+      }).toList();
+    });
 
 class _BannerPage extends StatelessWidget {
   final Map<String, dynamic> banner;
@@ -265,9 +275,8 @@ class _BannerPage extends StatelessWidget {
           ? CachedNetworkImage(
               imageUrl: imageUrl,
               fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
-                color: AppColors.lightBorder,
-              ),
+              placeholder: (context, url) =>
+                  Container(color: AppColors.lightBorder),
               errorWidget: (context, url, error) => Container(
                 color: AppColors.lightBorder,
                 child: const Icon(
@@ -301,10 +310,7 @@ class _BannerPage extends StatelessWidget {
     }
 
     if (altText.isNotEmpty) {
-      image = Semantics(
-        label: altText,
-        child: image,
-      );
+      image = Semantics(label: altText, child: image);
     }
 
     if (isCurrent) {
@@ -327,4 +333,3 @@ class _BannerPage extends StatelessWidget {
     );
   }
 }
-

@@ -63,6 +63,11 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
   }
 
   Future<void> _buy(Map<String, dynamic> option) async {
+    // In-flight guard: a fast double-tap can open two confirm dialogs
+    // before the card flips to busy, which would fire two
+    // play_pass_purchase RPCs. Bail if a purchase is already running.
+    if (_buyingType != null) return;
+
     final type = option['type'] as String;
     final price = option['price_paise'] as int;
     final familyId = ref.read(currentFamilyIdProvider);
@@ -92,12 +97,14 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
 
     final idem = const Uuid().v4();
     try {
-      final res = await Supabase.instance.client
-          .rpc<Map<String, dynamic>>('play_pass_purchase', params: {
-        'p_family_id': familyId,
-        'p_pass_type': type,
-        'p_idempotency_key': idem,
-      });
+      final res = await Supabase.instance.client.rpc<Map<String, dynamic>>(
+        'play_pass_purchase',
+        params: {
+          'p_family_id': familyId,
+          'p_pass_type': type,
+          'p_idempotency_key': idem,
+        },
+      );
 
       if (!mounted) return;
 
@@ -178,101 +185,98 @@ class _PlayPassPurchaseSheetState extends ConsumerState<PlayPassPurchaseSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.lightBorder,
-                  borderRadius: BorderRadius.circular(2),
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.lightBorder,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Play Passes',
-              style: AppTextStyles.h2(context),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Buy session credits upfront and save every time you play.',
-              style: AppTextStyles.body(
-                context,
-                color: AppColors.lightTextSecondary,
-              ),
-            ),
-            const SizedBox(height: 20),
-            plansAsync.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(
-                  child: CircularProgressIndicator(color: AppColors.navy),
-                ),
-              ),
-              error: (e, _) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Column(
-                  children: [
-                    Text(
-                      "Couldn't load Play Passes.",
-                      style: AppTextStyles.body(
-                        context,
-                        color: AppColors.lightTextSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => ref.invalidate(playPassPlansProvider),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-              data: (plans) => Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final opt in plans) ...[
-                    _PassOptionCard(
-                      option: opt,
-                      singleSessionPrice: oneHourPaise,
-                      busy: _buyingType == opt['type'],
-                      onTap: () {
-                        AppHaptics.light();
-                        _confirmAndBuy(opt);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                ],
-              ),
-            ),
-            if (_errorText != null) ...[
+              const SizedBox(height: 20),
+              Text('Play Passes', style: AppTextStyles.h2(context)),
               const SizedBox(height: 4),
               Text(
-                _errorText!,
+                'Buy session credits upfront and save every time you play.',
+                style: AppTextStyles.body(
+                  context,
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              plansAsync.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.navy),
+                  ),
+                ),
+                error: (e, _) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Column(
+                    children: [
+                      Text(
+                        "Couldn't load Play Passes.",
+                        style: AppTextStyles.body(
+                          context,
+                          color: AppColors.lightTextSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => ref.invalidate(playPassPlansProvider),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+                data: (plans) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final opt in plans) ...[
+                      _PassOptionCard(
+                        option: opt,
+                        singleSessionPrice: oneHourPaise,
+                        busy: _buyingType == opt['type'],
+                        onTap: () {
+                          AppHaptics.light();
+                          _confirmAndBuy(opt);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                ),
+              ),
+              if (_errorText != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  _errorText!,
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.adminRed,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Text(
+                'Each pass is for a 1-hour play visit. Need more time? Extend '
+                'for ₹300 directly from the app after your session starts. '
+                '1 kid = 1 pass. No coupons can be used with passes.',
                 style: AppTextStyles.caption(
                   context,
-                  color: AppColors.adminRed,
+                  color: AppColors.lightTextSecondary,
                 ),
               ),
             ],
-            const SizedBox(height: 8),
-            Text(
-              'Each pass is for a 1-hour play visit. Need more time? Extend '
-              'for ₹300 directly from the app after your session starts. '
-              '1 kid = 1 pass. No coupons can be used with passes.',
-              style: AppTextStyles.caption(
-                context,
-                color: AppColors.lightTextSecondary,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 }
 
@@ -291,13 +295,18 @@ class _PassOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = option['total'] as int;
-    final price = option['price_paise'] as int;
-    final days = option['days'] as int;
-    final label = option['label'] as String;
-    final tag = option['tag'] as String;
-    final perSession = price ~/ total;
-    final totalSavings = (singleSessionPrice - perSession) * total;
+    final total = (option['total'] as num?)?.toInt() ?? 0;
+    final price = (option['price_paise'] as num?)?.toInt() ?? 0;
+    final days = (option['days'] as num?)?.toInt() ?? 0;
+    final label = option['label'] as String? ?? '';
+    final tag = option['tag'] as String? ?? '';
+    // Guard division: a plan with total==0 would crash on `price ~/ total`.
+    final perSession = total > 0 ? price ~/ total : price;
+    // Clamp so a plan priced above the single-session rate never renders a
+    // negative "Save -₹X" badge.
+    final totalSavings = ((singleSessionPrice - perSession) * total)
+        .clamp(0, 1 << 30)
+        .toInt();
 
     return InkWell(
       onTap: busy ? null : onTap,
@@ -319,21 +328,25 @@ class _PassOptionCard extends StatelessWidget {
                     children: [
                       Text(
                         '$total Visits',
-                        style: AppTextStyles.bodyLarge(context)
-                            .copyWith(fontWeight: FontWeight.w800),
+                        style: AppTextStyles.bodyLarge(
+                          context,
+                        ).copyWith(fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.gold.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           tag,
-                          style: AppTextStyles.caption(context)
-                              .copyWith(color: AppColors.navy),
+                          style: AppTextStyles.caption(
+                            context,
+                          ).copyWith(color: AppColors.navy),
                         ),
                       ),
                     ],
@@ -361,22 +374,28 @@ class _PassOptionCard extends StatelessWidget {
                           color: AppColors.lightTextSecondary,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.activeGreen.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'Save ${Money.fromPaise(totalSavings)}',
-                          style: AppTextStyles.caption(context).copyWith(
-                            color: AppColors.fitGreen,
-                            fontWeight: FontWeight.w700,
+                      if (totalSavings > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.activeGreen.withValues(
+                              alpha: 0.12,
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Save ${Money.fromPaise(totalSavings)}',
+                            style: AppTextStyles.caption(context).copyWith(
+                              color: AppColors.fitGreen,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ],

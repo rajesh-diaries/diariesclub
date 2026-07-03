@@ -60,26 +60,34 @@ class _SplitSummarySheetState extends State<SplitSummarySheet> {
   Widget build(BuildContext context) {
     final order = ['rafi', 'ellie', 'gerry', 'zena'];
 
-    return GestureDetector(
-      onTap: _dismiss, // tap-to-skip the auto-dismiss wait.
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+    // The whole card used to be a tap-to-dismiss target, so a parent
+    // tapping to read the split got yanked to /home. Only the drag handle
+    // dismisses now; the content card itself absorbs taps.
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.lightBorder,
-                  borderRadius: BorderRadius.circular(2),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _dismiss, // tap the handle to skip the auto-dismiss wait.
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.lightBorder,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -146,7 +154,9 @@ class _SplitRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: dimmed ? AppColors.lightBackground : color.withValues(alpha: 0.10),
+        color: dimmed
+            ? AppColors.lightBackground
+            : color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -190,34 +200,34 @@ class _SplitRow extends StatelessWidget {
   }
 
   static String _heroName(String t) => switch (t) {
-        'rafi' => 'Rafi',
-        'ellie' => 'Ellie',
-        'gerry' => 'Gerry',
-        'zena' => 'Zena',
-        _ => '?',
-      };
+    'rafi' => 'Rafi',
+    'ellie' => 'Ellie',
+    'gerry' => 'Gerry',
+    'zena' => 'Zena',
+    _ => '?',
+  };
 
   static String _traitLabel(String t) => switch (t) {
-        'rafi' => 'Brave',
-        'ellie' => 'Kind',
-        'gerry' => 'Curious',
-        'zena' => 'Creative',
-        _ => '',
-      };
+    'rafi' => 'Brave',
+    'ellie' => 'Kind',
+    'gerry' => 'Curious',
+    'zena' => 'Creative',
+    _ => '',
+  };
 
   static Color _heroColor(String t) => switch (t) {
-        'rafi' => AppColors.rafiCoral,
-        'ellie' => AppColors.ellieBlue,
-        'gerry' => AppColors.gerryAmber,
-        'zena' => AppColors.zenaGreen,
-        _ => AppColors.gold,
-      };
+    'rafi' => AppColors.rafiCoral,
+    'ellie' => AppColors.ellieBlue,
+    'gerry' => AppColors.gerryAmber,
+    'zena' => AppColors.zenaGreen,
+    _ => AppColors.gold,
+  };
 
   static IconData _heroIcon(String t) => switch (t) {
-        'rafi' => PhosphorIconsFill.shieldStar,
-        'ellie' => PhosphorIconsFill.heart,
-        'gerry' => PhosphorIconsFill.magnifyingGlass,
-        'zena' => PhosphorIconsFill.palette,
-        _ => PhosphorIconsFill.circle,
-      };
+    'rafi' => PhosphorIconsFill.shieldStar,
+    'ellie' => PhosphorIconsFill.heart,
+    'gerry' => PhosphorIconsFill.magnifyingGlass,
+    'zena' => PhosphorIconsFill.palette,
+    _ => PhosphorIconsFill.circle,
+  };
 }

@@ -42,10 +42,7 @@ class QuantityStepper extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _Btn(
-            icon: PhosphorIconsRegular.minus,
-            onTap: () => change(-1),
-          ),
+          _Btn(icon: PhosphorIconsRegular.minus, onTap: () => change(-1)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
@@ -53,16 +50,10 @@ class QuantityStepper extends ConsumerWidget {
               style: AppTextStyles.body(
                 context,
                 color: Colors.white,
-              ).copyWith(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
+              ).copyWith(fontSize: 14, fontWeight: FontWeight.w800),
             ),
           ),
-          _Btn(
-            icon: PhosphorIconsRegular.plus,
-            onTap: () => change(1),
-          ),
+          _Btn(icon: PhosphorIconsRegular.plus, onTap: () => change(1)),
         ],
       ),
     );
@@ -79,9 +70,11 @@ class _Btn extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       customBorder: const CircleBorder(),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Icon(icon, size: 16, color: Colors.white),
+      // >=44px hit target (a11y) while keeping the 16px glyph.
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Center(child: Icon(icon, size: 16, color: Colors.white)),
       ),
     );
   }

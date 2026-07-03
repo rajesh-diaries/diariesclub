@@ -10,6 +10,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/utils/venues.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../providers/cart_provider.dart';
 
 const _venueId = Venues.kondapurId;
 
@@ -58,13 +59,15 @@ class _OrderConfirmSheetState extends ConsumerState<OrderConfirmSheet> {
       return;
     }
     try {
-      final result = await Supabase.instance.client
-          .rpc<Map<String, dynamic>>('order_preview', params: {
-        'p_venue_id': _venueId,
-        'p_family_id': familyId,
-        'p_items': widget.items,
-        'p_child_id': widget.childId,
-      });
+      final result = await Supabase.instance.client.rpc<Map<String, dynamic>>(
+        'order_preview',
+        params: {
+          'p_venue_id': _venueId,
+          'p_family_id': familyId,
+          'p_items': widget.items,
+          'p_child_id': widget.childId,
+        },
+      );
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -201,12 +204,16 @@ class _OrderConfirmSheetState extends ConsumerState<OrderConfirmSheet> {
   }
 
   Widget _buildSummary(int balancePaise) {
-    final total = (_preview!['total_paise'] as int?) ?? 0;
-    final foodTaxable = (_preview!['food_taxable_paise'] as int?) ?? 0;
-    final foodGst = (_preview!['food_gst_paise'] as int?) ?? 0;
-    final sessionValue = (_preview!['session_value_paise'] as int?) ?? 0;
-    final rounding = (_preview!['rounding_paise'] as int?) ?? 0;
-    final coins = (_preview!['coins_earned'] as int?) ?? 0;
+    final total = (_preview!['total_paise'] as num?)?.toInt() ?? 0;
+    final foodTaxable = (_preview!['food_taxable_paise'] as num?)?.toInt() ?? 0;
+    final foodGst = (_preview!['food_gst_paise'] as num?)?.toInt() ?? 0;
+    final sessionValue =
+        (_preview!['session_value_paise'] as num?)?.toInt() ?? 0;
+    final rounding = (_preview!['rounding_paise'] as num?)?.toInt() ?? 0;
+    final coins = (_preview!['coins_earned'] as num?)?.toInt() ?? 0;
+    final payment = ref.watch(cartPaymentMethodProvider);
+    final isWallet = payment == CartPaymentMethod.wallet;
+    final canPlace = isWallet ? balancePaise >= total : true;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -218,13 +225,9 @@ class _OrderConfirmSheetState extends ConsumerState<OrderConfirmSheet> {
           const _Divider(),
           _Line(label: 'Food (taxable)', value: foodTaxable),
         ],
-        if (foodGst > 0)
-          _Line(label: 'GST 5% (food)', value: foodGst),
+        if (foodGst > 0) _Line(label: 'GST 5% (food)', value: foodGst),
         if (sessionValue > 0)
-          _Line(
-            label: 'Play session (incl. GST)',
-            value: sessionValue,
-          ),
+          _Line(label: 'Play session (incl. GST)', value: sessionValue),
         if (rounding != 0)
           _Line(
             label: rounding > 0 ? 'Rounding' : 'Rounding discount',
@@ -232,47 +235,44 @@ class _OrderConfirmSheetState extends ConsumerState<OrderConfirmSheet> {
             showPlus: rounding > 0,
           ),
         const _Divider(),
-        _Line(
-          label: 'Total',
-          value: total,
-          isTotal: true,
-        ),
+        _Line(label: 'Total', value: total, isTotal: true),
         const SizedBox(height: 8),
         if (coins > 0)
           Text(
-            '+${Money.fromPaise(coins * 100)} Coins earned',
+            '+$coins Coins earned',
             style: AppTextStyles.caption(
               context,
               color: AppColors.gold,
             ).copyWith(fontWeight: FontWeight.w700),
           ),
-        const SizedBox(height: 16),
-        Text(
-          'Wallet balance: ${Money.fromPaise(balancePaise)}',
-          style: AppTextStyles.caption(
-            context,
-            color: AppColors.lightTextSecondary,
-          ),
-        ),
-        if (balancePaise < total) ...[
-          const SizedBox(height: 8),
+        if (isWallet) ...[
+          const SizedBox(height: 16),
           Text(
-            'Your wallet is short by ${Money.fromPaise(total - balancePaise)}.',
+            'Wallet balance: ${Money.fromPaise(balancePaise)}',
             style: AppTextStyles.caption(
               context,
-              color: AppColors.adminRed,
+              color: AppColors.lightTextSecondary,
             ),
           ),
+          if (balancePaise < total) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Your wallet is short by ${Money.fromPaise(total - balancePaise)}.',
+              style: AppTextStyles.caption(context, color: AppColors.adminRed),
+            ),
+          ],
         ],
         const SizedBox(height: 20),
         PrimaryButton(
           label: 'Place order · ${Money.fromPaise(total)}',
           loading: _confirming,
-          onPressed: balancePaise < total ? null : _confirm,
+          onPressed: canPlace ? _confirm : null,
         ),
         const SizedBox(height: 8),
         Text(
-          'Tap above to confirm. This will debit your wallet and place the order.',
+          isWallet
+              ? 'Tap above to confirm. This will debit your wallet and place the order.'
+              : 'Tap above to confirm. You’ll pay at the counter when you pick up.',
           textAlign: TextAlign.center,
           style: AppTextStyles.caption(
             context,
@@ -308,25 +308,27 @@ class _Line extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: (isTotal
-                      ? AppTextStyles.bodyLarge(context)
-                      : AppTextStyles.body(context))
-                  .copyWith(
-                fontWeight: isBold || isTotal ? FontWeight.w700 : null,
-                color: isTotal ? AppColors.navy : null,
-              ),
+              style:
+                  (isTotal
+                          ? AppTextStyles.bodyLarge(context)
+                          : AppTextStyles.body(context))
+                      .copyWith(
+                        fontWeight: isBold || isTotal ? FontWeight.w700 : null,
+                        color: isTotal ? AppColors.navy : null,
+                      ),
             ),
           ),
           if (value != null)
             Text(
               '${showPlus && value! > 0 ? '+' : ''}${Money.fromPaise(value!)}',
-              style: (isTotal
-                      ? AppTextStyles.h3(context)
-                      : AppTextStyles.body(context))
-                  .copyWith(
-                fontWeight: isTotal ? FontWeight.w800 : FontWeight.w700,
-                color: isTotal ? AppColors.navy : null,
-              ),
+              style:
+                  (isTotal
+                          ? AppTextStyles.h3(context)
+                          : AppTextStyles.body(context))
+                      .copyWith(
+                        fontWeight: isTotal ? FontWeight.w800 : FontWeight.w700,
+                        color: isTotal ? AppColors.navy : null,
+                      ),
             ),
         ],
       ),

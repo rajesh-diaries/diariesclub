@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/providers/child_stage_history_provider.dart';
+import '../../core/providers/family_children_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/empty_state.dart';
@@ -34,17 +35,40 @@ class PerTraitDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final child = ref.watch(childByIdProvider(childId));
     final history =
-        ref.watch(childStageHistoryProvider(childId)).valueOrNull ??
-            const [];
-    final filteredCount =
-        history.where((e) => e.trait == hero).length;
+        ref.watch(childStageHistoryProvider(childId)).valueOrNull ?? const [];
+    final filteredCount = history.where((e) => e.trait == hero).length;
 
     if (child == null) {
-      return const Scaffold(
-        body: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: SkeletonList(itemCount: 6, itemHeight: 96),
+      // childByIdProvider returns null both while the family children
+      // stream is still loading AND when the child no longer exists (e.g.
+      // soft-deleted). Only show the skeleton for the former; a resolved
+      // null means "not found", so surface an escape hatch instead of an
+      // infinite skeleton.
+      final resolved = ref.watch(familyChildrenProvider).hasValue;
+      if (!resolved) {
+        return const Scaffold(
+          body: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: SkeletonList(itemCount: 6, itemHeight: 96),
+            ),
+          ),
+        );
+      }
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(PhosphorIconsRegular.arrowLeft),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        body: const SafeArea(
+          child: Center(
+            child: BrandedEmptyState(
+              icon: PhosphorIconsRegular.userMinus,
+              title: 'Child not found',
+              subtitle: 'This profile may have been removed.',
+            ),
           ),
         ),
       );
@@ -99,10 +123,7 @@ class PerTraitDetailScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            HeroCardCollectionSection(
-              childId: childId,
-              singleHero: hero,
-            ),
+            HeroCardCollectionSection(childId: childId, singleHero: hero),
             const SizedBox(height: 24),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -121,17 +142,14 @@ class PerTraitDetailScreen extends ConsumerWidget {
                 child: BrandedEmptyState(
                   icon: PhosphorIconsRegular.tree,
                   title: 'No milestones yet',
-                  subtitle: "Keep playing after sessions to grow this hero's milestones.",
+                  subtitle:
+                      "Keep playing after sessions to grow this hero's milestones.",
                 ),
               )
             else
-              // Reuse the master timeline; the per-trait variant just
-              // filters to this trait via client-side filter inside the
-              // widget. We pass the same childId — the timeline shows
-              // every transition including non-this-trait ones, which is
-              // a forgivable v1 simplification (per-trait filter is
-              // tracked as a future polish).
-              StageHistoryTimeline(childId: childId),
+              // Reuse the master timeline, filtered to this trait so the
+              // per-trait page only shows this hero's transitions.
+              StageHistoryTimeline(childId: childId, trait: hero),
           ],
         ),
       ),
@@ -139,20 +157,20 @@ class PerTraitDetailScreen extends ConsumerWidget {
   }
 
   static String _heroName(String h) => switch (h) {
-        'rafi' => 'Rafi',
-        'ellie' => 'Ellie',
-        'gerry' => 'Gerry',
-        'zena' => 'Zena',
-        _ => '?',
-      };
+    'rafi' => 'Rafi',
+    'ellie' => 'Ellie',
+    'gerry' => 'Gerry',
+    'zena' => 'Zena',
+    _ => '?',
+  };
 
   static Color _heroColor(String h) => switch (h) {
-        'rafi' => AppColors.rafiCoral,
-        'ellie' => AppColors.ellieBlue,
-        'gerry' => AppColors.gerryAmber,
-        'zena' => AppColors.zenaGreen,
-        _ => AppColors.gold,
-      };
+    'rafi' => AppColors.rafiCoral,
+    'ellie' => AppColors.ellieBlue,
+    'gerry' => AppColors.gerryAmber,
+    'zena' => AppColors.zenaGreen,
+    _ => AppColors.gold,
+  };
 }
 
 class _Hero extends StatelessWidget {
@@ -221,21 +239,21 @@ class _Hero extends StatelessWidget {
   }
 
   static String _heroFullLabel(String h) => switch (h) {
-        'rafi' => 'Rafi the Brave',
-        'ellie' => 'Ellie the Kind',
-        'gerry' => 'Gerry the Curious',
-        'zena' => 'Zena the Creative',
-        _ => h,
-      };
+    'rafi' => 'Rafi the Brave',
+    'ellie' => 'Ellie the Kind',
+    'gerry' => 'Gerry the Curious',
+    'zena' => 'Zena the Creative',
+    _ => h,
+  };
 
   static String _stageLabel(String s) =>
       s.isEmpty ? '?' : s[0].toUpperCase() + s.substring(1);
 
   static IconData _iconFor(String h) => switch (h) {
-        'rafi' => PhosphorIconsFill.shieldStar,
-        'ellie' => PhosphorIconsFill.heart,
-        'gerry' => PhosphorIconsFill.magnifyingGlass,
-        'zena' => PhosphorIconsFill.palette,
-        _ => PhosphorIconsFill.sparkle,
-      };
+    'rafi' => PhosphorIconsFill.shieldStar,
+    'ellie' => PhosphorIconsFill.heart,
+    'gerry' => PhosphorIconsFill.magnifyingGlass,
+    'zena' => PhosphorIconsFill.palette,
+    _ => PhosphorIconsFill.sparkle,
+  };
 }

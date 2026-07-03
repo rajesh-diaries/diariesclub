@@ -6,13 +6,19 @@ import 'widgets/safari_colors.dart';
 import 'widgets/safari_faq_section.dart';
 import 'widgets/safari_hero_banner.dart';
 import 'widgets/safari_philosophy_card.dart';
-import 'widgets/safari_trait_card.dart';
+import 'widgets/safari_trait_video_card.dart';
+import 'widgets/safari_typical_morning.dart';
 import 'widgets/safari_waitlist_form.dart';
 import 'widgets/safari_what_it_is.dart';
 
-class SafariScreen extends StatelessWidget {
+class SafariScreen extends StatefulWidget {
   const SafariScreen({super.key});
 
+  @override
+  State<SafariScreen> createState() => _SafariScreenState();
+}
+
+class _SafariScreenState extends State<SafariScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -20,14 +26,16 @@ class SafariScreen extends StatelessWidget {
       body: ListView(
         padding: EdgeInsets.zero,
         children: const [
-          SafariAnnouncementCard(),
           SafariHeroBanner(),
+          SafariAnnouncementCard(),
+          SizedBox(height: 16),
+          SafariWhatItIs(),
           SizedBox(height: 32),
           SafariPhilosophyCard(),
           SizedBox(height: 32),
-          _FourTraitsSection(),
+          SafariTypicalMorning(),
           SizedBox(height: 32),
-          SafariWhatItIs(),
+          _FourTraitsSection(),
           SizedBox(height: 32),
           SafariFaqSection(),
           SizedBox(height: 32),
@@ -48,22 +56,30 @@ class _FourTraitsSection extends StatelessWidget {
     {
       'image': 'assets/hero/rafi.png',
       'title': 'Brave like Rafi',
-      'desc': 'The courage to try, fail, and try again. To speak up, stand tall, and explore the unknown without fear.',
+      'desc': 'Trying new things, speaking up, and bouncing back.',
+      'scenario': 'Going first on the slide',
+      'video': 'assets/videos/rafi_brave.mp4',
     },
     {
       'image': 'assets/hero/gerry.png',
       'title': 'Curious like Gerry',
-      'desc': 'The hunger to ask "why?" and "what if?" To look closer, reach higher, and never stop wondering about the world.',
+      'desc': 'Asking "why?", exploring, and wondering.',
+      'scenario': 'Looking under a rock',
+      'video': 'assets/videos/gerry_curious.mp4',
     },
     {
       'image': 'assets/hero/ellie.png',
       'title': 'Kind like Ellie',
-      'desc': 'The strength to care, share, and include others. True confidence comes from lifting people up, not putting them down.',
+      'desc': 'Sharing, including others, and caring.',
+      'scenario': 'Sharing snack time',
+      'video': 'assets/videos/ellie_kind.mp4',
     },
     {
       'image': 'assets/hero/zena.png',
       'title': 'Creative like Zena',
-      'desc': 'The ability to see what isn\'t there yet. To adapt, imagine, and build something new from the pieces around you.',
+      'desc': 'Imagining, building, and finding new ways.',
+      'scenario': 'Painting with unexpected tools',
+      'video': 'assets/videos/zena_creative.mp4',
     },
   ];
 
@@ -75,20 +91,21 @@ class _FourTraitsSection extends StatelessWidget {
         children: [
           Text(
             'The Four Traits',
-            style: AppTextStyles.h3(
-              context,
-              color: SafariColors.jungleGreen,
-            ),
+            style: AppTextStyles.h3(context, color: SafariColors.jungleGreen),
           ),
           const SizedBox(height: 24),
-          ..._traits.map((t) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: SafariTraitCard(
-              imagePath: t['image']!,
-              title: t['title']!,
-              description: t['desc']!,
+          ..._traits.map(
+            (t) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: SafariTraitVideoCard(
+                title: t['title']!,
+                description: t['desc']!,
+                scenario: t['scenario']!,
+                placeholderImage: t['image']!,
+                videoAsset: t['video']!,
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -103,10 +120,7 @@ class _Footer extends StatelessWidget {
     return Center(
       child: Text(
         'Safari Club · Play Diaries',
-        style: AppTextStyles.caption(
-          context,
-          color: const Color(0xFFAAAAAA),
-        ),
+        style: AppTextStyles.caption(context, color: const Color(0xFFAAAAAA)),
       ),
     );
   }

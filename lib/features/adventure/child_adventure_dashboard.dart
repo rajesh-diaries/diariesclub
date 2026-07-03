@@ -3,13 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../core/providers/family_children_provider.dart';
+import '../../core/providers/hero_recap_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/skeleton_card.dart';
 import '../../core/widgets/trait_progress_bar.dart';
 import '../gamification/widgets/stage_history_timeline.dart';
 import 'providers/child_by_id_provider.dart';
+import 'providers/child_stats_summary_provider.dart';
 import 'widgets/child_header.dart';
 import 'widgets/growth_this_month_card.dart';
 import 'widgets/hero_card_collection_section.dart';
@@ -41,16 +45,33 @@ class ChildAdventureDashboard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final child = ref.watch(childByIdProvider(childId));
     if (child == null) {
+      // childByIdProvider returns null both while the family children
+      // stream loads AND when the child no longer exists (soft-deleted).
+      // Only skeleton the former; a resolved null means "not found".
+      final resolved = ref.watch(familyChildrenProvider).hasValue;
+      if (!resolved) {
+        return const SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: SkeletonList(itemCount: 6, itemHeight: 96),
+          ),
+        );
+      }
       return const SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: SkeletonList(itemCount: 6, itemHeight: 96),
+        child: Center(
+          child: BrandedEmptyState(
+            icon: PhosphorIconsRegular.userMinus,
+            title: 'Child not found',
+            subtitle: 'This profile may have been removed.',
+          ),
         ),
       );
     }
 
     final totalXp = (child['total_xp'] as int?) ?? 0;
-    if (totalXp <= 0) {
+    final pending = ref.watch(pendingRecapsProvider).valueOrNull ?? const [];
+    final mine = pending.where((r) => r['child_id'] == childId).toList();
+    if (totalXp <= 0 && mine.isEmpty) {
       // No sessions yet → "begin the journey" empty state. (Total XP > 0
       // means at least one reflection or healthy-bite credit has fired.)
       return Column(
@@ -62,38 +83,47 @@ class ChildAdventureDashboard extends ConsumerWidget {
     }
 
     final childName = (child['name'] as String?) ?? 'Your kid';
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 96),
-      children: [
-        ChildHeader(child: child),
-        PendingRecapsBanner(childId: childId),
-        const SizedBox(height: kHomeSectionGap),
-        HeroWithinCelebrationCard(childId: childId, childName: childName),
-        StatsSummary(childId: childId),
-        const SizedBox(height: kHomeSectionGap),
-        StreakTrackerWidget(childId: childId),
-        const SizedBox(height: kHomeSectionGap),
-        GrowthThisMonthCard(childId: childId, childName: childName),
-        const SizedBox(height: kHomeSectionGap),
-        _HeroProgress(child: child),
-        const SizedBox(height: 16),
-        KidQuestsCard(childId: childId),
-        const SizedBox(height: 16),
-        HeroCardCollectionSection(childId: childId),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'HERO MILESTONES',
-            style: AppTextStyles.caption(
-              context,
-              color: AppColors.lightTextSecondary,
-            ).copyWith(letterSpacing: 1.0, fontWeight: FontWeight.w800),
+    return RefreshIndicator(
+      onRefresh: () async {
+        // Re-seed the realtime-backed child data and the future-backed
+        // stats/recaps so a pull-to-refresh recovers from a dropped socket.
+        ref.invalidate(familyChildrenProvider);
+        ref.invalidate(pendingRecapsProvider);
+        ref.invalidate(childStatsSummaryProvider(childId));
+      },
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 96),
+        children: [
+          ChildHeader(child: child),
+          PendingRecapsBanner(childId: childId),
+          const SizedBox(height: kHomeSectionGap),
+          HeroWithinCelebrationCard(childId: childId, childName: childName),
+          StatsSummary(childId: childId),
+          const SizedBox(height: kHomeSectionGap),
+          StreakTrackerWidget(childId: childId),
+          const SizedBox(height: kHomeSectionGap),
+          GrowthThisMonthCard(childId: childId, childName: childName),
+          const SizedBox(height: kHomeSectionGap),
+          _HeroProgress(child: child),
+          const SizedBox(height: 16),
+          KidQuestsCard(childId: childId),
+          const SizedBox(height: 16),
+          HeroCardCollectionSection(childId: childId),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'HERO MILESTONES',
+              style: AppTextStyles.caption(
+                context,
+                color: AppColors.lightTextSecondary,
+              ).copyWith(letterSpacing: 1.0, fontWeight: FontWeight.w800),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        StageHistoryTimeline(childId: childId),
-      ],
+          const SizedBox(height: 8),
+          StageHistoryTimeline(childId: childId),
+        ],
+      ),
     );
   }
 }

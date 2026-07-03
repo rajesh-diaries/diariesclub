@@ -15,7 +15,7 @@ class HeroRecapCardWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionId = recap['session_id'] as String;
+    final sessionId = (recap['session_id'] as String?) ?? '';
     final childName =
         ((recap['children'] as Map?)?['name'] as String?) ?? 'Your kid';
     final deadline = recap['reflection_deadline'] as String?;
@@ -70,8 +70,7 @@ class HeroRecapCardWidget extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.gold.withValues(alpha: 0.20),
                 borderRadius: BorderRadius.circular(100),
@@ -116,7 +115,9 @@ class HeroRecapCardWidget extends ConsumerWidget {
 
   int? _hoursUntilDeadline(String? iso) {
     if (iso == null) return null;
-    final diff = DateTime.parse(iso).difference(DateTime.now()).inHours;
+    final parsed = DateTime.tryParse(iso);
+    if (parsed == null) return null;
+    final diff = parsed.difference(DateTime.now()).inHours;
     return diff < 0 ? 0 : diff;
   }
 }

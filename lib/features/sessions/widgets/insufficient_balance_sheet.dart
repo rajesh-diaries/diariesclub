@@ -21,9 +21,13 @@ class InsufficientBalanceSheet extends StatelessWidget {
   });
 
   void _topUp(BuildContext context) {
-    Navigator.of(context).pop();
+    // Capture the root navigator BEFORE popping this sheet — once popped,
+    // `context` is defunct and can't host the next sheet. The navigator's
+    // own context stays valid.
+    final navigator = Navigator.of(context, rootNavigator: true);
+    navigator.pop();
     showModalBottomSheet<void>(
-      context: context,
+      context: navigator.context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const TopUpSheet(),

@@ -22,8 +22,7 @@ class ExtendSessionSheet extends ConsumerStatefulWidget {
   const ExtendSessionSheet({super.key, required this.session});
 
   @override
-  ConsumerState<ExtendSessionSheet> createState() =>
-      _ExtendSessionSheetState();
+  ConsumerState<ExtendSessionSheet> createState() => _ExtendSessionSheetState();
 }
 
 /// Hardcoded fallback used when venue_config hasn't loaded yet (or is
@@ -80,11 +79,13 @@ class _ExtendSessionSheetState extends ConsumerState<ExtendSessionSheet> {
         ),
       );
     } on PostgrestException catch (e) {
+      if (!mounted) return;
       setState(() {
         _busy = false;
         _errorText = _mapError(e.message);
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _busy = false;
         _errorText = "Couldn't extend. Please try again.";
@@ -112,14 +113,15 @@ class _ExtendSessionSheetState extends ConsumerState<ExtendSessionSheet> {
     // duration isn't in the current list (e.g. admin removed it).
     if (!options.any((o) => o['minutes'] == _selectedMinutes) &&
         options.isNotEmpty) {
-      _selectedMinutes = options.first['minutes'] as int;
+      _selectedMinutes = (options.first['minutes'] as num?)?.toInt() ?? 30;
     }
     final selectedOption = options.firstWhere(
       (o) => o['minutes'] == _selectedMinutes,
       orElse: () => options.first,
     );
     final amountPaise = (selectedOption['price_paise'] as int?) ?? 0;
-    final canPay = !_busy &&
+    final canPay =
+        !_busy &&
         (_paymentMethod == 'cash' ||
             (balance != null && balance >= amountPaise));
 
@@ -176,12 +178,14 @@ class _ExtendSessionSheetState extends ConsumerState<ExtendSessionSheet> {
                 if (i > 0) const SizedBox(width: 12),
                 Expanded(
                   child: _DurationTile(
-                    label: (options[i]['label'] as String?) ??
+                    label:
+                        (options[i]['label'] as String?) ??
                         '+${options[i]['minutes']} min',
                     pricePaise: (options[i]['price_paise'] as int?) ?? 0,
                     selected: _selectedMinutes == options[i]['minutes'],
                     onTap: () => setState(
-                      () => _selectedMinutes = options[i]['minutes'] as int,
+                      () => _selectedMinutes =
+                          (options[i]['minutes'] as num?)?.toInt() ?? 30,
                     ),
                   ),
                 ),

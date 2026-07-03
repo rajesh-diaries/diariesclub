@@ -12,12 +12,16 @@ import 'package:screen_brightness/screen_brightness.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import '../../core/providers/active_sessions_provider.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/current_wallet_provider.dart';
+import '../../core/providers/play_passes_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_review_helper.dart';
 import '../../core/utils/currency.dart';
+import '../../../flavors.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/error_state.dart';
 
@@ -182,7 +186,8 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
           if (!mounted) return;
           final timeoutMin =
               (cfg?['session_pre_scan_timeout_minutes'] as int?) ?? 15;
-          final createdAt = DateTime.tryParse(
+          final createdAt =
+              DateTime.tryParse(
                 (session['created_at'] as String?) ?? '',
               )?.toUtc() ??
               DateTime.now().toUtc();
@@ -219,8 +224,10 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
   void _startTickers() {
     _countdownTick?.cancel();
     _statusSub?.cancel();
-    _countdownTick =
-        Timer.periodic(const Duration(seconds: 1), (_) => _tickCountdown());
+    _countdownTick = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _tickCountdown(),
+    );
     // `sessions` is in supabase_realtime — subscribe to this row so the
     // pending → active / cancelled_pre_scan transition arrives within a
     // second of staff scanning or the autocancel cron firing, with no
@@ -251,6 +258,13 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
     if (newStatus != 'pending') {
       _stopTickers();
       if (oldStatus == 'pending') {
+        // Wallet/Play Pass are consumed when the session flips to active, so
+        // refresh the family's balances immediately.
+        if (newStatus == 'active') {
+          ref.invalidate(playPassesProvider);
+          ref.invalidate(walletTransactionsBalanceProvider);
+          ref.invalidate(currentWalletProvider);
+        }
         _autoDismissTo(newStatus);
       }
     }
@@ -283,21 +297,37 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
   }
 
   Future<void> _autoCancelOnTimeout() async {
-    try {
-      await Supabase.instance.client.rpc<dynamic>(
-        'session_cancel_pending',
-        params: {'p_session_id': widget.sessionId},
-      );
-    } catch (_) {
-      // Best-effort — the server-side cron is the safety net. Let the
-      // realtime listener flip the screen state when it does eventually
-      // catch up.
+    // Cancel every session in the batch; otherwise only the first kid's
+    // session would be cancelled and the others would sit pending with
+    // wallet holds / consumed Play Passes.
+    final ids = _allSessionIds();
+    for (final id in ids) {
+      try {
+        await Supabase.instance.client.rpc<dynamic>(
+          'session_cancel_pending',
+          params: {'p_session_id': id},
+        );
+      } catch (_) {
+        // Best-effort — the server-side cron is the safety net. Let the
+        // realtime listener flip the screen state when it does eventually
+        // catch up.
+      }
     }
+  }
+
+  List<String> _allSessionIds() {
+    if (widget.batchSessionIds.isNotEmpty) {
+      // Ensure the primary session is included even if it wasn't in the
+      // batch list (it always should be, but this is defensive).
+      return {...widget.batchSessionIds, widget.sessionId}.toList();
+    }
+    return [widget.sessionId];
   }
 
   // _pollStatus removed — replaced by realtime stream in _startTickers.
 
   Future<void> _autoDismissTo(String? newStatus) async {
+    _refreshBalances();
     final messenger = ScaffoldMessenger.of(context);
     final message = newStatus == 'active'
         ? 'Session started! Have fun ✨'
@@ -331,13 +361,20 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
 
   Future<void> _cancelNow() async {
     if (_cancelling) return;
+    final isBatch = widget.batchSessionIds.length > 1;
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Cancel this session?'),
-        content: const Text(
-          "We'll release the hold on your wallet. You can start again "
-          'whenever you like.',
+        title: Text(
+          isBatch ? 'Cancel these sessions?' : 'Cancel this session?',
+        ),
+        content: Text(
+          isBatch
+              ? "We'll cancel all ${widget.batchSessionIds.length} sessions and "
+                    'release any wallet holds / Play Passes. You can start again '
+                    'whenever you like.'
+              : "We'll release the hold on your wallet. You can start again "
+                    'whenever you like.',
         ),
         actions: [
           TextButton(
@@ -347,7 +384,7 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.adminRed),
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Cancel session'),
+            child: Text(isBatch ? 'Cancel all sessions' : 'Cancel session'),
           ),
         ],
       ),
@@ -355,14 +392,18 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
     if (ok != true || !mounted) return;
     setState(() => _cancelling = true);
     try {
-      await Supabase.instance.client.rpc<dynamic>(
-        'session_cancel_pending',
-        params: {'p_session_id': widget.sessionId},
-      );
+      final ids = _allSessionIds();
+      for (final id in ids) {
+        await Supabase.instance.client.rpc<dynamic>(
+          'session_cancel_pending',
+          params: {'p_session_id': id},
+        );
+      }
       if (!mounted) return;
       _stopTickers();
+      _refreshBalances();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Session cancelled, hold released.')),
+        const SnackBar(content: Text('Sessions cancelled, holds released.')),
       );
       context.go('/home');
     } on PostgrestException catch (e) {
@@ -372,17 +413,24 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
       if (!mounted) return;
       AppHaptics.error();
       setState(() => _cancelling = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Couldn't cancel: ${e.message}")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Couldn't cancel: ${e.message}")));
     } catch (e) {
       if (!mounted) return;
       AppHaptics.error();
       setState(() => _cancelling = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Couldn't cancel: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Couldn't cancel: $e")));
     }
+  }
+
+  void _refreshBalances() {
+    ref.invalidate(activeSessionsProvider);
+    ref.invalidate(walletTransactionsBalanceProvider);
+    ref.invalidate(currentWalletProvider);
+    ref.invalidate(playPassesProvider);
   }
 
   Future<void> _confirmExit() async {
@@ -442,9 +490,8 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
   Widget build(BuildContext context) {
     final familyId = ref.watch(currentFamilyIdProvider);
     final session = _session;
-    final iAmOwner = familyId != null &&
-        session != null &&
-        session['family_id'] == familyId;
+    final iAmOwner =
+        familyId != null && session != null && session['family_id'] == familyId;
     final status = session?['status'] as String?;
 
     return PopScope(
@@ -474,10 +521,7 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                AppColors.navy,
-                Color(0xFF152C5C),
-              ],
+              colors: [AppColors.navy, Color(0xFF152C5C)],
             ),
           ),
           child: SafeArea(
@@ -496,20 +540,20 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
                     ),
                   )
                 : session == null
-                    ? const Center(child: CircularProgressIndicator())
-                    : status == 'cancelled_pre_scan'
-                        ? _CancelledBody(onHome: () => context.go('/home'))
-                        : _Body(
-                            session: session,
-                            qrPayload: _qrPayload!,
-                            iAmOwner: iAmOwner,
-                            isPending: status == 'pending',
-                            remaining: _remaining,
-                            cancelling: _cancelling,
-                            onCancelNow: _cancelNow,
-                            childName: _childName,
-                            batchChildNames: _batchChildNames,
-                          ),
+                ? const Center(child: CircularProgressIndicator())
+                : status == 'cancelled_pre_scan'
+                ? _CancelledBody(onHome: () => context.go('/home'))
+                : _Body(
+                    session: session,
+                    qrPayload: _qrPayload!,
+                    iAmOwner: iAmOwner,
+                    isPending: status == 'pending',
+                    remaining: _remaining,
+                    cancelling: _cancelling,
+                    onCancelNow: _cancelNow,
+                    childName: _childName,
+                    batchChildNames: _batchChildNames,
+                  ),
           ),
         ),
       ),
@@ -547,6 +591,10 @@ class _Body extends StatefulWidget {
 class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
   late final ConfettiController _confetti;
   late final AnimationController _pulse;
+  // Latch so the celebration + review request fires exactly once, when the
+  // session actually becomes active (kid scanned in) — not while it's still
+  // pending and the QR is merely on screen waiting for a scan.
+  bool _celebrated = false;
 
   @override
   void initState() {
@@ -556,12 +604,31 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
+    // Only celebrate if the session is already active on first render (e.g.
+    // reopened from Home). While pending we wait for the scan.
+    if (!widget.isPending) _celebrate();
+  }
+
+  @override
+  void didUpdateWidget(covariant _Body oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Fire on the pending → active transition, exactly once.
+    if (oldWidget.isPending && !widget.isPending) _celebrate();
+  }
+
+  void _celebrate() {
+    if (_celebrated) return;
+    _celebrated = true;
     _confetti.play();
     AppHaptics.success();
     _maybeRequestReview();
   }
 
   Future<void> _maybeRequestReview() async {
+    // The native iOS review sheet is non-functional in dev/AdHoc builds
+    // (Apple ignores submits from non-App-Store binaries). Only prompt in
+    // production so testers don't get a broken Submit button.
+    if (!F.isProd) return;
     final isHappyWindow = await AppReviewHelper.recordSuccessfulSession();
     if (isHappyWindow) {
       await AppReviewHelper.maybeRequestAfterHappyMoment();
@@ -611,10 +678,10 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
               const SizedBox(height: 4),
               // Sparkle icon
               const Icon(
-                PhosphorIconsFill.sparkle,
-                color: AppColors.gold,
-                size: 32,
-              )
+                    PhosphorIconsFill.sparkle,
+                    color: AppColors.gold,
+                    size: 32,
+                  )
                   .animate()
                   .fadeIn(duration: 400.ms)
                   .scale(
@@ -625,10 +692,10 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
               const SizedBox(height: 6),
               // Title — personalised with kid's name(s) when available.
               Text(
-                _buildGreeting(),
-                style: AppTextStyles.h2(context, color: Colors.white),
-                textAlign: TextAlign.center,
-              )
+                    _buildGreeting(),
+                    style: AppTextStyles.h2(context, color: Colors.white),
+                    textAlign: TextAlign.center,
+                  )
                   .animate(delay: 200.ms)
                   .fadeIn(duration: 400.ms)
                   .slideY(
@@ -659,7 +726,9 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.gold.withValues(alpha: 0.2 + 0.3 * glow),
+                          color: AppColors.gold.withValues(
+                            alpha: 0.2 + 0.3 * glow,
+                          ),
                           blurRadius: 20 + 30 * glow,
                           spreadRadius: 2 + 6 * glow,
                         ),
@@ -682,157 +751,166 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
                 },
               ),
               const SizedBox(height: 16),
-          if (widget.isPending) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.navy.withValues(alpha: 0.35),
-                border: Border.all(
-                  color: _isUrgent(widget.remaining)
-                      ? AppColors.adminRed.withValues(alpha: 0.60)
-                      : AppColors.gold.withValues(alpha: 0.50),
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    PhosphorIconsFill.timer,
-                    color: _isUrgent(widget.remaining)
-                        ? AppColors.adminRed
-                        : AppColors.gold,
-                    size: 20,
+              if (widget.isPending) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Auto-cancels in ',
-                      style: AppTextStyles.body(
-                        context,
-                        color: Colors.white.withValues(alpha: 0.92),
+                  decoration: BoxDecoration(
+                    color: AppColors.navy.withValues(alpha: 0.35),
+                    border: Border.all(
+                      color: _isUrgent(widget.remaining)
+                          ? AppColors.adminRed.withValues(alpha: 0.60)
+                          : AppColors.gold.withValues(alpha: 0.50),
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        PhosphorIconsFill.timer,
+                        color: _isUrgent(widget.remaining)
+                            ? AppColors.adminRed
+                            : AppColors.gold,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Auto-cancels in ',
+                          style: AppTextStyles.body(
+                            context,
+                            color: Colors.white.withValues(alpha: 0.92),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        _formatRemaining(widget.remaining),
+                        style: AppTextStyles.bodyLarge(
+                          context,
+                          color: _isUrgent(widget.remaining)
+                              ? AppColors.adminRed
+                              : AppColors.gold,
+                        ).copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.lightSurface,
+                  border: Border.all(color: AppColors.lightBorder),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      PhosphorIconsFill.clock,
+                      color: AppColors.navy,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      duration == 60
+                          ? '1 hour'
+                          : duration > 0
+                          ? '$duration min'
+                          : '—',
+                      style: AppTextStyles.body(context),
+                    ),
+                    const Spacer(),
+                    Flexible(
+                      child: Text(
+                        '${Money.fromPaise(amount)} · ${widget.isPending ? 'on hold' : paymentMethod}',
+                        textAlign: TextAlign.end,
+                        style: AppTextStyles.caption(
+                          context,
+                          color: AppColors.lightTextSecondary,
+                        ),
                       ),
                     ),
+                  ],
+                ),
+              ),
+              if (widget.isPending) ...[
+                const SizedBox(height: 16),
+                TextButton.icon(
+                  onPressed: widget.cancelling ? null : widget.onCancelNow,
+                  icon: Icon(
+                    PhosphorIconsRegular.x,
+                    size: 16,
+                    color: AppColors.adminRed.withValues(alpha: 0.9),
                   ),
-                  Text(
-                    _formatRemaining(widget.remaining),
-                    style: AppTextStyles.bodyLarge(
+                  label: Text(
+                    widget.cancelling ? 'Cancelling…' : 'Cancel session',
+                    style: AppTextStyles.body(
                       context,
-                      color: _isUrgent(widget.remaining)
-                          ? AppColors.adminRed
-                          : AppColors.gold,
-                    ).copyWith(fontWeight: FontWeight.w800),
+                      color: AppColors.adminRed.withValues(alpha: 0.9),
+                    ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.lightSurface,
-              border: Border.all(color: AppColors.lightBorder),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  PhosphorIconsFill.clock,
-                  color: AppColors.navy,
-                  size: 18,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  duration == 60 ? '1 hour' : '$duration min',
-                  style: AppTextStyles.body(context),
-                ),
-                const Spacer(),
-                Text(
-                  '${Money.fromPaise(amount)} · ${widget.isPending ? 'on hold' : paymentMethod}',
-                  style: AppTextStyles.caption(
-                    context,
-                    color: AppColors.lightTextSecondary,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    minimumSize: const Size(0, 44),
                   ),
                 ),
               ],
-            ),
+              if (!widget.iAmOwner)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text(
+                    '(Heads up: this session is on a different account.)',
+                    style: AppTextStyles.caption(
+                      context,
+                      color: AppColors.adminRed,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 24),
+            ],
           ),
-          if (widget.isPending) ...[
-            const SizedBox(height: 16),
-            TextButton.icon(
-              onPressed: widget.cancelling ? null : widget.onCancelNow,
-              icon: Icon(
-                PhosphorIconsRegular.x,
-                size: 16,
-                color: AppColors.adminRed.withValues(alpha: 0.9),
-              ),
-              label: Text(
-                widget.cancelling ? 'Cancelling…' : 'Cancel session',
-                style: AppTextStyles.body(
-                  context,
-                  color: AppColors.adminRed.withValues(alpha: 0.9),
-                ),
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ],
-          if (!widget.iAmOwner)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(
-                '(Heads up: this session is on a different account.)',
-                style: AppTextStyles.caption(
-                  context,
-                  color: AppColors.adminRed,
-                ),
-              ),
-            ),
-          const SizedBox(height: 24),
-        ],
-      ),
-    ),
-    // Confetti floats over everything without pushing content down.
-    Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 180,
-      child: ConfettiWidget(
-        confettiController: _confetti,
-        blastDirectionality: BlastDirectionality.explosive,
-        maxBlastForce: 15,
-        minBlastForce: 3,
-        emissionFrequency: 0.04,
-        numberOfParticles: 14,
-        gravity: 0.4,
-        colors: const [
-          AppColors.gold,
-          AppColors.rafiCoral,
-          AppColors.ellieBlue,
-          AppColors.gerryAmber,
-          AppColors.zenaGreen,
-        ],
-      ),
-    ),
-  ],
-);
+        ),
+        // Confetti floats over everything without pushing content down.
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 180,
+          child: ConfettiWidget(
+            confettiController: _confetti,
+            blastDirectionality: BlastDirectionality.explosive,
+            maxBlastForce: 15,
+            minBlastForce: 3,
+            emissionFrequency: 0.04,
+            numberOfParticles: 14,
+            gravity: 0.4,
+            colors: const [
+              AppColors.gold,
+              AppColors.rafiCoral,
+              AppColors.ellieBlue,
+              AppColors.gerryAmber,
+              AppColors.zenaGreen,
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -863,10 +941,7 @@ class _CancelledBody extends StatelessWidget {
           Text(
             "We didn't get a scan in time, so your wallet hold has been "
             'released. Start a new session whenever you like.',
-            style: AppTextStyles.body(
-              context,
-              color: Colors.white70,
-            ),
+            style: AppTextStyles.body(context, color: Colors.white70),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),

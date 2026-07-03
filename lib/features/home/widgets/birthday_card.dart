@@ -54,7 +54,8 @@ class BirthdayCardList extends ConsumerWidget {
     for (final child in children) {
       final dobRaw = child['date_of_birth'] as String?;
       if (dobRaw == null) continue;
-      final dob = DateTime.parse(dobRaw);
+      final dob = DateTime.tryParse(dobRaw);
+      if (dob == null) continue;
 
       // Next birthday (this year's, or next year's if already passed today).
       var nextBday = DateTime(today.year, dob.month, dob.day);
@@ -83,8 +84,7 @@ class BirthdayCardList extends ConsumerWidget {
         if (slotDateStr != null) {
           final slotDate = DateTime.tryParse(slotDateStr);
           if (slotDate != null) {
-            daysSincePartySlot =
-                DateTime.now().difference(slotDate).inDays;
+            daysSincePartySlot = DateTime.now().difference(slotDate).inDays;
           }
         } else {
           // Fallback: if slot_date is missing, use updated_at so completed
@@ -93,8 +93,7 @@ class BirthdayCardList extends ConsumerWidget {
           if (updatedAtStr != null) {
             final updatedAt = DateTime.tryParse(updatedAtStr);
             if (updatedAt != null) {
-              daysSincePartySlot =
-                  DateTime.now().difference(updatedAt).inDays;
+              daysSincePartySlot = DateTime.now().difference(updatedAt).inDays;
             }
           }
         }
@@ -105,12 +104,14 @@ class BirthdayCardList extends ConsumerWidget {
           daysSincePartySlot: daysSincePartySlot,
         );
         if (variant != _Variant.hidden) {
-          reservationEntries.add(_CardEntry(
-            child: child,
-            reservation: activeReservation,
-            daysUntil: daysUntil,
-            variant: variant,
-          ));
+          reservationEntries.add(
+            _CardEntry(
+              child: child,
+              reservation: activeReservation,
+              daysUntil: daysUntil,
+              variant: variant,
+            ),
+          );
         }
       } else {
         unengaged.add(_UnengagedChild(child: child, daysUntil: daysUntil));
@@ -121,16 +122,13 @@ class BirthdayCardList extends ConsumerWidget {
     // state. Suppressed when every child has a reservation already.
     Widget? residualCard;
     if (children.isEmpty || unengaged.isNotEmpty) {
-      final richEligible = unengaged
-          .where((u) {
-            final state = (u.child['birthday_interest_state'] as String?) ??
-                'interested';
-            return state == 'interested' &&
-                u.daysUntil >= 0 &&
-                u.daysUntil <= thresholdDays;
-          })
-          .toList()
-        ..sort((a, b) => a.daysUntil.compareTo(b.daysUntil));
+      final richEligible = unengaged.where((u) {
+        final state =
+            (u.child['birthday_interest_state'] as String?) ?? 'interested';
+        return state == 'interested' &&
+            u.daysUntil >= 0 &&
+            u.daysUntil <= thresholdDays;
+      }).toList()..sort((a, b) => a.daysUntil.compareTo(b.daysUntil));
 
       if (richEligible.isNotEmpty) {
         final closest = richEligible.first;
@@ -166,16 +164,16 @@ class BirthdayCardList extends ConsumerWidget {
     required int daysUntil,
     required int daysSincePartySlot,
   }) {
-    if (status == 'completed' &&
-        daysSincePartySlot > _postPartyHomeDays) {
+    if (status == 'completed' && daysSincePartySlot > _postPartyHomeDays) {
       return _Variant.hidden;
     }
     return switch (status) {
       'interested' => _Variant.interestSubmitted,
       'admin_contacted' => _Variant.adminContacted,
-      'confirmed' => daysSincePartySlot > 0
-          ? _Variant.hidden
-          : (daysUntil <= 1 ? _Variant.tomorrow : _Variant.confirmed),
+      'confirmed' =>
+        daysSincePartySlot > 0
+            ? _Variant.hidden
+            : (daysUntil <= 1 ? _Variant.tomorrow : _Variant.confirmed),
       'completed' => _Variant.thanksForCelebrating,
       _ => _Variant.hidden,
     };
@@ -350,8 +348,10 @@ class _BirthdayCardTile extends StatelessWidget {
     final dateStr = r['slot_date'] as String?;
     final timeStr = r['slot_start_time'] as String?;
     if (dateStr != null && timeStr != null) {
-      final d = DateTime.parse(dateStr);
-      return '${DateFormat('EEE MMM d').format(d)} · $timeStr';
+      final d = DateTime.tryParse(dateStr);
+      if (d != null) {
+        return '${DateFormat('EEE MMM d').format(d)} · $timeStr';
+      }
     }
     final preferredMonth = r['preferred_month'] as String?;
     return preferredMonth ?? 'Date locked';
@@ -494,9 +494,9 @@ class _DiscoveryBirthdayCard extends StatelessWidget {
                 children: [
                   Text(
                     'Explore birthday packages →',
-                    style: AppTextStyles.body(context).copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: AppTextStyles.body(
+                      context,
+                    ).copyWith(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 2),
                   Text(

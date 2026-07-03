@@ -28,11 +28,11 @@ class StageTransition {
   });
 
   factory StageTransition.fromJson(Map<String, dynamic> j) => StageTransition(
-        trait: j['trait'] as String,
-        fromStage: j['from'] as String,
-        toStage: j['to'] as String,
-        cardImageUrl: j['card_image_url'] as String?,
-      );
+    trait: j['trait'] as String,
+    fromStage: j['from'] as String,
+    toStage: j['to'] as String,
+    cardImageUrl: j['card_image_url'] as String?,
+  );
 }
 
 /// Plays the trait stage-transition cinematic. Pure Flutter — no Lottie
@@ -68,6 +68,7 @@ class _StageTransitionOverlayState extends State<StageTransitionOverlay>
   int _currentIndex = 0;
   late final AnimationController _controller;
   Timer? _autoAdvanceTimer;
+  bool _completed = false;
 
   @override
   void initState() {
@@ -86,8 +87,12 @@ class _StageTransitionOverlayState extends State<StageTransitionOverlay>
   }
 
   void _advance() {
-    if (!mounted) return;
+    if (!mounted || _completed) return;
     if (_currentIndex >= widget.transitions.length - 1) {
+      // Latch + cancel the pending timer so a tap racing the 3.5s
+      // auto-advance can't fire onComplete (a maybePop) twice.
+      _completed = true;
+      _autoAdvanceTimer?.cancel();
       widget.onComplete();
       return;
     }
@@ -139,10 +144,7 @@ class _StageTransitionOverlayState extends State<StageTransitionOverlay>
                     const SizedBox(height: 4),
                     Text(
                       widget.childName,
-                      style: AppTextStyles.body(
-                        context,
-                        color: Colors.white70,
-                      ),
+                      style: AppTextStyles.body(context, color: Colors.white70),
                     ),
                     const SizedBox(height: 20),
                     Container(
@@ -183,23 +185,23 @@ class _StageTransitionOverlayState extends State<StageTransitionOverlay>
   }
 
   static String _heroName(String t) => switch (t) {
-        'rafi' => 'Rafi',
-        'ellie' => 'Ellie',
-        'gerry' => 'Gerry',
-        'zena' => 'Zena',
-        _ => '?',
-      };
+    'rafi' => 'Rafi',
+    'ellie' => 'Ellie',
+    'gerry' => 'Gerry',
+    'zena' => 'Zena',
+    _ => '?',
+  };
 
   static String _stageLabel(String s) =>
       s.isEmpty ? '?' : s[0].toUpperCase() + s.substring(1);
 
   static Color _heroColor(String t) => switch (t) {
-        'rafi' => AppColors.rafiCoral,
-        'ellie' => AppColors.ellieBlue,
-        'gerry' => AppColors.gerryAmber,
-        'zena' => AppColors.zenaGreen,
-        _ => AppColors.gold,
-      };
+    'rafi' => AppColors.rafiCoral,
+    'ellie' => AppColors.ellieBlue,
+    'gerry' => AppColors.gerryAmber,
+    'zena' => AppColors.zenaGreen,
+    _ => AppColors.gold,
+  };
 }
 
 /// Hero icon scaling-in with a pop curve. Tween-based; swap with a Lottie
@@ -227,8 +229,8 @@ class _HeroReveal extends StatelessWidget {
         final scale = t < 0.35
             ? Curves.easeOutBack.transform(t / 0.35) * 1.15
             : t < 0.55
-                ? 1.15 - 0.15 * ((t - 0.35) / 0.20)
-                : 1.0;
+            ? 1.15 - 0.15 * ((t - 0.35) / 0.20)
+            : 1.0;
         final glow = (1 - (t - 0.55).abs() * 2).clamp(0.0, 1.0);
         return Container(
           width: 200,
@@ -245,10 +247,7 @@ class _HeroReveal extends StatelessWidget {
               ),
             ],
           ),
-          child: Transform.scale(
-            scale: scale,
-            child: _revealChild(),
-          ),
+          child: Transform.scale(scale: scale, child: _revealChild()),
         );
       },
     );
@@ -275,12 +274,12 @@ class _HeroReveal extends StatelessWidget {
   Widget _iconFallback() => Icon(_heroIcon(trait), color: color, size: 92);
 
   static IconData _heroIcon(String t) => switch (t) {
-        'rafi' => PhosphorIconsFill.shieldStar,
-        'ellie' => PhosphorIconsFill.heart,
-        'gerry' => PhosphorIconsFill.magnifyingGlass,
-        'zena' => PhosphorIconsFill.palette,
-        _ => PhosphorIconsFill.circle,
-      };
+    'rafi' => PhosphorIconsFill.shieldStar,
+    'ellie' => PhosphorIconsFill.heart,
+    'gerry' => PhosphorIconsFill.magnifyingGlass,
+    'zena' => PhosphorIconsFill.palette,
+    _ => PhosphorIconsFill.circle,
+  };
 }
 
 /// Minimal particle-confetti. ≤24 particles per spec — keeps low-end
@@ -324,9 +323,7 @@ class _ConfettiState extends State<_Confetti> {
         builder: (_, __) {
           return Stack(
             alignment: Alignment.center,
-            children: [
-              for (final p in _particles) _renderParticle(p),
-            ],
+            children: [for (final p in _particles) _renderParticle(p)],
           );
         },
       ),

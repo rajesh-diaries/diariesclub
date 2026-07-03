@@ -42,11 +42,7 @@ class ReferralEntryCard extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            const Icon(
-              PhosphorIconsFill.gift,
-              color: AppColors.gold,
-              size: 28,
-            ),
+            const Icon(PhosphorIconsFill.gift, color: AppColors.gold, size: 28),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -54,7 +50,10 @@ class ReferralEntryCard extends ConsumerWidget {
                 children: [
                   Text(
                     'Have a referral code?',
-                    style: AppTextStyles.cardTitle(context, color: Colors.white),
+                    style: AppTextStyles.cardTitle(
+                      context,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -118,16 +117,24 @@ class _ReferralEntryDialogState extends ConsumerState<_ReferralEntryDialog> {
       _error = null;
     });
     try {
-      await Supabase.instance.client
-          .rpc<dynamic>('referral_attach', params: {'p_code': code});
+      await Supabase.instance.client.rpc<dynamic>(
+        'referral_attach',
+        params: {'p_code': code},
+      );
       widget.parentRef.invalidate(currentFamilyProvider);
       widget.parentRef.invalidate(referralRedeemEligibleProvider);
       if (!mounted) return;
+      // Read the credit from venue_config so the snackbar matches the card
+      // headline instead of a stale hardcoded ₹100.
+      final cfg = ref.read(venueConfigProvider).valueOrNull ?? const {};
+      final creditLabel = Money.fromPaise(
+        (cfg['referral_new_family_credit_paise'] as int?) ?? 10000,
+      );
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Code applied. Both wallets get ₹100 after your first visit.',
+            'Code applied. Both wallets get $creditLabel after your first visit.',
           ),
         ),
       );
@@ -189,8 +196,7 @@ class _ReferralEntryDialogState extends ConsumerState<_ReferralEntryDialog> {
       ),
       actions: [
         TextButton(
-          onPressed:
-              _busy ? null : () => Navigator.of(context).pop(),
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         FilledButton(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -80,11 +81,14 @@ class _PromoCard extends StatelessWidget {
                 children: [
                   Text(
                     'Play Passes',
-                    style: AppTextStyles.cardTitle(context, color: Colors.white),
+                    style: AppTextStyles.cardTitle(
+                      context,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Save up to ₹200 per visit. Buy 5, 10 or 15 passes.',
+                    'Buy session credits upfront and save on every visit.',
                     style: AppTextStyles.cardSubtitle(
                       context,
                       color: Colors.white.withValues(alpha: 0.85),
@@ -112,47 +116,51 @@ class _ActivePassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(kHomeCardPadding),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFDF8EE),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
-        borderRadius: BorderRadius.circular(kHomeCardRadius),
-        boxShadow: [kHomeCardShadow(context)],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.gold.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      onTap: () => context.push('/session/start'),
+      borderRadius: BorderRadius.circular(kHomeCardRadius),
+      child: Container(
+        padding: const EdgeInsets.all(kHomeCardPadding),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFDF8EE),
+          border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
+          borderRadius: BorderRadius.circular(kHomeCardRadius),
+          boxShadow: [kHomeCardShadow(context)],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                PhosphorIconsFill.ticket,
+                color: AppColors.gold,
+                size: 24,
+              ),
             ),
-            child: const Icon(
-              PhosphorIconsFill.ticket,
-              color: AppColors.gold,
-              size: 24,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$remaining Play Pass${remaining == 1 ? '' : 'es'}',
+                    style: AppTextStyles.cardTitle(context),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _validityLabel(passes),
+                    style: AppTextStyles.cardSubtitle(context),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$remaining Play Pass${remaining == 1 ? '' : 'es'}',
-                  style: AppTextStyles.cardTitle(context),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _validityLabel(passes),
-                  style: AppTextStyles.cardSubtitle(context),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
