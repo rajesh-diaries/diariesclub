@@ -55,12 +55,72 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   String? _couponBackendCode; // actual code sent to RPC (e.g. "2KIDS")
   String? _couponError;
 
+  // First-session welcome treatment (mutually exclusive):
+  //   {'type':'discount','code':'WELCOME100', ...}  → auto-apply ₹100 off
+  //   {'type':'referral','credit_paise':...}         → "friend gifted you ₹100"
+  //   {'type':'none'} / null                         → nothing
+  // Resolved server-side by welcome_offer_for_session.
+  Map<String, dynamic>? _welcomeOffer;
+  bool _welcomeAutoApplyDone = false;
+
   late Future<List<Map<String, dynamic>>> _childrenFuture;
 
   @override
   void initState() {
     super.initState();
     _childrenFuture = _loadChildren();
+    _loadWelcomeOffer();
+  }
+
+  /// Ask the backend which first-session welcome treatment this family gets.
+  Future<void> _loadWelcomeOffer() async {
+    final familyId = ref.read(currentFamilyIdProvider);
+    if (familyId == null) return;
+    try {
+      final res = await Supabase.instance.client.rpc<Map<String, dynamic>>(
+        'welcome_offer_for_session',
+        params: {'p_family_id': familyId, 'p_venue_id': _venueId},
+      );
+      if (!mounted) return;
+      setState(() => _welcomeOffer = res);
+      // If a duration is already chosen, apply straight away.
+      _maybeAutoApplyWelcome();
+    } catch (e) {
+      debugPrint('[WELCOME_OFFER] error: $e');
+    }
+  }
+
+  /// Auto-applies WELCOME100 once, for a non-referred first-timer, as soon as a
+  /// duration is picked and no other coupon is in play. Runs at most once so a
+  /// cleared or overridden (e.g. sibling) coupon is never silently re-added.
+  Future<void> _maybeAutoApplyWelcome() async {
+    if (_welcomeAutoApplyDone) return;
+    if (_welcomeOffer?['type'] != 'discount') return;
+    if (_couponBackendCode != null) return;
+    if (_selectedDurationMinutes == null) return;
+
+    _welcomeAutoApplyDone = true;
+    final code = (_welcomeOffer?['code'] as String?) ?? 'WELCOME100';
+    final cfg = ref.read(venueConfigProvider).valueOrNull;
+    final amount = _priceFor(_selectedDurationMinutes, cfg);
+    try {
+      final res = await Supabase.instance.client.rpc<Map<String, dynamic>>(
+        'coupon_validate',
+        params: {'p_code': code, 'p_amount_paise': amount},
+      );
+      if (!mounted) return;
+      if (res['valid'] == true && _couponBackendCode == null) {
+        final returnedCode = (res['code'] as String?) ?? code;
+        setState(() {
+          _couponDiscountPaise = res['discount_paise'] as int? ?? 0;
+          _appliedCouponCode = returnedCode;
+          _couponBackendCode = returnedCode;
+          _couponError = null;
+        });
+      }
+    } catch (e) {
+      debugPrint('[WELCOME_OFFER] auto-apply error: $e');
+    }
   }
 
   Future<List<Map<String, dynamic>>> _loadChildren() async {
@@ -573,6 +633,11 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (_welcomeOffer != null &&
+                            _welcomeOffer!['type'] != 'none') ...[
+                          _WelcomeOfferBanner(offer: _welcomeOffer!),
+                          const SizedBox(height: 20),
+                        ],
                         if (children.length > 1) ...[
                           Text(
                             'Who\'s playing?',
@@ -702,6 +767,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                       _paymentMethod = 'wallet';
                                     }
                                   });
+                                  _maybeAutoApplyWelcome();
                                 },
                               ),
                             ),
@@ -722,6 +788,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
                                       _paymentMethod = 'wallet';
                                     }
                                   });
+                                  _maybeAutoApplyWelcome();
                                 },
                               ),
                             ),
@@ -1145,7 +1212,7 @@ class _CouponSection extends StatelessWidget {
           textCapitalization: TextCapitalization.characters,
           textInputAction: TextInputAction.done,
           decoration: InputDecoration(
-            hintText: enabled ? 'e.g. WELCOME50' : 'Pick a duration first',
+            hintText: enabled ? 'e.g. WELCOME100' : 'Pick a duration first',
             border: const OutlineInputBorder(),
             isDense: true,
             errorText: error,
@@ -1271,6 +1338,86 @@ class _SiblingCouponChips extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Prominent first-session welcome banner. Two flavours:
+///   * discount  → "₹100 OFF your first play — applied!"
+///   * referral  → "A friend gifted you ₹100 — lands in your wallet after play"
+class _WelcomeOfferBanner extends StatelessWidget {
+  final Map<String, dynamic> offer;
+  const _WelcomeOfferBanner({required this.offer});
+
+  @override
+  Widget build(BuildContext context) {
+    final type = offer['type'] as String?;
+    final bool isDiscount = type == 'discount';
+
+    final int paise = isDiscount
+        ? ((offer['value_paise'] as num?)?.toInt() ?? 0)
+        : ((offer['credit_paise'] as num?)?.toInt() ?? 0);
+    if (paise <= 0) return const SizedBox.shrink();
+    final String rupees = '₹${paise ~/ 100}';
+
+    final String title = isDiscount
+        ? '$rupees OFF your first play!'
+        : 'A friend gifted you $rupees!';
+    final String subtitle = isDiscount
+        ? 'Welcome offer applied automatically at checkout.'
+        : 'It lands in your wallet right after your first play.';
+    final IconData icon =
+        isDiscount ? PhosphorIconsFill.confetti : PhosphorIconsFill.gift;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.gold,
+            AppColors.gold.withValues(alpha: 0.85),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.gold.withValues(alpha: 0.30),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.navy, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.bodyLarge(context).copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: AppTextStyles.caption(
+                    context,
+                    color: AppColors.navy.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
