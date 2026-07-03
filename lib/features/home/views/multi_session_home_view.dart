@@ -5,6 +5,7 @@ import '../../../core/providers/family_children_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../widgets/active_session_card.dart';
 import '../widgets/announcements_feed.dart';
+import '../widgets/healthy_bite_reminder_banner.dart';
 import '../widgets/home_banner_carousel.dart';
 import '../widgets/birthday_card.dart';
 import '../widgets/home_combos_strip.dart';
@@ -48,6 +49,15 @@ class MultiSessionHomeView extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ActiveSessionsCard(sessions: sessions),
+          // Complimentary Healthy Bite nudge — one per actively-playing
+          // session, shown only in its last 10 minutes. Each banner
+          // self-hides when not eligible, once staff hands the bite over
+          // (Realtime clears healthy_bite_claimed_at), or when dismissed.
+          // Filtered to active/grace so a pending (unscanned) session that
+          // is nearing its pre-scan expiry never triggers a false nudge.
+          ...sessions
+              .where((s) => s['status'] == 'active' || s['status'] == 'grace')
+              .map((s) => HealthyBiteReminderBanner(session: s)),
           // In-flight kitchen status — mirrors what the staff app sees,
           // so the parent watches their cappuccino move placed →
           // preparing → ready in real time. Hidden when nothing is in
