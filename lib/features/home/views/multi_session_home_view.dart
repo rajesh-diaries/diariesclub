@@ -41,6 +41,27 @@ class MultiSessionHomeView extends ConsumerWidget {
     // (the start screen handles guests / new-child flow).
     final showStartCta = children.isEmpty || hasIdleChildren;
 
+    // At most ONE Healthy Bite nudge on Home, even with several sessions
+    // closing: pick the actively-playing session closest to ending that
+    // staff hasn't handed the bite over for. The banner itself only appears
+    // inside the last 10 minutes and self-hides on claim (Realtime) /
+    // dismiss / session end.
+    final hbCandidates = sessions
+        .where((s) =>
+            (s['status'] == 'active' || s['status'] == 'grace') &&
+            s['healthy_bite_claimed_at'] == null &&
+            s['expires_at'] != null)
+        .toList()
+      ..sort((a, b) {
+        final ae = DateTime.tryParse(a['expires_at'] as String? ?? '');
+        final be = DateTime.tryParse(b['expires_at'] as String? ?? '');
+        if (ae == null) return 1;
+        if (be == null) return -1;
+        return ae.compareTo(be);
+      });
+    final Map<String, dynamic>? primaryHealthyBiteSession =
+        hbCandidates.isEmpty ? null : hbCandidates.first;
+
     // Greeting now lives in [HomeAppBar]. Start with the immersive
     // ActiveSessionsCard so the parent sees the timer first.
     return SingleChildScrollView(
@@ -49,15 +70,11 @@ class MultiSessionHomeView extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ActiveSessionsCard(sessions: sessions),
-          // Complimentary Healthy Bite nudge — one per actively-playing
-          // session, shown only in its last 10 minutes. Each banner
-          // self-hides when not eligible, once staff hands the bite over
-          // (Realtime clears healthy_bite_claimed_at), or when dismissed.
-          // Filtered to active/grace so a pending (unscanned) session that
-          // is nearing its pre-scan expiry never triggers a false nudge.
-          ...sessions
-              .where((s) => s['status'] == 'active' || s['status'] == 'grace')
-              .map((s) => HealthyBiteReminderBanner(session: s)),
+          // Single complimentary Healthy Bite nudge (see primary session
+          // selection above) — shown only inside the last 10 minutes and
+          // self-hiding on claim (Realtime) / dismiss / session end.
+          if (primaryHealthyBiteSession != null)
+            HealthyBiteReminderBanner(session: primaryHealthyBiteSession),
           // In-flight kitchen status — mirrors what the staff app sees,
           // so the parent watches their cappuccino move placed →
           // preparing → ready in real time. Hidden when nothing is in
