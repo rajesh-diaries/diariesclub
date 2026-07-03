@@ -218,7 +218,9 @@ class _Entry {
   }
 
   /// Short label shown INSIDE the ring (the headline number).
-  /// Format: mm:ss (or +mm:ss in grace).
+  /// Format: MMM:ss using total minutes, so a 2-hour session starts at
+  /// 120:00 instead of looking like 59:23 (which made parents think the
+  /// 2-hour booking was only 1 hour).
   String ringLabel() {
     if (isPending) return '—';
     final end = expiresAt;
@@ -227,12 +229,14 @@ class _Entry {
     final diff = end.difference(now);
     if (isGrace) {
       final over = diff.abs();
-      final mm = over.inMinutes.remainder(60).toString().padLeft(2, '0');
-      final ss = over.inSeconds.remainder(60).toString().padLeft(2, '0');
+      final totalSeconds = over.inSeconds;
+      final mm = (totalSeconds ~/ 60).toString();
+      final ss = (totalSeconds % 60).toString().padLeft(2, '0');
       return '+$mm:$ss';
     }
-    final mm = diff.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final ss = diff.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final totalSeconds = diff.inSeconds;
+    final mm = (totalSeconds ~/ 60).toString();
+    final ss = (totalSeconds % 60).toString().padLeft(2, '0');
     return '$mm:$ss';
   }
 

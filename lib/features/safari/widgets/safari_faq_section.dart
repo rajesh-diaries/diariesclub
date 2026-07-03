@@ -13,24 +13,28 @@ class SafariFaqSection extends StatefulWidget {
 }
 
 class _SafariFaqSectionState extends State<SafariFaqSection> {
-  final List<bool> _expanded = [false, false, false, false];
+  final List<bool> _expanded = [false, false, false, false, false];
 
   final List<Map<String, String>> _faqs = const [
     {
-      'q': 'When will Safari Club open?',
-      'a': 'We are preparing the space and will share the launch timeline with waitlisted families first. Add your name to get early access.',
+      'q': 'Is this a school or Montessori program?',
+      'a': 'No. Safari Club is a play-based morning club using The Safari Method. We focus on character traits and life skills, not academics.',
     },
     {
-      'q': 'What age is Safari Club for?',
-      'a': 'Safari Club is open to children aged 2 to 5 years. Activities are adapted to each age group so every child stays engaged.',
+      'q': 'How is this different from activity classes?',
+      'a': 'Most activity classes teach one skill. Safari Club uses play to build the four traits that help in every part of life.',
     },
     {
-      'q': 'What will a typical day look like?',
-      'a': 'A mix of guided play, creative projects, music and movement, story time, and calm reflection — all woven around our four character traits.',
+      'q': 'What should my child bring?',
+      'a': 'A water bottle is plenty. Healthy snacks or meals can be provided, or you’re welcome to send your own snack box.',
     },
     {
-      'q': 'Will there be screens or devices?',
-      'a': 'No screens. We keep the day tactile and social so children learn through doing, creating, and connecting with others.',
+      'q': 'Can we visit before enrolling?',
+      'a': 'Yes. We’ll invite interested families for a visit once enrollment opens.',
+    },
+    {
+      'q': 'When does Safari Club start?',
+      'a': 'We’re preparing to launch soon. Tap “I’m interested” to be the first to know.',
     },
   ];
 

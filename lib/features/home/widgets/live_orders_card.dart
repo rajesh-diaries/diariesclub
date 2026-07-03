@@ -8,16 +8,11 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../club/providers/active_orders_provider.dart';
 
-/// Customer-facing kitchen-status card on home. Renders one row per
-/// in-flight order with a status pill that flips in real time as the
-/// staff app advances the order through placed → preparing → ready.
+/// Customer-facing kitchen-status card on home. Shows a compact, at-a-glance
+/// view of in-flight orders: item summary + current status badge + short
+/// human status line. Tapping opens the order detail page.
 ///
-/// Sits between the session timer and the "Order food" CTA on
-/// multi-session home so the parent can glance and know exactly what's
-/// happening with their cappuccino + meal.
-///
-/// Hidden when there are no in-flight orders (no empty state — the
-/// "Order food" CTA right below already invites action).
+/// Hidden when there are no in-flight orders.
 class LiveOrdersCard extends ConsumerWidget {
   const LiveOrdersCard({super.key});
 
@@ -43,12 +38,12 @@ class LiveOrdersCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
             child: Row(
               children: [
                 const Icon(
                   PhosphorIconsFill.cookingPot,
-                  size: 20,
+                  size: 18,
                   color: AppColors.navy,
                 ),
                 const SizedBox(width: 8),
@@ -63,7 +58,7 @@ class LiveOrdersCard extends ConsumerWidget {
           ),
           for (var i = 0; i < orders.length; i++) ...[
             if (i > 0)
-              const Divider(height: 1, color: AppColors.lightBorder),
+              const Divider(height: 1, indent: 14, endIndent: 14, color: AppColors.lightBorder),
             _OrderRow(
               order: orders[i],
               items: allItems
@@ -86,12 +81,12 @@ class _OrderRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final id = order['id'] as String;
     final status = (order['status'] as String?) ?? 'pending';
-    final isServed = status == 'served';
+    final serviceType = (order['service_type'] as String?) ?? 'dine_in';
 
     return InkWell(
       onTap: () => context.push('/club/order/$id'),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
+        padding: const EdgeInsets.fromLTRB(14, 10, 12, 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -105,45 +100,31 @@ class _OrderRow extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
-                  _StatusPills(status: status),
-                  if (isServed) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.gold.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: AppColors.gold.withValues(alpha: 0.40),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      _StatusBadge(status: status),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _statusMessage(status, serviceType),
+                          style: AppTextStyles.caption(
+                            context,
+                            color: AppColors.lightTextSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Text('✨', style: AppTextStyles.caption(context)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              "Enjoy! Hope it's lovely. ❤️",
-                              style: AppTextStyles.body(context).copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.navy,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: 4),
             const Icon(
               PhosphorIconsRegular.caretRight,
+              size: 18,
               color: AppColors.lightTextSecondary,
             ),
           ],
@@ -168,122 +149,48 @@ class _OrderRow extends StatelessWidget {
     }
     return parts.join(' · ');
   }
-}
 
-/// Compact pill row: placed → preparing → ready → served. The current
-/// status is filled with colour, past states get a dimmer fill, future
-/// states are outlined. Mirrors what the kitchen sees on the staff app.
-class _StatusPills extends StatelessWidget {
-  final String status;
-  const _StatusPills({required this.status});
-
-  static const _steps = <(_OrderStep, String)>[
-    (_OrderStep.placed, 'Placed'),
-    (_OrderStep.preparing, 'Preparing'),
-    (_OrderStep.ready, 'Ready'),
-    (_OrderStep.served, 'Served'),
-  ];
-
-  _OrderStep get _currentStep => switch (status) {
-        'pending' => _OrderStep.placed,
-        'preparing' => _OrderStep.preparing,
-        'ready' => _OrderStep.ready,
-        'served' => _OrderStep.served,
-        _ => _OrderStep.placed,
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    final current = _currentStep;
-    return Row(
-      children: [
-        for (var i = 0; i < _steps.length; i++) ...[
-          _StatusPill(
-            label: _steps[i].$2,
-            state: _steps[i].$1.index < current.index
-                ? _PillState.past
-                : _steps[i].$1.index == current.index
-                    ? _PillState.current
-                    : _PillState.future,
-          ),
-          if (i < _steps.length - 1) const SizedBox(width: 6),
-        ],
-      ],
-    );
+  String _statusMessage(String status, String serviceType) {
+    final isPickup = serviceType == 'takeaway';
+    return switch (status) {
+      'preparing' => 'Preparing your order',
+      'ready' => isPickup ? 'Ready for pickup' : 'Ready to serve',
+      'served' => 'Served — enjoy!',
+      _ => 'Order received',
+    };
   }
 }
 
-enum _OrderStep { placed, preparing, ready, served }
-
-enum _PillState { past, current, future }
-
-class _StatusPill extends StatelessWidget {
-  final String label;
-  final _PillState state;
-  const _StatusPill({required this.label, required this.state});
+class _StatusBadge extends StatelessWidget {
+  final String status;
+  const _StatusBadge({required this.status});
 
   @override
   Widget build(BuildContext context) {
-    final Color fill;
-    final Color textColor;
-    final Color border;
-    final bool showDot;
+    final (label, color) = switch (status) {
+      'preparing' => ('Preparing', AppColors.gold),
+      'ready' => ('Ready', AppColors.navy),
+      'served' => ('Served', AppColors.activeGreen),
+      _ => ('Placed', AppColors.lightTextSecondary),
+    };
 
-    switch (state) {
-      case _PillState.current:
-        fill = AppColors.navy;
-        textColor = Colors.white;
-        border = AppColors.navy;
-        showDot = true;
-        break;
-      case _PillState.past:
-        fill = AppColors.activeGreen.withValues(alpha: 0.18);
-        textColor = AppColors.activeGreen;
-        border = AppColors.activeGreen.withValues(alpha: 0.40);
-        showDot = false;
-        break;
-      case _PillState.future:
-        fill = Colors.transparent;
-        textColor = AppColors.lightTextSecondary;
-        border = AppColors.lightBorder;
-        showDot = false;
-        break;
-    }
+    final bg = status == 'ready' || status == 'served'
+        ? color
+        : color.withValues(alpha: 0.12);
+    final fg = status == 'ready' || status == 'served'
+        ? Colors.white
+        : color;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: fill,
-        border: Border.all(color: border),
+        color: bg,
         borderRadius: BorderRadius.circular(100),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (state == _PillState.past)
-            const Padding(
-              padding: EdgeInsets.only(right: 4),
-              child: Icon(
-                PhosphorIconsRegular.check,
-                size: 12,
-                color: AppColors.activeGreen,
-              ),
-            ),
-          if (showDot)
-            Container(
-              width: 6,
-              height: 6,
-              margin: const EdgeInsets.only(right: 6),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-            ),
-          Text(
-            label,
-            style: AppTextStyles.pillLabel(context, color: textColor),
-          ),
-        ],
+      child: Text(
+        label,
+        style: AppTextStyles.caption(context, color: fg)
+            .copyWith(fontWeight: FontWeight.w800),
       ),
     );
   }

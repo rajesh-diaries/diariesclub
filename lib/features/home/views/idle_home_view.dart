@@ -11,6 +11,7 @@ import '../widgets/home_combos_strip.dart';
 import '../widgets/live_orders_card.dart';
 import '../widgets/my_upcoming_workshops.dart';
 import '../widgets/order_food_card.dart';
+import '../widgets/pending_reflections_section.dart';
 import '../widgets/play_pass_promo_card.dart';
 import '../widgets/referral_entry_card.dart';
 
@@ -68,6 +69,8 @@ class IdleHomeBody extends ConsumerWidget {
           padding: EdgeInsets.only(top: kHomeSectionGap),
           child: LiveOrdersCard(),
         ),
+        const SizedBox(height: kHomeSectionGap),
+        const PendingReflectionsSection(),
         if (referralEligible) ...[
           const SizedBox(height: kHomeSectionGap),
           const ReferralEntryCard(),

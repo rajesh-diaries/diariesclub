@@ -223,7 +223,13 @@ class _TopUpSheetState extends ConsumerState<TopUpSheet> {
         'family_id': family?['id'],
         'idempotency_key': _idempotencyKey,
       },
-      'theme': {'color': '#1E3A7B'},
+      'theme': {
+        'color': '#1E3A7B',
+        // Hide the Razorpay top bar (including the back / close button) on
+        // the success screen so parents can't accidentally dismiss the sheet
+        // before the auto-redirect happens.
+        'hide_topbar': true,
+      },
       // Show GPay / PhonePe / Paytm app icons that deep-link into the
       // app for one-tap pay. Requires LSApplicationQueriesSchemes in
       // Info.plist (added 2026-05-19) — without it Razorpay's iOS SDK

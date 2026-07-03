@@ -78,9 +78,9 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay> {
   /// assets/welcome_clips/. Missing heroes default to 0 (always fallback).
   static const _clipCounts = <String, int>{
     'gerry': 1,
-    'rafi': 5,
-    'zena': 4,
-    'ellie': 0,
+    'rafi': 1,
+    'zena': 1,
+    'ellie': 1,
   };
 
   @override
@@ -134,7 +134,7 @@ class _SessionWelcomeOverlayState extends State<SessionWelcomeOverlay> {
         }
         _controller = controller;
         controller.setLooping(false);
-        controller.setVolume(0);
+        controller.setVolume(1);
         await controller.play();
         setState(() => _videoReady = true);
 

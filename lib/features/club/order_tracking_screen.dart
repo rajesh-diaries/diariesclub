@@ -35,7 +35,13 @@ class OrderTrackingScreen extends ConsumerWidget {
         title: Text(invoice ?? 'Order #${orderId.substring(0, 6)}'),
         leading: IconButton(
           icon: const Icon(PhosphorIconsRegular.arrowLeft),
-          onPressed: () => context.go('/club'),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              context.go('/club');
+            }
+          },
         ),
       ),
       body: orderAsync.when(
@@ -104,11 +110,16 @@ class _Body extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _StatusHero(status: status, fulfillment: fulfillment),
+            _StatusHero(
+              status: status,
+              fulfillment: fulfillment,
+              paymentMethod: payment,
+            ),
             const SizedBox(height: 16),
             OrderStatusTimeline(
               currentStatus: status,
               fulfillmentMode: fulfillment,
+              paymentMethod: payment,
             ),
             const SizedBox(height: 24),
             if (invoice != null) ...[
@@ -267,12 +278,24 @@ class _Body extends ConsumerWidget {
 class _StatusHero extends StatelessWidget {
   final String status;
   final String fulfillment;
-  const _StatusHero({required this.status, required this.fulfillment});
+  final String paymentMethod;
+  const _StatusHero({
+    required this.status,
+    required this.fulfillment,
+    required this.paymentMethod,
+  });
 
   (String, String) _readyText() => switch (fulfillment) {
         'takeaway' => ('Ready for pickup', 'Come collect at the counter.'),
         'table_service' => ('Ready to serve', 'Heading to your table.'),
         _ => ('Ready to serve', 'Your order will be served at your table.'),
+      };
+
+  String _cancelledSubtitle() => switch (paymentMethod) {
+        'wallet' => 'Refunded to your wallet.',
+        'cash' => 'No charge.',
+        'razorpay' => 'Refund initiated to your original payment method.',
+        _ => 'Order cancelled.',
       };
 
   @override
@@ -305,7 +328,7 @@ class _StatusHero extends StatelessWidget {
         ),
       'cancelled' => (
           'Cancelled',
-          'Refunded to your wallet.',
+          _cancelledSubtitle(),
           AppColors.adminRed,
           PhosphorIconsFill.xCircle,
         ),

@@ -9,10 +9,12 @@ import '../../../core/theme/app_text_styles.dart';
 class OrderStatusTimeline extends StatelessWidget {
   final String currentStatus;
   final String fulfillmentMode;
+  final String paymentMethod;
   const OrderStatusTimeline({
     super.key,
     required this.currentStatus,
     this.fulfillmentMode = 'dine_in',
+    this.paymentMethod = 'wallet',
   });
 
   static const _steps = ['pending', 'preparing', 'ready', 'served'];
@@ -45,7 +47,7 @@ class OrderStatusTimeline extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Order cancelled. Refunded to wallet.',
+                    _cancelledSubtitle(paymentMethod),
                     style: AppTextStyles.body(
                       context,
                       color: AppColors.adminRed,
@@ -58,6 +60,13 @@ class OrderStatusTimeline extends StatelessWidget {
       ],
     );
   }
+
+  String _cancelledSubtitle(String paymentMethod) => switch (paymentMethod) {
+        'wallet' => 'Order cancelled. Refunded to wallet.',
+        'cash' => 'Order cancelled. No charge.',
+        'razorpay' => 'Order cancelled. Refund initiated to your original payment method.',
+        _ => 'Order cancelled.',
+      };
 
   String _label(String s) {
     if (s == 'ready') {

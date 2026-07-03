@@ -20,7 +20,7 @@ class SafariPhilosophyCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'What makes Safari Club different?',
+            'Why Safari Club?',
             style: AppTextStyles.bodyLarge(
               context,
               color: SafariColors.jungleGreen,
@@ -28,21 +28,21 @@ class SafariPhilosophyCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const _PhilosophyItem(
+            icon: PhosphorIconsRegular.star,
+            text:
+                'Built around four life traits — Every session grows Brave, Curious, Kind, and Creative through guided play.',
+          ),
+          const SizedBox(height: 12),
+          const _PhilosophyItem(
+            icon: PhosphorIconsRegular.users,
+            text:
+                'Real-world skills through play — Sharing, communication, routines, independence, and empathy learned naturally.',
+          ),
+          const SizedBox(height: 12),
+          const _PhilosophyItem(
             icon: PhosphorIconsRegular.heart,
             text:
-                'Whole-child growth. Social, emotional and creative skills built through play.',
-          ),
-          const SizedBox(height: 12),
-          const _PhilosophyItem(
-            icon: PhosphorIconsRegular.brain,
-            text:
-                'Guided exploration. Curiosity-led activities that build confidence and independence.',
-          ),
-          const SizedBox(height: 12),
-          const _PhilosophyItem(
-            icon: PhosphorIconsRegular.handHeart,
-            text:
-                'Hands-on learning. No screens, no worksheets — just meaningful experiences.',
+                'Outcomes you can picture — They carry these traits into every classroom, playground, and conversation.',
           ),
         ],
       ),
