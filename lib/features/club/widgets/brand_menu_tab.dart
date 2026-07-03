@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -79,11 +80,13 @@ class _BrandMenuTabState extends ConsumerState<BrandMenuTab> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               if (categories.length > 1)
-                SliverToBoxAdapter(
-                  child: _CategoryPills(
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _CategoryPillsHeader(
                     categories: categories,
                     selected: _selectedCategory,
                     onSelected: (c) => setState(() => _selectedCategory = c),
+                    background: Theme.of(context).scaffoldBackgroundColor,
                   ),
                 ),
               if (filtered.isEmpty)
@@ -207,4 +210,49 @@ class _CategoryPills extends StatelessWidget {
   }
 
   String _label(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+}
+
+/// Keeps the horizontal category pills pinned to the top of the menu list while
+/// the items scroll underneath (same behaviour as the Cafe/FIT/… tab bar above).
+class _CategoryPillsHeader extends SliverPersistentHeaderDelegate {
+  final List<String> categories;
+  final String? selected;
+  final ValueChanged<String?> onSelected;
+  final Color background;
+
+  _CategoryPillsHeader({
+    required this.categories,
+    required this.selected,
+    required this.onSelected,
+    required this.background,
+  });
+
+  // Matches the _CategoryPills SizedBox height.
+  static const double _height = 48;
+
+  @override
+  double get minExtent => _height;
+
+  @override
+  double get maxExtent => _height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    // Opaque background so list items scroll cleanly behind the pinned pills.
+    return Container(
+      color: background,
+      child: _CategoryPills(
+        categories: categories,
+        selected: selected,
+        onSelected: onSelected,
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _CategoryPillsHeader old) {
+    return selected != old.selected ||
+        background != old.background ||
+        !listEquals(categories, old.categories);
+  }
 }
