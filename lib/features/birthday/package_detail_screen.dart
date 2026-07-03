@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/family_children_provider.dart';
+import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency.dart';
@@ -414,8 +415,16 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
             // disables itself and shows a "Coming soon" subline.
             Builder(
               builder: (context) {
-                final pdfUrl = (package['pdf_url'] as String?) ?? '';
-                final hasPdf = pdfUrl.isNotEmpty;
+                final venueCfg =
+                    ref.watch(venueConfigProvider).valueOrNull ?? const {};
+                final packagePdf = (package['pdf_url'] as String?)?.trim();
+                final venueBrochure =
+                    (venueCfg['birthday_brochure_url'] as String?)?.trim();
+                final effectiveUrl =
+                    (packagePdf != null && packagePdf.isNotEmpty)
+                        ? packagePdf
+                        : (venueBrochure ?? '');
+                final hasPdf = effectiveUrl.isNotEmpty;
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: OutlinedButton.icon(
@@ -425,7 +434,7 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('Download package with menu & details'),
+                          const Text('Download celebration brochure'),
                           if (!hasPdf) ...[
                             const SizedBox(height: 2),
                             Text(
@@ -442,8 +451,9 @@ class _PackageDetailScreenState extends ConsumerState<PackageDetailScreen> {
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(48),
                     ),
-                    onPressed:
-                        hasPdf ? () => launchUrl(Uri.parse(pdfUrl)) : null,
+                    onPressed: hasPdf
+                        ? () => launchUrl(Uri.parse(effectiveUrl))
+                        : null,
                   ),
                 );
               },
@@ -626,7 +636,7 @@ class _PriceBar extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Per pax · 18% GST extra',
+            'Per pax · 5% GST extra',
             style: AppTextStyles.caption(
               context,
               color: AppColors.lightTextSecondary,
@@ -745,7 +755,7 @@ class _HowItWorks extends StatelessWidget {
     const steps = [
       ('1', 'Tell us roughly when, and how many guests.'),
       ('2',
-          'On confirmation, we collect a deposit offline (cash/UPI to our team).'),
+          'On confirmation, an advance payment of 25% is required.'),
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
