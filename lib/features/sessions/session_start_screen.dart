@@ -56,7 +56,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
   String? _couponError;
 
   // First-session welcome treatment (mutually exclusive):
-  //   {'type':'discount','code':'ELLIE', ...}  → auto-apply ₹100 off
+  //   {'type':'discount','code':'WELCOME100', ...}  → auto-apply ₹100 off
   //   {'type':'referral','credit_paise':...}         → "friend gifted you ₹100"
   //   {'type':'none'} / null                         → nothing
   // Resolved server-side by welcome_offer_for_session.
@@ -90,7 +90,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     }
   }
 
-  /// Auto-applies ELLIE (welcome coupon) once, for a non-referred first-timer, as soon as a
+  /// Auto-applies WELCOME100 once, for a non-referred first-timer, as soon as a
   /// duration is picked and no other coupon is in play. Runs at most once so a
   /// cleared or overridden (e.g. sibling) coupon is never silently re-added.
   Future<void> _maybeAutoApplyWelcome() async {
@@ -100,13 +100,17 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     if (_selectedDurationMinutes == null) return;
 
     _welcomeAutoApplyDone = true;
-    final code = (_welcomeOffer?['code'] as String?) ?? 'ELLIE';
+    final code = (_welcomeOffer?['code'] as String?) ?? 'WELCOME100';
     final cfg = ref.read(venueConfigProvider).valueOrNull;
     final amount = _priceFor(_selectedDurationMinutes, cfg);
     try {
       final res = await Supabase.instance.client.rpc<Map<String, dynamic>>(
         'coupon_validate',
-        params: {'p_code': code, 'p_amount_paise': amount},
+        params: {
+          'p_code': code,
+          'p_amount_paise': amount,
+          'p_kid_count': _selectedChildIds.length,
+        },
       );
       if (!mounted) return;
       if (res['valid'] == true && _couponBackendCode == null) {
@@ -211,7 +215,11 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     try {
       final res = await Supabase.instance.client.rpc<Map<String, dynamic>>(
         'coupon_validate',
-        params: {'p_code': code, 'p_amount_paise': amount},
+        params: {
+          'p_code': code,
+          'p_amount_paise': amount,
+          'p_kid_count': _selectedChildIds.length,
+        },
       );
       if (!mounted) return;
       if (res['valid'] == true) {
@@ -269,7 +277,11 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
     try {
       final res = await Supabase.instance.client.rpc<Map<String, dynamic>>(
         'coupon_validate',
-        params: {'p_code': code, 'p_amount_paise': amount},
+        params: {
+          'p_code': code,
+          'p_amount_paise': amount,
+          'p_kid_count': _selectedChildIds.length,
+        },
       );
       if (!mounted) return;
       if (res['valid'] == true) {
@@ -394,6 +406,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
             'p_payment_method': _paymentMethod,
             'p_idempotency_key': idem,
             'p_batch_id': batchId,
+            'p_kid_count': children.length,
             if (couponForCall != null) 'p_coupon_code': couponForCall,
           },
         );
@@ -441,6 +454,8 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         'coupon_exhausted': 'That coupon has been fully redeemed.',
         'coupon_already_used_by_family': 'You\'ve already used that coupon.',
         'coupon_min_order_not_met': 'Coupon needs a higher order amount.',
+        'coupon_requires_more_kids':
+            'That code needs more kids in the booking.',
       };
       for (final entry in couponErrors.entries) {
         if (e.message.contains(entry.key)) {
