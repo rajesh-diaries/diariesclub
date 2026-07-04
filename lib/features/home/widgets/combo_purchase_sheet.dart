@@ -130,6 +130,14 @@ class _ComboPurchaseSheetState extends ConsumerState<ComboPurchaseSheet> {
   /// Place the order straight from the sheet (food-only combos OR
   /// after a session was created for with-session combos).
   Future<void> _placeOrder({required bool withSession}) async {
+    // In-flight guard: the button's `_busy ? null` disable only takes effect
+    // after the next frame repaints, so a sub-frame double-tap can re-enter
+    // this method and fire a second order_place with a fresh idempotency key
+    // (which the server cannot dedupe) — double-charging the wallet. Read the
+    // flag directly so we bail before the repaint lands. Mirrors the guards in
+    // PlayPassPurchaseSheet._buy and TopUpSheet._initiatePayment.
+    if (_busy) return;
+
     final combo = widget.combo;
     final familyId = ref.read(currentFamilyIdProvider);
     if (familyId == null) return;

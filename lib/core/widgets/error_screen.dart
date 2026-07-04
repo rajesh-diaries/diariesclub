@@ -63,9 +63,15 @@ class FriendlyErrorScreen extends StatelessWidget {
                   await Clipboard.setData(
                     ClipboardData(text: 'Play Diaries error: $code'),
                   );
+                  // Real support line (venue_config.whatsapp_support_phone).
+                  // Hardcoded here rather than read from config because this is
+                  // the fallback surface shown when things break — config may
+                  // itself have failed to load, and the one time a customer
+                  // needs support most is exactly when we must not hand them a
+                  // dead number.
                   await launchUrl(
                     Uri.parse(
-                      'https://wa.me/919876543210?text=Diaries+Club+error:+$code',
+                      'https://wa.me/918978075757?text=Play+Diaries+error:+$code',
                     ),
                   );
                 },

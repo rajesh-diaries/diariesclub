@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers/family_children_provider.dart';
+import '../../core/providers/venue_config_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/error_screen.dart';
@@ -14,7 +15,16 @@ import '../../core/widgets/skeleton_card.dart';
 import 'providers/birthday_packages_provider.dart';
 import 'providers/reservation_providers.dart';
 
-const _supportPhone = '919876543210';
+/// Resolves the WhatsApp support number from venue_config — the birthday
+/// line first, then the generic support line. Returns null when neither is
+/// configured so callers hide the action rather than dial a dead number.
+String? _resolveSupportPhone(Map<String, dynamic>? cfg) {
+  final birthday = (cfg?['birthday_whatsapp_phone'] as String?)?.trim();
+  if (birthday != null && birthday.isNotEmpty) return birthday;
+  final generic = (cfg?['whatsapp_support_phone'] as String?)?.trim();
+  if (generic != null && generic.isNotEmpty) return generic;
+  return null;
+}
 
 /// Reservation status — Realtime stream from `reservation_by_id_provider`.
 /// Renders the status header, a summary card, the pipeline timeline, an
@@ -50,7 +60,12 @@ class ReservationStatusScreen extends ConsumerWidget {
             onSelected: (v) async {
               final reservation = async.valueOrNull;
               if (v == 'help') {
-                _openWhatsApp();
+                _openWhatsApp(
+                  context,
+                  _resolveSupportPhone(
+                    ref.read(venueConfigProvider).valueOrNull,
+                  ),
+                );
               } else if (v == 'cancel' && reservation != null) {
                 await _confirmCancel(context, reservation);
               }
@@ -169,8 +184,14 @@ class ReservationStatusScreen extends ConsumerWidget {
     }
   }
 
-  void _openWhatsApp() {
-    launchUrl(Uri.parse('https://wa.me/$_supportPhone'));
+  void _openWhatsApp(BuildContext context, String? phone) {
+    if (phone == null || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Support contact is unavailable right now.')),
+      );
+      return;
+    }
+    launchUrl(Uri.parse('https://wa.me/$phone'));
   }
 }
 
@@ -215,7 +236,11 @@ class _StatusBody extends ConsumerWidget {
             _ActionCard(reservation: reservation),
             if (reservation['status'] == 'confirmed')
               _PartyDetailsCard(reservation: reservation),
-            const _ContactCard(),
+            _ContactCard(
+              phone: _resolveSupportPhone(
+                ref.watch(venueConfigProvider).valueOrNull,
+              ),
+            ),
           ],
         ),
       ),
@@ -706,9 +731,11 @@ class _PartyDetailsCard extends StatelessWidget {
 }
 
 class _ContactCard extends StatelessWidget {
-  const _ContactCard();
+  final String? phone;
+  const _ContactCard({this.phone});
   @override
   Widget build(BuildContext context) {
+    final hasPhone = phone != null && phone!.isNotEmpty;
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       padding: const EdgeInsets.all(16),
@@ -727,11 +754,12 @@ class _ContactCard extends StatelessWidget {
               style: AppTextStyles.body(context),
             ),
           ),
-          TextButton(
-            onPressed: () =>
-                launchUrl(Uri.parse('https://wa.me/$_supportPhone')),
-            child: const Text('Open'),
-          ),
+          if (hasPhone)
+            TextButton(
+              onPressed: () =>
+                  launchUrl(Uri.parse('https://wa.me/$phone')),
+              child: const Text('Open'),
+            ),
         ],
       ),
     );
