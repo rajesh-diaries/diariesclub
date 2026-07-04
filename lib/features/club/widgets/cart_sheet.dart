@@ -179,12 +179,23 @@ class _CartSheetState extends ConsumerState<CartSheet> {
       AppHaptics.error();
       setState(() => _busy = false);
       if (e.message.contains('insufficient_balance')) {
+        // cart.totalPaise is the pre-GST food subtotal; order_place adds food
+        // GST on top, so the real debit is higher. Over-ask the top-up by the
+        // food GST so it actually clears the order (over-asking a suggestion is
+        // safe — session-inclusive combos just top up a little extra).
+        final foodGstPct =
+            (ref.read(venueConfigProvider).valueOrNull?['food_gst_percent']
+                    as num?)
+                ?.toDouble() ??
+            5.0;
+        final requiredPaise =
+            cart.totalPaise + (cart.totalPaise * foodGstPct / 100).ceil();
         showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
           builder: (_) => InsufficientBalanceSheet(
-            requiredPaise: cart.totalPaise,
+            requiredPaise: requiredPaise,
             onSwitchToCash: () {
               if (!mounted) return;
               ref.read(cartPaymentMethodProvider.notifier).state =

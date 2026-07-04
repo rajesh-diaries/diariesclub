@@ -43,9 +43,17 @@ List<Map<String, dynamic>> _resolveOptions(Map<String, dynamic>? cfg) {
 
 class _ExtendSessionSheetState extends ConsumerState<ExtendSessionSheet> {
   int _selectedMinutes = 30;
-  String _paymentMethod = 'wallet';
+  // Self-serve extends are wallet-only. Cash is a staff-collected action and
+  // the server now rejects parent-initiated cash extends (they previously
+  // granted free play time with no debit).
+  static const String _paymentMethod = 'wallet';
   bool _busy = false;
   String? _errorText;
+
+  // One idempotency key per selected duration, stable across retries so a
+  // timeout-after-commit retry dedupes instead of debiting the wallet twice.
+  // Changing the duration is a new intent and mints a new key.
+  final Map<int, String> _idemByMinutes = {};
 
   Future<void> _submit(int amountPaise) async {
     // Hard re-entrancy guard — `canPay` already disables the button
@@ -57,7 +65,8 @@ class _ExtendSessionSheetState extends ConsumerState<ExtendSessionSheet> {
       _busy = true;
       _errorText = null;
     });
-    final idem = const Uuid().v4();
+    final idem =
+        _idemByMinutes.putIfAbsent(_selectedMinutes, () => const Uuid().v4());
 
     try {
       await Supabase.instance.client.rpc<Map<String, dynamic>>(
@@ -95,7 +104,7 @@ class _ExtendSessionSheetState extends ConsumerState<ExtendSessionSheet> {
 
   String _mapError(String msg) {
     if (msg.contains('insufficient_balance')) {
-      return 'Wallet balance is too low. Try cash or top up first.';
+      return 'Wallet balance is too low. Top up to extend.';
     }
     if (msg.contains('session_not_active')) {
       return 'This session is no longer active.';
@@ -119,11 +128,8 @@ class _ExtendSessionSheetState extends ConsumerState<ExtendSessionSheet> {
       (o) => o['minutes'] == _selectedMinutes,
       orElse: () => options.first,
     );
-    final amountPaise = (selectedOption['price_paise'] as int?) ?? 0;
-    final canPay =
-        !_busy &&
-        (_paymentMethod == 'cash' ||
-            (balance != null && balance >= amountPaise));
+    final amountPaise = (selectedOption['price_paise'] as num?)?.toInt() ?? 0;
+    final canPay = !_busy && balance != null && balance >= amountPaise;
 
     return Container(
       decoration: BoxDecoration(
@@ -201,26 +207,14 @@ class _ExtendSessionSheetState extends ConsumerState<ExtendSessionSheet> {
             title:
                 'Wallet${balance != null ? ' (${Money.fromPaise(balance)})' : ''}',
             subtitle: balance != null && balance < amountPaise
-                ? 'Not enough balance'
+                ? 'Not enough balance — top up to extend'
                 : 'Pay instantly from wallet',
             leading: const Icon(
               PhosphorIconsFill.wallet,
               color: AppColors.navy,
               size: 24,
             ),
-            onChanged: (_) => setState(() => _paymentMethod = 'wallet'),
-          ),
-          SelectableCard<String>(
-            value: 'cash',
-            groupValue: _paymentMethod,
-            title: 'Cash at desk',
-            subtitle: 'Pay when you check out',
-            leading: const Icon(
-              PhosphorIconsRegular.money,
-              color: AppColors.navy,
-              size: 24,
-            ),
-            onChanged: (_) => setState(() => _paymentMethod = 'cash'),
+            onChanged: (_) {},
           ),
           if (_errorText != null) ...[
             const SizedBox(height: 8),

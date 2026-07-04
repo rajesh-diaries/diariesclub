@@ -24,7 +24,7 @@ final lowWalletBalanceProvider = Provider<bool>((ref) {
   final balance = ref.watch(walletBalancePaiseProvider);
   if (balance == null) return false;
   final cfg = ref.watch(venueConfigProvider).valueOrNull;
-  final threshold = cfg?['low_balance_threshold_paise'] as int?;
+  final threshold = (cfg?['low_balance_threshold_paise'] as num?)?.toInt();
   if (threshold == null) return false;
   return balance < threshold;
 });

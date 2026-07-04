@@ -116,7 +116,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
       if (res['valid'] == true && _couponBackendCode == null) {
         final returnedCode = (res['code'] as String?) ?? code;
         setState(() {
-          _couponDiscountPaise = res['discount_paise'] as int? ?? 0;
+          _couponDiscountPaise = (res['discount_paise'] as num?)?.toInt() ?? 0;
           _appliedCouponCode = returnedCode;
           _couponBackendCode = returnedCode;
           _couponError = null;
@@ -227,7 +227,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         AppHaptics.success();
         setState(() {
           _validatingCoupon = false;
-          _couponDiscountPaise = res['discount_paise'] as int? ?? 0;
+          _couponDiscountPaise = (res['discount_paise'] as num?)?.toInt() ?? 0;
           _appliedCouponCode = returnedCode;
           _couponBackendCode = returnedCode;
           _couponError = null;
@@ -289,7 +289,7 @@ class _SessionStartScreenState extends ConsumerState<SessionStartScreen> {
         AppHaptics.success();
         setState(() {
           _validatingCoupon = false;
-          _couponDiscountPaise = res['discount_paise'] as int? ?? 0;
+          _couponDiscountPaise = (res['discount_paise'] as num?)?.toInt() ?? 0;
           _appliedCouponCode = returnedCode;
           _couponBackendCode = returnedCode;
         });

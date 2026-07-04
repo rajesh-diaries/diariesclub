@@ -19,7 +19,8 @@ final playPassesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) asyn
   return (rows as List)
       .map((r) => Map<String, dynamic>.from(r as Map))
       .where((p) =>
-          ((p['used_passes'] as int?) ?? 0) < ((p['total_passes'] as int?) ?? 0))
+          ((p['used_passes'] as num?)?.toInt() ?? 0) <
+          ((p['total_passes'] as num?)?.toInt() ?? 0))
       .toList();
 });
 
@@ -28,8 +29,8 @@ final remainingPassesCountProvider = Provider<int>((ref) {
   final passes = ref.watch(playPassesProvider).valueOrNull ?? const [];
   var count = 0;
   for (final p in passes) {
-    final total = (p['total_passes'] as int?) ?? 0;
-    final used = (p['used_passes'] as int?) ?? 0;
+    final total = (p['total_passes'] as num?)?.toInt() ?? 0;
+    final used = (p['used_passes'] as num?)?.toInt() ?? 0;
     count += (total - used).clamp(0, total);
   }
   return count;

@@ -333,7 +333,11 @@ class _FitBuilderScreenState extends ConsumerState<FitBuilderScreen> {
             },
           ],
           'p_fulfillment_mode': 'dine_in',
-          'p_payment_method': 'wallet',
+          // Use the method the confirm sheet actually shows (it reads
+          // cartPaymentMethodProvider); hardcoding 'wallet' here charged the
+          // wallet even when the sheet said "Cash". order_place handles a cash
+          // combo-session the same as the combo sheet (session goes pending).
+          'p_payment_method': ref.read(cartPaymentMethodProvider).rpcValue,
           'p_combo_id': null,
           'p_child_id': _selectedChildId,
           'p_idempotency_key': idempotencyKey,

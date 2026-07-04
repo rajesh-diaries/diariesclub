@@ -136,7 +136,14 @@ class ComboLine extends CartLine {
     List<String> linkedFitSelectionsSummary = const [],
   }) =>
       ComboLine(
-        id: 'combo:$comboId',
+        // FIT-linked combos carry per-build selections + upcharge, so each
+        // build must be its own line (like FitMealLine's uuid id). A shared
+        // 'combo:$comboId' id would collide in changeQuantityById/removal and
+        // let two different customisations merge. Plain combos keep the stable
+        // id so they still merge by comboId.
+        id: linkedFitTemplateId != null
+            ? 'combo:$comboId:${const Uuid().v4()}'
+            : 'combo:$comboId',
         comboId: comboId,
         name: name,
         unitPricePaise: unitPricePaise,
@@ -270,11 +277,18 @@ class CartNotifier extends StateNotifier<CartState> {
     state = CartState(lines: next);
   }
 
-  /// Add or merge a combo by combo_id.
+  /// Add or merge a combo by combo_id. FIT-linked combos are NEVER merged —
+  /// each carries its own per-build selections + upcharge, so merging by
+  /// comboId would bill the first build's price for both (wrong meal, wrong
+  /// money). They append as distinct lines, exactly like [addFitMeal].
   void addCombo(ComboLine line) {
+    if (line.hasLinkedFitMeal) {
+      state = CartState(lines: [...state.lines, line]);
+      return;
+    }
     final next = [...state.lines];
     final idx = next.indexWhere(
-      (l) => l is ComboLine && l.comboId == line.comboId,
+      (l) => l is ComboLine && l.comboId == line.comboId && !l.hasLinkedFitMeal,
     );
     if (idx >= 0) {
       final existing = next[idx] as ComboLine;
