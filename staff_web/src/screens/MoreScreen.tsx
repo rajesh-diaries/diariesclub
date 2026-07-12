@@ -10,8 +10,11 @@ import {
   UsersIcon,
   ChevronRight,
   SignOutIcon,
+  VolumeIcon,
+  VolumeOffIcon,
 } from '../components/icons'
 import { useAuth } from '../state/auth'
+import { useAlerts } from '../components/Alerts'
 import {
   usePendingCounterPayments,
   usePendingHealthyBites,
@@ -20,6 +23,7 @@ import {
 export function MoreScreen() {
   const nav = useNavigate()
   const { venueLabel, signOut } = useAuth()
+  const { muted, toggleMute } = useAlerts()
   const pay = usePendingCounterPayments()
   const bites = usePendingHealthyBites()
   const payCount = pay.data?.length ?? 0
@@ -95,6 +99,22 @@ export function MoreScreen() {
             </span>
           </Card>
         ))}
+
+        <button
+          onClick={toggleMute}
+          className="mb-3 flex w-full items-center gap-4 rounded-[1.25rem] border border-line bg-surface/80 p-4 text-left active:scale-[0.99]"
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-surface-2 text-primary">
+            {muted ? <VolumeOffIcon size={24} /> : <VolumeIcon size={24} />}
+          </span>
+          <span className="flex-1">
+            <span className="block font-bold">Alert sound</span>
+            <span className="block text-sm text-dim">
+              Chime on new orders &amp; check-ins
+            </span>
+          </span>
+          <Pill tone={muted ? 'dim' : 'active'}>{muted ? 'Off' : 'On'}</Pill>
+        </button>
 
         <button
           onClick={signOut}

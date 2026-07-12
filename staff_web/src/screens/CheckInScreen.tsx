@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header, Page } from '../components/Shell'
 import { Button, Card, Pill, useToast } from '../components/ui'
@@ -8,12 +8,15 @@ import {
   CheckIcon,
   ClockIcon,
   UsersIcon,
+  WalletIcon,
   QrIcon,
   ChevronRight,
 } from '../components/icons'
 import { rpc } from '../lib/supabase'
-import { toE164, relativeFrom } from '../lib/format'
+import { toE164, relativeFrom, rupees } from '../lib/format'
 import { useAuth } from '../state/auth'
+import { useCustomerSummary } from '../hooks/useCustomerSummary'
+import { CustomerSheet } from '../components/CustomerSheet'
 
 interface Family {
   id: string
@@ -48,22 +51,29 @@ export function CheckInScreen() {
 
   const [family, setFamily] = useState<Family | null>(null)
   const [children, setChildren] = useState<Child[]>([])
-  const [summary, setSummary] = useState<{
-    visit_count?: number
-    last_visit_at?: string | null
-  } | null>(null)
+  const [profileOpen, setProfileOpen] = useState(false)
+  // Shared, cached — the CustomerSheet reuses this exact fetch when opened.
+  const summary = useCustomerSummary(family?.id).data
 
   const [childId, setChildId] = useState<string | null>(null)
   const [duration, setDuration] = useState<number | null>(null)
   const [payment, setPayment] = useState('wallet')
   const [starting, setStarting] = useState(false)
 
+  // Stable idempotency key per start intent — a retry after a timeout (or a
+  // double-tap) reuses it so the server dedupes instead of creating a SECOND
+  // session and charging twice. Regenerates only when the selection changes.
+  const idemKey = useMemo(
+    () => crypto.randomUUID(),
+    [family?.id, childId, duration, payment],
+  )
+
   const canStart = !!family && (childId !== null || children.length === 0) && !!duration
 
   function reset() {
     setFamily(null)
     setChildren([])
-    setSummary(null)
+    setProfileOpen(false)
     setChildId(null)
     setDuration(null)
     setPayment('wallet')
@@ -88,10 +98,7 @@ export function CheckInScreen() {
       setFamily(fam)
       setChildren(kids)
       setChildId(kids.length === 1 ? kids[0].id : null)
-      // Fire-and-forget richer stats.
-      rpc<any>('staff_customer_summary', { p_family_id: fam.id })
-        .then(setSummary)
-        .catch(() => {})
+      // Richer stats load via useCustomerSummary(family.id) once set above.
     } catch (err: any) {
       const msg = String(err?.message ?? '')
       setLookupError(
@@ -105,6 +112,7 @@ export function CheckInScreen() {
   }
 
   async function startSession(staff: Actor) {
+    if (starting) return
     if (!family || !duration || !venueId) return
     setStarting(true)
     try {
@@ -115,7 +123,7 @@ export function CheckInScreen() {
         p_duration_minutes: duration,
         p_payment_method: payment,
         p_staff_pin_id: staff.staffId,
-        p_idempotency_key: crypto.randomUUID(),
+        p_idempotency_key: idemKey,
       })
       const who = children.find((c) => c.id === childId)?.name ?? family.name
       toast(`Session started for ${who} 🎉`, 'ok')
@@ -136,21 +144,21 @@ export function CheckInScreen() {
     <>
       <Header subtitle="Front desk" title="Check in" />
       <Page>
-        {/* Fast path: scan the QR the parent shows after starting a session */}
+        {/* Primary action: scanning the parent's QR is the fastest check-in,
+            so it's the big hero button, not a small row. */}
         <button
           onClick={() => nav('/scan')}
-          className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-line bg-surface-2 px-4 py-3.5 text-left active:scale-[0.99]"
+          className="mb-4 flex w-full flex-col items-center gap-3 overflow-hidden rounded-[1.5rem] border border-primary/40 bg-gradient-to-b from-primary/25 to-primary/5 px-6 py-7 text-center active:scale-[0.99]"
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
-            <QrIcon size={22} />
+          <span className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-3xl bg-primary text-white shadow-[0_14px_34px_-8px_rgba(79,124,255,0.85)]">
+            <QrIcon size={42} />
           </span>
-          <span className="flex-1">
-            <span className="block font-bold">Scan QR</span>
-            <span className="block text-xs text-dim">
+          <span>
+            <span className="block text-xl font-black tracking-tight">Scan QR</span>
+            <span className="mt-1 block text-sm text-dim">
               Fastest — scan the parent's session code
             </span>
           </span>
-          <ChevronRight size={18} className="text-faint" />
         </button>
 
         <div className="mb-3 flex items-center gap-3 px-1">
@@ -228,7 +236,10 @@ export function CheckInScreen() {
         {/* Family found */}
         {family && (
           <div className="animate-rise">
-            <Card className="mb-4 border-active/30 bg-active/5 p-4">
+            <Card
+              onClick={() => setProfileOpen(true)}
+              className="mb-4 border-active/30 bg-active/5 p-4"
+            >
               <div className="flex items-center gap-3">
                 <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-active/15 text-active">
                   <CheckIcon size={24} />
@@ -237,9 +248,11 @@ export function CheckInScreen() {
                   <p className="truncate text-lg font-extrabold">{family.name}</p>
                   <p className="text-sm text-dim">{family.phone}</p>
                 </div>
+                <ChevronRight size={18} className="text-faint" />
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <MetaPill icon={<UsersIcon size={14} />}
+                <MetaPill
+                  icon={<UsersIcon size={14} />}
                   text={`${summary?.visit_count ?? 0} ${
                     (summary?.visit_count ?? 0) === 1 ? 'visit' : 'visits'
                   }`}
@@ -250,7 +263,16 @@ export function CheckInScreen() {
                     text={`Last visit ${relativeFrom(summary.last_visit_at)}`}
                   />
                 )}
+                {summary && (
+                  <MetaPill
+                    icon={<WalletIcon size={14} />}
+                    text={rupees(summary.wallet_balance_paise)}
+                  />
+                )}
               </div>
+              <p className="mt-2 text-xs font-semibold text-active/80">
+                Tap for full customer profile ›
+              </p>
             </Card>
 
             {/* Child */}
@@ -336,6 +358,10 @@ export function CheckInScreen() {
           </div>
         )}
       </Page>
+      <CustomerSheet
+        familyId={profileOpen ? (family?.id ?? null) : null}
+        onClose={() => setProfileOpen(false)}
+      />
     </>
   )
 }

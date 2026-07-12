@@ -3,9 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 import { Header, Page } from '../components/Shell'
 import { Button, Card, Spinner, useToast } from '../components/ui'
 import { useActor } from '../components/Actor'
-import { SearchIcon, SparkIcon, CheckIcon } from '../components/icons'
+import { SearchIcon, SparkIcon, CheckIcon, InfoIcon } from '../components/icons'
 import { supabase, rpc } from '../lib/supabase'
 import { toE164 } from '../lib/format'
+import { CustomerSheet } from '../components/CustomerSheet'
 
 type Tab = 'perk' | 'card'
 
@@ -113,6 +114,8 @@ function SurpriseCard() {
   const [childId, setChildId] = useState<string | null>(null)
   const [cardId, setCardId] = useState<string | null>(null)
   const [granting, setGranting] = useState(false)
+  const [familyId, setFamilyId] = useState<string | null>(null)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   const cards = useQuery({
     queryKey: ['card-defs'],
@@ -136,8 +139,10 @@ function SurpriseCard() {
     setLooking(true)
     setChildren(null)
     setChildId(null)
+    setFamilyId(null)
     try {
       const res = await rpc<any>('staff_lookup_family', { p_phone: e164 })
+      setFamilyId(res.family?.id ?? null)
       const kids: Child[] = (res.children ?? []).map((c: any) => ({
         id: c.id,
         name: c.name,
@@ -196,6 +201,15 @@ function SurpriseCard() {
           </Button>
         </div>
       </Card>
+
+      {familyId && (
+        <button
+          onClick={() => setProfileOpen(true)}
+          className="mb-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-line bg-surface-2 py-3 text-sm font-bold text-dim active:bg-line"
+        >
+          <InfoIcon size={16} /> View customer profile
+        </button>
+      )}
 
       {children && children.length > 0 && (
         <div className="animate-rise">
@@ -269,6 +283,10 @@ function SurpriseCard() {
           </Button>
         </div>
       )}
+      <CustomerSheet
+        familyId={profileOpen ? familyId : null}
+        onClose={() => setProfileOpen(false)}
+      />
     </div>
   )
 }

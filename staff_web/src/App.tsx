@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './state/auth'
 import { ToastHost, Spinner } from './components/ui'
 import { ActorProvider } from './components/Actor'
+import { AlertsProvider } from './components/Alerts'
 import { BottomNav } from './components/Shell'
 import { LoginScreen } from './screens/LoginScreen'
 import { HomeScreen } from './screens/HomeScreen'
@@ -39,24 +40,26 @@ function Gate() {
 
   return (
     <ActorProvider>
-      <div className="relative flex min-h-full flex-col">
-        <Routes>
-          <Route path="/" element={<HomeScreen />} />
-          <Route path="/checkin" element={<CheckInScreen />} />
-          <Route path="/live" element={<LiveSessionsScreen />} />
-          <Route path="/kitchen" element={<KitchenScreen />} />
-          <Route path="/bites" element={<HealthyBitesScreen />} />
-          <Route path="/pay" element={<PendingPaymentsScreen />} />
-          <Route path="/scan" element={<ScanScreen />} />
-          <Route path="/walkin" element={<WalkInScreen />} />
-          <Route path="/menu" element={<MenuScreen />} />
-          <Route path="/workshops" element={<WorkshopsScreen />} />
-          <Route path="/rewards" element={<RewardsScreen />} />
-          <Route path="/more" element={<MoreScreen />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-        <BottomNav />
-      </div>
+      <AlertsProvider>
+        <div className="relative flex min-h-full flex-col">
+          <Routes>
+            <Route path="/" element={<HomeScreen />} />
+            <Route path="/checkin" element={<CheckInScreen />} />
+            <Route path="/live" element={<LiveSessionsScreen />} />
+            <Route path="/kitchen" element={<KitchenScreen />} />
+            <Route path="/bites" element={<HealthyBitesScreen />} />
+            <Route path="/pay" element={<PendingPaymentsScreen />} />
+            <Route path="/scan" element={<ScanScreen />} />
+            <Route path="/walkin" element={<WalkInScreen />} />
+            <Route path="/menu" element={<MenuScreen />} />
+            <Route path="/workshops" element={<WorkshopsScreen />} />
+            <Route path="/rewards" element={<RewardsScreen />} />
+            <Route path="/more" element={<MoreScreen />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+          <BottomNav />
+        </div>
+      </AlertsProvider>
     </ActorProvider>
   )
 }

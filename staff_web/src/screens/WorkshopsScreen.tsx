@@ -3,9 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 import { Header, Page } from '../components/Shell'
 import { Button, Card, Empty, Pill, Spinner, useToast } from '../components/ui'
 import { useActor } from '../components/Actor'
-import { SparkIcon, ChevronRight, CheckIcon } from '../components/icons'
+import { SparkIcon, ChevronRight, CheckIcon, InfoIcon } from '../components/icons'
 import { supabase, rpc } from '../lib/supabase'
 import { useAuth } from '../state/auth'
+import { CustomerSheet } from '../components/CustomerSheet'
 
 interface Workshop {
   id: string
@@ -16,6 +17,7 @@ interface Workshop {
 }
 interface Reg {
   id: string
+  family_id?: string | null
   child_name?: string
   family_name?: string
   attended?: boolean
@@ -103,6 +105,7 @@ function Registrations({
       })
       return (data ?? []).map((r: any) => ({
         id: r.id ?? r.registration_id,
+        family_id: r.family_id ?? null,
         child_name: r.child_name ?? r.child?.name,
         family_name: r.family_name ?? r.family?.name,
         attended: r.attended ?? !!r.attended_at,
@@ -111,6 +114,7 @@ function Registrations({
     },
   })
   const [busy, setBusy] = useState<string | null>(null)
+  const [profileId, setProfileId] = useState<string | null>(null)
 
   async function mark(reg: Reg) {
     const staff = await requireActor()
@@ -147,12 +151,27 @@ function Registrations({
         ) : (
           rows.map((r) => (
             <Card key={r.id} className="mb-2 flex items-center gap-3 p-3.5">
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-bold">{r.child_name ?? 'Child'}</p>
-                {r.family_name && (
-                  <p className="truncate text-sm text-dim">{r.family_name}</p>
-                )}
-              </div>
+              {r.family_id ? (
+                <button
+                  onClick={() => setProfileId(r.family_id!)}
+                  className="min-w-0 flex-1 text-left active:opacity-70"
+                >
+                  <p className="flex items-center gap-1.5 font-bold">
+                    <span className="truncate">{r.child_name ?? 'Child'}</span>
+                    <InfoIcon size={14} className="shrink-0 text-faint" />
+                  </p>
+                  {r.family_name && (
+                    <p className="truncate text-sm text-dim">{r.family_name}</p>
+                  )}
+                </button>
+              ) : (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold">{r.child_name ?? 'Child'}</p>
+                  {r.family_name && (
+                    <p className="truncate text-sm text-dim">{r.family_name}</p>
+                  )}
+                </div>
+              )}
               {r.attended ? (
                 <Pill tone="active">
                   <CheckIcon size={14} /> Present
@@ -171,6 +190,7 @@ function Registrations({
           ))
         )}
       </Page>
+      <CustomerSheet familyId={profileId} onClose={() => setProfileId(null)} />
     </>
   )
 }

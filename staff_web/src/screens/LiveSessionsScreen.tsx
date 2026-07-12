@@ -3,21 +3,25 @@ import { Header, Page } from '../components/Shell'
 import { Button, Card, Empty, Pill, useToast } from '../components/ui'
 import { Sheet } from '../components/Sheet'
 import { useActor } from '../components/Actor'
-import { SessionsIcon, RefreshIcon, ClockIcon } from '../components/icons'
+import { SessionsIcon, RefreshIcon, ClockIcon, InfoIcon } from '../components/icons'
 import { rpc } from '../lib/supabase'
 import { clock, secondsUntil } from '../lib/format'
 import { useNow } from '../hooks/useNow'
 import {
   useActiveSessions,
+  usePendingExits,
   embedName,
   type SessionRow,
 } from '../hooks/useVenueData'
+import { CustomerSheet } from '../components/CustomerSheet'
 
 export function LiveSessionsScreen() {
   const sessions = useActiveSessions()
+  const pendingExits = usePendingExits()
   const now = useNow()
   const [extend, setExtend] = useState<SessionRow | null>(null)
   const [close, setClose] = useState<SessionRow | null>(null)
+  const [profileId, setProfileId] = useState<string | null>(null)
 
   const rows = sessions.data ?? []
   const sorted = [...rows].sort((a, b) => {
@@ -44,22 +48,30 @@ export function LiveSessionsScreen() {
       <Page>
         {sessions.isLoading ? (
           <SkeletonList />
-        ) : sorted.length === 0 ? (
+        ) : sorted.length === 0 && (pendingExits.data?.length ?? 0) === 0 ? (
           <Empty
             icon={<SessionsIcon size={48} />}
             title="No one playing right now"
             hint="Check a child in from the front desk and they'll show up here, live."
           />
         ) : (
-          sorted.map((s) => (
-            <SessionCard
-              key={s.id}
-              s={s}
-              now={now}
-              onExtend={() => setExtend(s)}
-              onClose={() => setClose(s)}
+          <>
+            {sorted.map((s) => (
+              <SessionCard
+                key={s.id}
+                s={s}
+                now={now}
+                onExtend={() => setExtend(s)}
+                onClose={() => setClose(s)}
+                onInfo={s.family_id ? () => setProfileId(s.family_id) : undefined}
+              />
+            ))}
+            <StillInsideSection
+              rows={pendingExits.data ?? []}
+              onDone={() => pendingExits.refetch()}
+              onInfo={(familyId) => setProfileId(familyId)}
             />
-          ))
+          </>
         )}
       </Page>
 
@@ -79,6 +91,7 @@ export function LiveSessionsScreen() {
           sessions.refetch()
         }}
       />
+      <CustomerSheet familyId={profileId} onClose={() => setProfileId(null)} />
     </>
   )
 }
@@ -88,16 +101,31 @@ function SessionCard({
   now,
   onExtend,
   onClose,
+  onInfo,
 }: {
   s: SessionRow
   now: number
   onExtend: () => void
   onClose: () => void
+  onInfo?: () => void
 }) {
   const grace = s.status === 'grace'
   const remaining = secondsUntil(s.expires_at, now)
   const child = embedName(s.children) || 'Guest'
   const guardian = embedName(s.families)
+  const startedAt = new Date(s.started_at).toLocaleTimeString('en-IN', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+
+  const heading = (
+    <>
+      <p className="truncate text-lg font-extrabold">{child}</p>
+      {guardian && <p className="truncate text-sm text-dim">{guardian}</p>}
+      <p className="mt-0.5 text-xs text-faint">Started {startedAt}</p>
+    </>
+  )
 
   return (
     <Card
@@ -106,20 +134,35 @@ function SessionCard({
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-lg font-extrabold">{child}</p>
-          {guardian && (
-            <p className="truncate text-sm text-dim">{guardian}</p>
-          )}
-        </div>
-        {grace ? (
-          <Pill tone="grace">Grace</Pill>
+        {onInfo ? (
+          <button onClick={onInfo} className="min-w-0 text-left active:opacity-70">
+            {heading}
+          </button>
         ) : (
-          <Pill tone="active">
-            <span className="live-dot mr-1 inline-block h-1.5 w-1.5 rounded-full bg-active" />
-            Active
-          </Pill>
+          <div className="min-w-0">{heading}</div>
         )}
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <div className="flex items-center gap-2">
+          {grace ? (
+            <Pill tone="grace">Grace</Pill>
+          ) : (
+            <Pill tone="active">
+              <span className="live-dot mr-1 inline-block h-1.5 w-1.5 rounded-full bg-active" />
+              Active
+            </Pill>
+          )}
+          {onInfo && (
+            <button
+              onClick={onInfo}
+              aria-label="Customer profile"
+              className="rounded-full border border-line bg-surface-2 p-1.5 text-dim active:bg-line"
+            >
+              <InfoIcon size={18} />
+            </button>
+          )}
+          </div>
+          <PaymentPill method={s.payment_method} />
+        </div>
       </div>
 
       {/* Countdown */}
@@ -170,16 +213,23 @@ function ExtendSheet({
   onDone: () => void
 }) {
   const toast = useToast()
+  const requireActor = useActor().requireActor
   const [busy, setBusy] = useState<number | null>(null)
 
   async function extend(mins: number) {
     if (!session) return
+    // Must identify as staff: the server rejects parent-initiated cash extends
+    // (they used to hand out free play time). staff_on_behalf + PIN is allowed.
+    const staff = await requireActor()
+    if (!staff) return
     setBusy(mins)
     try {
       await rpc('session_extend', {
         p_session_id: session.id,
         p_duration_minutes: mins,
         p_payment_method: 'cash',
+        p_initiated_by: 'staff_on_behalf',
+        p_staff_pin_id: staff.staffId,
       })
       toast(`Extended by ${mins} min`, 'ok')
       onDone()
@@ -268,6 +318,110 @@ function CloseSheet({
       </Button>
     </Sheet>
   )
+}
+
+/** The "still inside" layer: sessions the customer wrapped up (or that
+ *  auto-closed) but that staff hasn't confirmed have left the floor. */
+function StillInsideSection({
+  rows,
+  onDone,
+  onInfo,
+}: {
+  rows: SessionRow[]
+  onDone: () => void
+  onInfo: (familyId: string) => void
+}) {
+  if (rows.length === 0) return null
+  return (
+    <div className="mt-7">
+      <div className="mb-1 flex items-center gap-2">
+        <p className="text-sm font-bold text-dim">Still inside · wrapped up</p>
+        <Pill tone="gold">{rows.length}</Pill>
+      </div>
+      <p className="mb-3 text-xs text-faint">
+        Session ended but not yet off the floor. Tap “Left” once they walk out.
+      </p>
+      {rows.map((s) => (
+        <ExitCard key={s.id} s={s} onDone={onDone} onInfo={onInfo} />
+      ))}
+    </div>
+  )
+}
+
+function ExitCard({
+  s,
+  onDone,
+  onInfo,
+}: {
+  s: SessionRow
+  onDone: () => void
+  onInfo: (familyId: string) => void
+}) {
+  const toast = useToast()
+  const requireActor = useActor().requireActor
+  const [busy, setBusy] = useState(false)
+  const child = embedName(s.children) || 'Guest'
+  const guardian = embedName(s.families)
+  const startedAt = new Date(s.started_at).toLocaleTimeString('en-IN', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+
+  async function confirmExit() {
+    const staff = await requireActor()
+    if (!staff) return
+    setBusy(true)
+    try {
+      await rpc('staff_confirm_exit', {
+        p_session_id: s.id,
+        p_staff_pin_id: staff.staffId,
+      })
+      toast(`${child} marked as left`, 'ok')
+      onDone()
+    } catch {
+      toast("Couldn't confirm exit.", 'err')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card className="mb-3 flex items-center gap-3 p-4">
+      <button
+        onClick={() => s.family_id && onInfo(s.family_id)}
+        className="min-w-0 flex-1 text-left active:opacity-70"
+      >
+        <p className="truncate font-bold">{child}</p>
+        {guardian && <p className="truncate text-sm text-dim">{guardian}</p>}
+        <p className="mt-0.5 text-xs text-faint">Started {startedAt}</p>
+      </button>
+      <PaymentPill method={s.payment_method} />
+      <Button
+        variant="surface"
+        loading={busy}
+        onClick={confirmExit}
+        className="shrink-0 px-4 py-2.5 text-sm"
+      >
+        Left ✓
+      </Button>
+    </Card>
+  )
+}
+
+const PAYMENT_LABELS: Record<
+  string,
+  { label: string; tone: 'primary' | 'gold' | 'active' | 'dim' }
+> = {
+  wallet: { label: 'Wallet', tone: 'primary' },
+  cash: { label: 'Cash', tone: 'gold' },
+  play_pass: { label: 'Play Pass', tone: 'active' },
+}
+
+/** Wallet / Cash / Play Pass tag so staff see the mode at a glance. */
+function PaymentPill({ method }: { method: string | null }) {
+  const p = PAYMENT_LABELS[method ?? ''] ?? { label: method ?? '—', tone: 'dim' as const }
+  return <Pill tone={p.tone}>{p.label}</Pill>
 }
 
 function SkeletonList() {

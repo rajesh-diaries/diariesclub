@@ -12,6 +12,7 @@ export interface SessionRow {
   started_at: string
   expires_at: string
   completed_at: string | null
+  left_at: string | null
   duration_minutes: number
   payment_method: string
   healthy_bite_earned: boolean
@@ -26,6 +27,9 @@ export interface OrderItem {
   quantity: number
   brand: string | null
   notes: string | null
+  // FIT builds: {category_id: option_id} (or arrays for multi-select). Resolve
+  // the option ids to names via useFitLabels() to show the actual meal.
+  selections_jsonb?: Record<string, unknown> | null
 }
 export interface OrderRow {
   id: string
@@ -42,7 +46,7 @@ export interface OrderRow {
 
 const SESSION_COLS =
   'id, child_id, family_id, venue_id, status, started_at, expires_at, ' +
-  'completed_at, duration_minutes, payment_method, healthy_bite_earned, ' +
+  'completed_at, left_at, duration_minutes, payment_method, healthy_bite_earned, ' +
   'healthy_bite_distributed, healthy_bite_claimed_at, children(name), families(name)'
 
 /** Active + grace sessions at this venue. Polled every 15s (embedded
@@ -66,6 +70,79 @@ export function useActiveSessions() {
   })
 }
 
+/** Kids who wrapped up / auto-closed today but whom staff hasn't yet confirmed
+ *  physically left the play area (left_at IS NULL). This is the "still inside"
+ *  floor list — the layer the founder asked for so a billing-closed session
+ *  doesn't silently vanish while the family is still on the floor. */
+export function usePendingExits() {
+  const { venueId } = useAuth()
+  return useQuery({
+    queryKey: ['pending-exits', venueId],
+    enabled: !!venueId,
+    refetchInterval: 15_000,
+    queryFn: async (): Promise<SessionRow[]> => {
+      const sinceIso = new Date(Date.now() - 12 * 3600_000).toISOString()
+      const { data, error } = await supabase
+        .from('sessions')
+        .select(SESSION_COLS)
+        .eq('venue_id', venueId!)
+        .in('status', ['completed', 'auto_closed'])
+        .is('left_at', null)
+        .gte('started_at', sinceIso)
+        .order('completed_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as unknown as SessionRow[]
+    },
+  })
+}
+
+export interface ShiftSummary {
+  since: string
+  cash_paise: number
+  wallet_paise: number
+  orders: { cash_paise: number; wallet_paise: number }
+  sessions: { cash_paise: number; wallet_paise: number; play_pass_count: number }
+  extends: { cash_paise: number; wallet_paise: number }
+  sessions_today: number
+  kids_today: number
+  extended_today: number
+  inside_count: number
+  left_count: number
+}
+
+/** Today's wallet-vs-cash collection + headcounts for end-of-shift
+ *  reconciliation. Server-side aggregate via SECURITY DEFINER RPC (staff have
+ *  no direct money RLS). */
+export function useShiftSummary() {
+  const { venueId } = useAuth()
+  return useQuery({
+    queryKey: ['shift-summary', venueId],
+    enabled: !!venueId,
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<ShiftSummary> => {
+      const { data, error } = await supabase.rpc('staff_shift_summary', {})
+      if (error) throw error
+      return data as ShiftSummary
+    },
+  })
+}
+
+/** All FIT option id → {name, category order} — a small lookup so the kitchen
+ *  can turn a stored selections map into a readable build. Rarely changes, so
+ *  cached long. */
+export function useFitLabels() {
+  return useQuery({
+    queryKey: ['fit-labels'],
+    staleTime: 30 * 60_000,
+    queryFn: async (): Promise<Map<string, { name: string; order: number }>> => {
+      const { data, error } = await supabase.rpc('staff_fit_option_labels', {})
+      if (error) throw error
+      const obj = (data ?? {}) as Record<string, { name: string; order: number }>
+      return new Map(Object.entries(obj))
+    },
+  })
+}
+
 /** In-flight orders (pending/preparing/ready) at this venue, kept live via
  *  Realtime with an initial fetch for first paint. */
 export function useOrders() {
@@ -82,7 +159,7 @@ export function useOrders() {
         .select(
           'id, venue_id, family_id, status, created_at, total_paise, ' +
             'payment_method, fulfillment_mode, families(name), ' +
-            'order_items(name_snapshot, quantity, brand, notes)',
+            'order_items(name_snapshot, quantity, brand, notes, selections_jsonb)',
         )
         .eq('venue_id', venueId)
         .in('status', ['pending', 'preparing', 'ready'])
@@ -116,6 +193,8 @@ export interface PendingPayment {
   label: string
   amountPaise: number
   createdAt: string
+  /** Null for walk-in / guest rows that have no app family. */
+  familyId: string | null
 }
 
 /** Uncollected "pay at counter" (cash) sessions + café orders in the last
@@ -133,16 +212,20 @@ export function usePendingCounterPayments() {
         supabase
           .from('sessions')
           .select(
-            'id, amount_paise, duration_minutes, created_at, is_guest, guest_phone, children(name), families(name)',
+            'id, family_id, amount_paise, duration_minutes, created_at, is_guest, guest_phone, children(name), families(name)',
           )
           .eq('venue_id', venueId!)
           .eq('payment_method', 'cash')
           .is('counter_paid_at', null)
+          // Skip sessions bundled into a combo order — their value is already
+          // in the order's total (session_value_paise), so collecting the order
+          // covers the play. Without this the play amount double-counts.
+          .is('paid_via_order_id', null)
           .neq('status', 'cancelled')
           .gte('created_at', sinceIso),
         supabase
           .from('orders')
-          .select('id, total_paise, created_at, families(name)')
+          .select('id, family_id, total_paise, created_at, families(name)')
           .eq('venue_id', venueId!)
           .eq('payment_method', 'cash')
           .is('counter_paid_at', null)
@@ -161,6 +244,7 @@ export function usePendingCounterPayments() {
           label: `${s.duration_minutes}-min play`,
           amountPaise: s.amount_paise ?? 0,
           createdAt: s.created_at,
+          familyId: s.family_id ?? null,
         })
       }
       for (const o of (ord.data ?? []) as any[]) {
@@ -171,6 +255,7 @@ export function usePendingCounterPayments() {
           label: 'Café order',
           amountPaise: o.total_paise ?? 0,
           createdAt: o.created_at,
+          familyId: o.family_id ?? null,
         })
       }
       return out.sort(

@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { Header, Page } from '../components/Shell'
 import { Button, Card, Empty, Pill, useToast } from '../components/ui'
 import { useActor } from '../components/Actor'
-import { CashIcon, RefreshIcon, CheckIcon, SessionsIcon } from '../components/icons'
+import { CashIcon, RefreshIcon, CheckIcon, SessionsIcon, InfoIcon } from '../components/icons'
 import { rpc } from '../lib/supabase'
 import { rupees, relativeFrom } from '../lib/format'
 import {
   usePendingCounterPayments,
   type PendingPayment,
 } from '../hooks/useVenueData'
+import { CustomerSheet } from '../components/CustomerSheet'
 
 /** "Pay at counter" collections. The deliberate exception to the no-money
  *  rule: staff must see the amount to collect, then tap Received. */
@@ -16,6 +17,7 @@ export function PendingPaymentsScreen() {
   const pending = usePendingCounterPayments()
   const rows = pending.data ?? []
   const total = rows.reduce((s, r) => s + r.amountPaise, 0)
+  const [profileId, setProfileId] = useState<string | null>(null)
 
   return (
     <>
@@ -55,16 +57,30 @@ export function PendingPaymentsScreen() {
               </Pill>
             </Card>
             {rows.map((p) => (
-              <PaymentCard key={`${p.refType}-${p.id}`} p={p} onDone={() => pending.refetch()} />
+              <PaymentCard
+                key={`${p.refType}-${p.id}`}
+                p={p}
+                onDone={() => pending.refetch()}
+                onInfo={p.familyId ? () => setProfileId(p.familyId) : undefined}
+              />
             ))}
           </>
         )}
       </Page>
+      <CustomerSheet familyId={profileId} onClose={() => setProfileId(null)} />
     </>
   )
 }
 
-function PaymentCard({ p, onDone }: { p: PendingPayment; onDone: () => void }) {
+function PaymentCard({
+  p,
+  onDone,
+  onInfo,
+}: {
+  p: PendingPayment
+  onDone: () => void
+  onInfo?: () => void
+}) {
   const toast = useToast()
   const requireActor = useActor().requireActor
   const [busy, setBusy] = useState(false)
@@ -99,12 +115,27 @@ function PaymentCard({ p, onDone }: { p: PendingPayment; onDone: () => void }) {
         <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-surface-2 text-gold">
           {p.refType === 'session' ? <SessionsIcon size={22} /> : <CashIcon size={22} />}
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-extrabold">{p.name}</p>
-          <p className="text-sm text-dim">
-            {p.label} · {relativeFrom(p.createdAt)}
-          </p>
-        </div>
+        {onInfo ? (
+          <button
+            onClick={onInfo}
+            className="min-w-0 flex-1 text-left active:opacity-70"
+          >
+            <p className="flex items-center gap-1.5 text-lg font-extrabold">
+              <span className="truncate">{p.name}</span>
+              <InfoIcon size={15} className="shrink-0 text-faint" />
+            </p>
+            <p className="text-sm text-dim">
+              {p.label} · {relativeFrom(p.createdAt)}
+            </p>
+          </button>
+        ) : (
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-lg font-extrabold">{p.name}</p>
+            <p className="text-sm text-dim">
+              {p.label} · {relativeFrom(p.createdAt)}
+            </p>
+          </div>
+        )}
         <p className="text-xl font-black text-gold">{rupees(p.amountPaise)}</p>
       </div>
       <Button

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Header, Page } from '../components/Shell'
 import { Button, Card, Empty, Pill, useToast } from '../components/ui'
 import { useActor } from '../components/Actor'
-import { SparkIcon, RefreshIcon, CheckIcon } from '../components/icons'
+import { SparkIcon, RefreshIcon, CheckIcon, InfoIcon } from '../components/icons'
 import { rpc } from '../lib/supabase'
 import { relativeFrom } from '../lib/format'
 import {
@@ -12,6 +12,7 @@ import {
   type BiteRow,
   type BiteStatus,
 } from '../hooks/useVenueData'
+import { CustomerSheet } from '../components/CustomerSheet'
 
 /** Complimentary healthy snack — staff hand it out (or decline) per child
  *  after they've played. Distribution can surprise the child with a hero
@@ -21,6 +22,7 @@ import {
 export function HealthyBitesScreen() {
   const bites = useHealthyBites()
   const rows = bites.data ?? []
+  const [profileId, setProfileId] = useState<string | null>(null)
 
   // Actionable (to-give / still-playing) first, settled (given / skipped) below.
   const ORDER: Record<BiteStatus, number> = {
@@ -70,16 +72,30 @@ export function HealthyBitesScreen() {
               {rows.length} {rows.length === 1 ? 'child' : 'children'} today
             </p>
             {sorted.map((b) => (
-              <BiteCard key={b.id} bite={b} onDone={() => bites.refetch()} />
+              <BiteCard
+                key={b.id}
+                bite={b}
+                onDone={() => bites.refetch()}
+                onInfo={b.family_id ? () => setProfileId(b.family_id) : undefined}
+              />
             ))}
           </>
         )}
       </Page>
+      <CustomerSheet familyId={profileId} onClose={() => setProfileId(null)} />
     </>
   )
 }
 
-function BiteCard({ bite, onDone }: { bite: BiteRow; onDone: () => void }) {
+function BiteCard({
+  bite,
+  onDone,
+  onInfo,
+}: {
+  bite: BiteRow
+  onDone: () => void
+  onInfo?: () => void
+}) {
   const toast = useToast()
   const requireActor = useActor().requireActor
   const [busy, setBusy] = useState<'give' | 'skip' | null>(null)
@@ -136,12 +152,27 @@ function BiteCard({ bite, onDone }: { bite: BiteRow; onDone: () => void }) {
         >
           {status === 'given' ? <CheckIcon size={24} /> : <SparkIcon size={24} />}
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-extrabold">{child}</p>
-          <p className="text-sm text-dim">
-            Played {relativeFrom(bite.completed_at ?? bite.started_at)}
-          </p>
-        </div>
+        {onInfo ? (
+          <button
+            onClick={onInfo}
+            className="min-w-0 flex-1 text-left active:opacity-70"
+          >
+            <p className="flex items-center gap-1.5 text-lg font-extrabold">
+              <span className="truncate">{child}</span>
+              <InfoIcon size={15} className="shrink-0 text-faint" />
+            </p>
+            <p className="text-sm text-dim">
+              Played {relativeFrom(bite.completed_at ?? bite.started_at)}
+            </p>
+          </button>
+        ) : (
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-lg font-extrabold">{child}</p>
+            <p className="text-sm text-dim">
+              Played {relativeFrom(bite.completed_at ?? bite.started_at)}
+            </p>
+          </div>
+        )}
         <StatusPill status={status} />
       </div>
       {!settled && (

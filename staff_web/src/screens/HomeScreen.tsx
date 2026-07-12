@@ -4,7 +4,7 @@ import { Card, Pill } from '../components/ui'
 import {
   SessionsIcon,
   KitchenIcon,
-  UsersIcon,
+  ClockIcon,
   CheckInIcon,
   ChevronRight,
   SignOutIcon,
@@ -13,10 +13,11 @@ import {
   CashIcon,
 } from '../components/icons'
 import { useAuth } from '../state/auth'
+import { rupees } from '../lib/format'
 import {
   useActiveSessions,
   useOrders,
-  useTodayStats,
+  useShiftSummary,
   usePendingHealthyBites,
   usePendingCounterPayments,
 } from '../hooks/useVenueData'
@@ -26,7 +27,7 @@ export function HomeScreen() {
   const { venueLabel, signOut } = useAuth()
   const sessions = useActiveSessions()
   const orders = useOrders()
-  const stats = useTodayStats()
+  const summary = useShiftSummary()
   const bites = usePendingHealthyBites()
   const payments = usePendingCounterPayments()
 
@@ -54,7 +55,7 @@ export function HomeScreen() {
           <button
             onClick={() => {
               sessions.refetch()
-              stats.refetch()
+              summary.refetch()
             }}
             className="rounded-full border border-line bg-surface p-2.5 text-dim active:bg-surface-2"
             aria-label="Refresh"
@@ -95,19 +96,53 @@ export function HomeScreen() {
           )}
         </Card>
 
-        {/* Today stat tiles */}
-        <div className="mb-5 grid grid-cols-2 gap-3">
+        {/* Today stat tiles — tap to open the floor list */}
+        <div className="mb-3 grid grid-cols-2 gap-3">
           <Stat
             icon={<SessionsIcon size={20} />}
-            value={stats.data?.sessionsToday ?? '—'}
+            value={summary.data?.sessions_today ?? '—'}
             label="Sessions today"
+            onClick={() => nav('/live')}
           />
           <Stat
-            icon={<UsersIcon size={20} />}
-            value={stats.data?.kidsToday ?? '—'}
-            label="Kids today"
+            icon={<ClockIcon size={20} />}
+            value={summary.data?.extended_today ?? '—'}
+            label="Extended"
+            onClick={() => nav('/live')}
           />
         </div>
+
+        {/* Today's collection — wallet vs cash for end-of-shift reconciliation */}
+        <Card className="animate-rise mb-5 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-gold">
+              <CashIcon size={18} />
+            </span>
+            <p className="text-xs font-bold uppercase tracking-wider text-faint">
+              Today’s collection
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-surface-2 p-3">
+              <p className="text-[11px] font-semibold text-faint">Cash · drawer</p>
+              <p className="mt-0.5 text-2xl font-black text-gold">
+                {rupees(summary.data?.cash_paise ?? 0)}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-surface-2 p-3">
+              <p className="text-[11px] font-semibold text-faint">Wallet</p>
+              <p className="mt-0.5 text-2xl font-black text-primary">
+                {rupees(summary.data?.wallet_paise ?? 0)}
+              </p>
+            </div>
+          </div>
+          {(summary.data?.inside_count ?? 0) > 0 && (
+            <p className="mt-3 text-xs text-dim">
+              {summary.data?.inside_count} still inside · {summary.data?.left_count}{' '}
+              left today
+            </p>
+          )}
+        </Card>
 
         {/* Primary action */}
         <button
@@ -200,14 +235,16 @@ function Stat({
   value,
   label,
   gold,
+  onClick,
 }: {
   icon: React.ReactNode
   value: React.ReactNode
   label: string
   gold?: boolean
+  onClick?: () => void
 }) {
   return (
-    <Card className="flex flex-col gap-1.5 p-3.5">
+    <Card onClick={onClick} className="flex flex-col gap-1.5 p-3.5">
       <span className={gold ? 'text-gold' : 'text-primary'}>{icon}</span>
       <span className="text-xl font-black leading-none">{value}</span>
       <span className="text-[11px] font-semibold text-faint">{label}</span>

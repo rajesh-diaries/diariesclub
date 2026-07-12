@@ -26,6 +26,8 @@ import 'content/stage_perks_screen.dart';
 import 'content/reflection_moments_screen.dart';
 import 'customers/customer_detail_screen.dart';
 import 'customers/customers_screen.dart';
+import 'home_banners/home_banner_edit_screen.dart';
+import 'home_banners/home_banners_list_screen.dart';
 import 'live_ops/live_ops_screen.dart';
 import 'login_screen.dart';
 import 'notifications/broadcast_screen.dart';
@@ -203,6 +205,19 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             path: '/admin/announcements/:id/edit',
             builder: (_, state) =>
                 AnnouncementEditScreen(id: state.pathParameters['id']),
+          ),
+          GoRoute(
+            path: '/admin/home-banners',
+            builder: (_, __) => const HomeBannersListScreen(),
+          ),
+          GoRoute(
+            path: '/admin/home-banners/new',
+            builder: (_, __) => const HomeBannerEditScreen(),
+          ),
+          GoRoute(
+            path: '/admin/home-banners/:id/edit',
+            builder: (_, state) =>
+                HomeBannerEditScreen(bannerId: state.pathParameters['id']),
           ),
           GoRoute(
             path: '/admin/safari-waitlist',

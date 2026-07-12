@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Header, Page } from '../components/Shell'
 import { Button, Card, useToast } from '../components/ui'
@@ -33,7 +33,15 @@ export function WalkInScreen() {
 
   const canStart = !!parentName.trim() && !!kidName.trim() && consent && !!duration
 
+  // Stable idempotency key per walk-in intent so a timeout retry / double-tap
+  // dedupes instead of creating a second guest session (double cash owed).
+  const idemKey = useMemo(
+    () => crypto.randomUUID(),
+    [parentName, kidName, duration, phone],
+  )
+
   async function start() {
+    if (busy) return
     if (!venueId || !duration) return
     const e164 = toE164(phone) // null if blank/invalid — phone is optional
     const staff = await requireActor()
@@ -50,7 +58,7 @@ export function WalkInScreen() {
         p_staff_pin_id: staff.staffId,
         p_is_guest: true,
         p_guest_phone: e164,
-        p_idempotency_key: crypto.randomUUID(),
+        p_idempotency_key: idemKey,
       })
 
       // Record the walk-in's details for the books (paper form is the

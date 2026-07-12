@@ -177,3 +177,29 @@ export const BellIcon = (p: P) => (
     <path d="M10.5 19a2 2 0 0 0 3 0" />
   </I>
 )
+export const InfoIcon = (p: P) => (
+  <I {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5" />
+    <path d="M12 7.6h.01" />
+  </I>
+)
+export const TrophyIcon = (p: P) => (
+  <I {...p}>
+    <path d="M7 4h10v5a5 5 0 0 1-10 0z" />
+    <path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3" />
+    <path d="M9.5 14.5 9 18h6l-.5-3.5M8 21h8" />
+  </I>
+)
+export const VolumeIcon = (p: P) => (
+  <I {...p}>
+    <path d="M11 5 6 9H3v6h3l5 4z" />
+    <path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8 8 0 0 1 0 12" />
+  </I>
+)
+export const VolumeOffIcon = (p: P) => (
+  <I {...p}>
+    <path d="M11 5 6 9H3v6h3l5 4z" />
+    <path d="M22 9l-6 6M16 9l6 6" />
+  </I>
+)

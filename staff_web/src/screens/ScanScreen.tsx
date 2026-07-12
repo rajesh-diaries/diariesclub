@@ -159,7 +159,7 @@ export function ScanScreen() {
           </Card>
         ) : (
           <>
-            <div className="relative mx-auto aspect-square w-full max-w-sm overflow-hidden rounded-[1.5rem] border border-line bg-black">
+            <div className="relative mx-auto aspect-[4/5] w-full overflow-hidden rounded-[1.5rem] border border-line bg-black">
               <video
                 ref={videoRef}
                 className="h-full w-full object-cover"
@@ -168,7 +168,7 @@ export function ScanScreen() {
               />
               {/* Reticle */}
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <div className="h-56 w-56 rounded-3xl border-4 border-white/80 shadow-[0_0_0_2000px_rgba(0,0,0,0.45)]" />
+                <div className="h-72 w-72 max-w-[80%] rounded-3xl border-4 border-white/80 shadow-[0_0_0_2000px_rgba(0,0,0,0.45)]" />
               </div>
               {(phase === 'starting' || phase === 'validating') && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/40 text-white">

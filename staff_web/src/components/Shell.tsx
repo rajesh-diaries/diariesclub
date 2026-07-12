@@ -7,6 +7,7 @@ import {
   CheckInIcon,
   MoreIcon,
 } from './icons'
+import { useAlerts } from './Alerts'
 
 /** Page scroll area sized to sit above the bottom nav. */
 export function Page({
@@ -62,11 +63,14 @@ const rightTabs = [
 export function BottomNav() {
   const nav = useNavigate()
   const loc = useLocation()
+  const { unseenOrders, unseenSessions } = useAlerts()
+  const badgeFor = (to: string) =>
+    to === '/kitchen' ? unseenOrders : to === '/live' ? unseenSessions : 0
   return (
     <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md">
       <div className="relative mx-3 mb-1 flex items-center justify-around rounded-[1.5rem] border border-line bg-surface/90 px-2 py-2 shadow-2xl backdrop-blur-xl">
         {leftTabs.map((t) => (
-          <Tab key={t.to} {...t} />
+          <Tab key={t.to} {...t} badge={badgeFor(t.to)} />
         ))}
 
         {/* Raised primary action: the most-used flow lives dead-center. */}
@@ -82,7 +86,7 @@ export function BottomNav() {
         </button>
 
         {rightTabs.map((t) => (
-          <Tab key={t.to} {...t} />
+          <Tab key={t.to} {...t} badge={badgeFor(t.to)} />
         ))}
       </div>
     </nav>
@@ -94,11 +98,13 @@ function Tab({
   label,
   icon: Icon,
   end,
+  badge = 0,
 }: {
   to: string
   label: string
   icon: (p: { size?: number }) => ReactNode
   end: boolean
+  badge?: number
 }) {
   return (
     <NavLink
@@ -108,8 +114,13 @@ function Tab({
     >
       {({ isActive }) => (
         <>
-          <span className={isActive ? 'text-primary' : 'text-faint'}>
+          <span className={`relative ${isActive ? 'text-primary' : 'text-faint'}`}>
             <Icon size={24} />
+            {badge > 0 && (
+              <span className="absolute -right-2.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-surface bg-danger px-1 text-[10px] font-black leading-none text-white">
+                {badge > 9 ? '9+' : badge}
+              </span>
+            )}
           </span>
           <span
             className={`text-[10px] font-bold ${
